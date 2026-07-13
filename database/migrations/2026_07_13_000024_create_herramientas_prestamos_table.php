@@ -10,11 +10,9 @@ return new class extends Migration
     {
         Schema::create('herramientas_prestamos', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('empleado_id');
-            $table->foreign('empleado_id')->references('id')->on('users')->onDelete('cascade');
-            $table->unsignedBigInteger('inventario_item_id');
-            $table->foreign('inventario_item_id')->references('id')->on('inventario_items')->onDelete('cascade');
-            $table->unsignedInteger('requisicion_material_id')->nullable();
+            $table->foreignId('empleado_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('inventario_id')->constrained('inventario')->cascadeOnDelete();
+            $table->foreignId('requisicion_material_id')->nullable()->constrained('requisicion_materiales')->nullOnDelete();
             $table->integer('cantidad');
             $table->enum('condicion', ['nueva', 'buena', 'regular', 'dañada'])->default('buena');
             $table->enum('estado_asignacion', ['prestado', 'devuelto', 'perdido', 'dañado'])->default('prestado');

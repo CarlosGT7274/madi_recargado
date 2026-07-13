@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('inventario_items', function (Blueprint $table) {
+        Schema::create('inventario', function (Blueprint $table) {
             $table->id();
             $table->enum('categoria', ['herramienta', 'material', 'epp', 'equipo']);
             $table->string('codigo', 100)->nullable();
@@ -18,9 +18,7 @@ return new class extends Migration
             $table->string('unidad', 50)->nullable();
             $table->string('ubicacion', 255)->nullable();
             $table->enum('estado', ['disponible', 'prestado', 'danado', 'baja'])->default('disponible');
-            $table->json('atributos_extra')->nullable();
-            $table->unsignedBigInteger('usuario_registro_id')->nullable();
-            $table->foreign('usuario_registro_id')->references('id')->on('users')->onDelete('set null');
+            $table->foreignId('usuario_registro_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->unique(['codigo']);
         });
@@ -28,6 +26,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('inventario_items');
+        Schema::dropIfExists('inventario');
     }
 };

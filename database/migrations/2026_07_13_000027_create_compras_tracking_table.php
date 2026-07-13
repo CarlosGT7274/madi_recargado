@@ -10,12 +10,11 @@ return new class extends Migration
     {
         Schema::create('compras_tracking', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('compra_orden_id');
-            $table->foreign('compra_orden_id')->references('id')->on('compras_ordenes')->onDelete('cascade');
+            $table->foreignId('compra_orden_id')->constrained('compras_ordenes')->cascadeOnDelete();
             $table->string('estado', 100);
             $table->text('observacion')->nullable();
             $table->string('ubicacion', 255)->nullable();
-            $table->string('usuario', 255);
+            $table->foreignId('usuario_id')->constrained('users')->cascadeOnDelete();
             $table->timestamp('fecha')->useCurrent();
         });
     }
