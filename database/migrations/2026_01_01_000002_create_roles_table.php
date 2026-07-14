@@ -10,8 +10,10 @@ return new class extends Migration
     {
         Schema::create('roles', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre', 255);
-            $table->boolean('activo')->default(1);
+            $table->string('slug', 100)->unique(); // ej: "admin", "supervisor" (identificador estable, no el bitmask)
+            $table->string('nombre', 150);
+            $table->boolean('es_superadmin')->default(false); // bypass total, en vez de "permisos" = 15 en todo
+            $table->boolean('activo')->default(true);
             $table->timestamps();
         });
     }
