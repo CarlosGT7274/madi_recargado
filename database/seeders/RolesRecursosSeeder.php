@@ -4,12 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\Recurso;
 use App\Models\Role;
-use App\Support\Authorization\Permiso;
+use App\Support\Accion;
 use Illuminate\Database\Seeder;
 
 /**
- * Ejemplo de estructura de seed. Ajusta los slugs de recursos a tu catálogo real
- * (o mejor: dalos de alta desde un CRUD de "Recursos" en producción).
+ * Ejemplo de estructura de seed con jerarquía real (padre_id). Ajusta los
+ * slugs a tu catálogo real, o mejor: dalos de alta desde un CRUD de
+ * "Recursos" en producción.
  */
 class RolesRecursosSeeder extends Seeder
 {
@@ -25,22 +26,37 @@ class RolesRecursosSeeder extends Seeder
             ['nombre' => 'Supervisor', 'es_superadmin' => false, 'activo' => true]
         );
 
-        // Ejemplo de recursos; sustituye por los reales de tu sistema.
-        $recursos = [
-            ['slug' => 'usuarios', 'nombre' => 'Usuarios', 'modulo' => 'Sistema'],
-            ['slug' => 'inventario', 'nombre' => 'Inventario', 'modulo' => 'Operación'],
-        ];
+        // Nodo padre: "sistema" agrupa usuarios y roles.
+        $sistema = Recurso::firstOrCreate(
+            ['slug' => 'sistema'],
+            ['padre_id' => null, 'nombre' => 'Sistema', 'activo' => true]
+        );
 
-        foreach ($recursos as $data) {
-            $recurso = Recurso::firstOrCreate(['slug' => $data['slug']], $data);
+        $usuarios = Recurso::firstOrCreate(
+            ['slug' => 'usuarios'],
+            ['padre_id' => $sistema->id, 'nombre' => 'Usuarios', 'activo' => true]
+        );
 
-            // admin es superadmin, no necesita filas en el pivot, pero si quieres explícito:
-            $admin->recursos()->syncWithoutDetaching([$recurso->id => ['permisos' => Permiso::ALL]]);
+        $inventario = Recurso::firstOrCreate(
+            ['slug' => 'inventario'],
+            ['padre_id' => null, 'nombre' => 'Inventario', 'activo' => true]
+        );
 
-            // supervisor: solo lectura y actualización, por ejemplo
-            $supervisor->recursos()->syncWithoutDetaching([
-                $recurso->id => ['permisos' => Permiso::READ | Permiso::UPDATE],
-            ]);
-        }
+        // admin es superadmin: el bypass ya lo cubre, pero puedes ser
+        // explícito también (útil si algún día quitas el bypass).
+        $admin->otorgar($sistema, Accion::ALL);
+        $admin->otorgar($inventario, Accion::ALL);
+
+        // supervisor: acceso de solo lectura al módulo "sistema" completo
+        // (usuarios NO tiene grant propio, hereda READ de su padre "sistema").
+        $supervisor->otorgar($sistema, Accion::READ);
+
+        // inventario: supervisor sí puede leer y actualizar, explícito.
+        $supervisor->otorgar($inventario, Accion::READ | Accion::UPDATE);
+
+        // Nota: $usuarios nunca recibe un grant propio para "supervisor" a
+        // propósito — así se ve la herencia funcionando: tienePermiso()
+        // sube de "usuarios" a "sistema" y encuentra el READ ahí.
+        unset($usuarios);
     }
 }

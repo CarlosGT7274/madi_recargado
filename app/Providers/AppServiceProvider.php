@@ -52,14 +52,13 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the single dynamic authorization gate. The resource is
-     * resolved at runtime against the `permisos` table (by its `endpoint`);
-     * nothing about the resource is hardcoded here.
+     * Único Gate dinámico. El recurso se resuelve en runtime contra
+     * `recursos` (por su slug); nada hardcodeado aquí.
      */
     protected function configureAuthorization(): void
     {
-        Gate::define('permiso', function (User $user, string $endpoint, int $accion): bool {
-            return $user->tienePermiso($endpoint, $accion);
+        Gate::define('permiso', function (User $user, string $recursoSlug, int $accion): bool {
+            return $user->puede($recursoSlug, $accion);
         });
     }
 }

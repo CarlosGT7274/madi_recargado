@@ -6,25 +6,24 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Uso en rutas (números, no palabras):
+ *
+ *   Route::middleware('permiso:usuarios,' . Accion::READ)->get(...);
+ *   Route::middleware('permiso:usuarios,' . Accion::CREATE)->post(...);
+ *
+ * "usuarios" es el slug del recurso en la tabla `recursos` (dinámico,
+ * no hardcodeado en enum). Este es el ÚNICO middleware de permisos —
+ * el viejo `CheckPermiso` (que pedía 'READ'/'CREATE' como palabras) y el
+ * `VerificarPermiso` anterior (que dependía de `permisos.endpoint`) quedan
+ * eliminados.
+ */
 class VerificarPermiso
 {
-    /**
-     * Reads the current route automatically (its name, falling back to the
-     * URI path) and matches it against `permisos.endpoint`. Only the CRUD
-     * action needs to be passed explicitly:
-     *
-     *   Route::get('/compras/ordenes', ...)
-     *       ->name('compras.ordenes.index')
-     *       ->middleware('permiso:' . Accion::READ);
-     *
-     * @param  Closure(Request): (Response)  $next
-     */
-    public function handle(Request $request, Closure $next, string $accion): Response
+    public function handle(Request $request, Closure $next, string $recursoSlug, string $accion): Response
     {
-        $endpoint = $request->route()?->getName() ?? $request->path();
-
         abort_unless(
-            $request->user()?->tienePermiso($endpoint, (int) $accion) === true,
+            $request->user()?->puede($recursoSlug, (int) $accion) === true,
             403,
         );
 

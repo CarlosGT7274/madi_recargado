@@ -7,17 +7,20 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * "Recursos" son las entidades autorizables del sistema (usuarios, inventario, compras, etc.)
-     * Viven en base de datos, NO como enum en PHP. Se dan de alta desde un seeder/CRUD,
-     * no se hardcodean nombres de permisos por recurso.
+     * "Recursos" son las entidades autorizables del sistema (usuarios,
+     * inventario, compras, etc.), en árbol vía padre_id — igual que tu
+     * `permisos` original, pero con un slug estable para referenciarlos
+     * en código/rutas en vez de un endpoint de ruta.
+     *
+     * Viven en base de datos, no como enum en PHP.
      */
     public function up(): void
     {
         Schema::create('recursos', function (Blueprint $table) {
             $table->id();
-            $table->string('slug', 100)->unique(); // ej: "usuarios", "inventario", "compras"
-            $table->string('nombre', 150);          // nombre visible, editable en runtime
-            $table->string('modulo', 100)->nullable(); // agrupador opcional (para UI de administración de roles)
+            $table->foreignId('padre_id')->nullable()->constrained('recursos')->nullOnDelete();
+            $table->string('slug', 100)->unique();
+            $table->string('nombre', 150);
             $table->boolean('activo')->default(true);
             $table->timestamps();
         });

@@ -2,55 +2,66 @@
 
 namespace App\Concerns;
 
+use App\Models\Recurso;
 use App\Models\Role;
-use App\Support\Authorization\Permiso;
+use App\Support\Accion;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Se agrega al modelo User del starter kit con: `use HasBitmaskAuthorization;`
- * No reemplaza login/2FA/verificacion/sesiones de Laravel, solo añade autorizacion.
+ * No reemplaza login/2FA/verificación/sesiones de Laravel — solo añade
+ * autorización encima. El recurso se identifica por su `slug` (dinámico,
+ * en la tabla `recursos`), nunca hardcodeado en un enum.
  */
 trait HasBitmaskAuthorization
 {
-    public function role(): BelongsTo
+    /**
+     * @var array<string, Recurso|null>
+     */
+    protected array $recursosCache = [];
+
+    public function rol(): BelongsTo
     {
-        return $this->belongsTo(Role::class);
+        return $this->belongsTo(Role::class, 'rol_id');
     }
 
     /**
-     * Verdad si el usuario puede realizar $accion (Permiso::READ|CREATE|UPDATE|DELETE)
-     * sobre el recurso identificado por su slug (columna `recursos.slug`, dinamico en BD).
+     * Verdad si el usuario puede realizar $accion (Accion::READ|CREATE|UPDATE|DELETE)
+     * sobre el recurso identificado por su slug.
      */
     public function puede(string $recursoSlug, int $accion): bool
     {
-        if (! $this->role) {
+        if ($this->rol === null) {
             return false;
         }
 
-        if ($this->role->es_superadmin) {
+        if ($this->rol->es_superadmin) {
             return true;
         }
 
-        return Permiso::tiene($this->role->permisosPara($recursoSlug), $accion);
+        $recurso = $this->recursosCache[$recursoSlug]
+            ??= Recurso::where('slug', $recursoSlug)->first();
+
+        return $recurso !== null && $this->rol->tienePermiso($recurso, $accion);
     }
 
     public function puedeLeer(string $recursoSlug): bool
     {
-        return $this->puede($recursoSlug, Permiso::READ);
+        return $this->puede($recursoSlug, Accion::READ);
     }
 
     public function puedeCrear(string $recursoSlug): bool
     {
-        return $this->puede($recursoSlug, Permiso::CREATE);
+        return $this->puede($recursoSlug, Accion::CREATE);
     }
 
     public function puedeActualizar(string $recursoSlug): bool
     {
-        return $this->puede($recursoSlug, Permiso::UPDATE);
+        return $this->puede($recursoSlug, Accion::UPDATE);
     }
 
     public function puedeEliminar(string $recursoSlug): bool
     {
-        return $this->puede($recursoSlug, Permiso::DELETE);
+        return $this->puede($recursoSlug, Accion::DELETE);
     }
 }
