@@ -4,15 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\Permiso;
 use App\Models\Role;
+use App\Support\Accion;
 use Illuminate\Database\Seeder;
 
 class RolesPermisosSeeder extends Seeder
 {
     public function run(): void
     {
-        // Rol al que Fortify asigna a cualquier usuario recién registrado
-        // (ver App\Actions\Fortify\CreateNewUser). Sin grants: no puede
-        // nada hasta que un admin lo mueva a otro rol.
         Role::firstOrCreate(['nombre' => 'Sin Asignar'], ['activo' => true]);
 
         $superAdmin = Role::firstOrCreate(['nombre' => 'Super Administrador'], ['activo' => true]);
@@ -33,16 +31,20 @@ class RolesPermisosSeeder extends Seeder
             ['padre_id' => null, 'endpoint' => 'inventario.index', 'activo' => true]
         );
 
-        // 15 = READ(1) + CREATE(2) + UPDATE(4) + DELETE(8) = todo.
-        // Sin bypass: el grant explícito es lo que le da el acceso, punto.
-        $superAdmin->otorgar($sistema, 15);
-        $superAdmin->otorgar($inventario, 15);
+        // Módulo nuevo: top-level a propósito, para que aparezca en el sidebar sin
+        // necesitar todavía la jerarquía de menú (eso lo resolvemos cuando existan
+        // más módulos bajo "Sistema").
+        $roles = Permiso::firstOrCreate(
+            ['nombre' => 'Roles'],
+            ['padre_id' => null, 'endpoint' => 'roles.index', 'activo' => true]
+        );
 
-        // supervisor: solo lectura en "sistema". "usuarios" no tiene grant
-        // propio a propósito — hereda el READ de su padre subiendo por
-        // padre_id. Así se ve la jerarquía funcionando de verdad.
-        $supervisor->otorgar($sistema, 1);
-        $supervisor->otorgar($inventario, 1 | 4); // lectura + actualizar
+        $superAdmin->otorgar($sistema, Accion::READ);
+        $superAdmin->otorgar($inventario, Accion::ALL);
+        $superAdmin->otorgar($roles, Accion::ALL);
+
+        $supervisor->otorgar($sistema, Accion::READ);
+        $supervisor->otorgar($inventario, Accion::READ | Accion::UPDATE);
 
         unset($usuarios);
     }

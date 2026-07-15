@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'permisos' => $request->user()?->rol?->mapaPermisos() ?? [],
+            'menu' => $request->user()?->rol?->menuVisible() ?? collect(),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

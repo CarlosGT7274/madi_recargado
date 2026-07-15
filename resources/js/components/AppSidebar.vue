@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from '@lucide/vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { BookOpen, FolderGit2 } from '@lucide/vue';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,15 +16,21 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
+import type { MenuItem, NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+const page = usePage();
+
+// Construido 100% a partir de lo que comparte el backend (menu.php en
+// HandleInertiaRequests). Ningún módulo aquí está hardcodeado: si el rol del
+// usuario no tiene permiso de lectura sobre un endpoint, ese item no existe.
+const mainNavItems = computed<NavItem[]>(() => {
+    const menu = (page.props.menu ?? []) as MenuItem[];
+
+    return menu.map((item) => ({
+        title: item.nombre,
+        href: item.url,
+    }));
+});
 
 const footerNavItems: NavItem[] = [
     {

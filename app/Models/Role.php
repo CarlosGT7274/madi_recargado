@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use App\Support\Accion;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
 
 class Role extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'nombre',
         'activo',
@@ -18,10 +23,6 @@ class Role extends Model
         'activo' => 'boolean',
     ];
 
-    /**
-     * Mapa en memoria permiso_id => permisos (bitmask) para esta instancia
-     * de rol. Se resuelve una sola vez, no una query por cada chequeo.
-     */
     protected ?Collection $permisosMapa = null;
 
     public function usuarios(): HasMany
@@ -44,10 +45,6 @@ class Role extends Model
             ]);
     }
 
-    /**
-     * Bitmask efectivo para un permiso, subiendo por `padre_id` hasta
-     * encontrar un grant explícito. 0 si no hay ninguno en toda la rama.
-     */
     public function permisosPara(Permiso $permiso): int
     {
         $mapa = $this->permisosMapa();
@@ -70,14 +67,37 @@ class Role extends Model
     }
 
     /**
-     * permiso_id => permisos, expuesto para compartir con el frontend
-     * (Inertia) y hacer gating de UI sin ida y vuelta al servidor.
-     *
      * @return array<int, int>
      */
     public function mapaPermisos(): array
     {
         return $this->permisosMapa()->all();
+    }
+
+    /**
+     * Módulos visibles en el sidebar para este rol: solo permisos activos,
+     * con endpoint definido, con ruta registrada, y con bit READ concedido
+     * (heredado o directo).
+     *
+     * @return Collection<int, array{id:int, nombre:string, endpoint:string, padre_id:?int, url:string}>
+     */
+    public function menuVisible(): Collection
+    {
+        return Permiso::query()
+            ->where('activo', true)
+            ->whereNotNull('endpoint')
+            ->orderBy('nombre')
+            ->get()
+            ->filter(fn (Permiso $permiso): bool => Route::has($permiso->endpoint)
+                && $this->tienePermiso($permiso, Accion::READ))
+            ->map(fn (Permiso $permiso): array => [
+                'id' => $permiso->id,
+                'nombre' => $permiso->nombre,
+                'endpoint' => $permiso->endpoint,
+                'padre_id' => $permiso->padre_id,
+                'url' => route($permiso->endpoint),
+            ])
+            ->values();
     }
 
     public function otorgar(Permiso $permiso, int $permisos): void

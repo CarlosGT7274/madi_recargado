@@ -12,3 +12,11 @@ export type NavItem = {
     icon?: LucideIcon;
     isActive?: boolean;
 };
+
+export type MenuItem = {
+    id: number;
+    nombre: string;
+    endpoint: string;
+    padre_id: number | null;
+    url: string;
+};
