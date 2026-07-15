@@ -1,7 +1,7 @@
 <!-- resources/js/components/PermisoTreeRow.vue -->
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { ChevronDown, ChevronRight } from '@lucide/vue';
+import { Check, ChevronDown, ChevronRight, Minus } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { PermisoNodo } from '@/types/roles';
@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     cambiar: [permisoId: number, bit: number, activo: boolean];
     quitar: [permisoId: number];
+    modulo: [ids: number[], activo: boolean];
 }>();
 
 const abierto = ref(true);
@@ -30,9 +31,25 @@ const ACCIONES = [
     { bit: 8, label: 'Eliminar' },
 ] as const;
 
+const TODAS = 15;
+
 function tiene(bit: number) {
     return (efectivo.value & bit) === bit;
 }
+
+// Ids for this node plus every descendant, used for whole-module selection.
+function subarbolIds(nodo: PermisoNodo): number[] {
+    return [nodo.id, ...nodo.hijos.flatMap(subarbolIds)];
+}
+const idsSubarbol = computed(() => subarbolIds(props.nodo));
+
+const estadoModulo = computed<boolean | 'indeterminate'>(() => {
+    const total = idsSubarbol.value.length;
+    const completos = idsSubarbol.value.filter((id) => (props.valores[id] ?? 0) === TODAS).length;
+    if (completos === 0) return false;
+    if (completos === total) return true;
+    return 'indeterminate';
+});
 </script>
 
 <template>
@@ -47,6 +64,17 @@ function tiene(bit: number) {
                     <ChevronRight v-else class="size-4" />
                 </button>
                 <span v-else class="inline-block w-4" />
+                <Checkbox
+                    v-if="nodo.hijos.length"
+                    :model-value="estadoModulo"
+                    :aria-label="`Seleccionar todo el módulo ${nodo.nombre}`"
+                    @update:model-value="(v) => emit('modulo', idsSubarbol, v === true)"
+                >
+                    <template #default="{ state }">
+                        <Minus v-if="state === 'indeterminate'" class="size-3.5" />
+                        <Check v-else class="size-3.5" />
+                    </template>
+                </Checkbox>
                 <div>
                     <p class="text-sm font-medium">{{ nodo.nombre }}</p>
                     <p v-if="nodo.endpoint" class="text-xs text-muted-foreground">/{{ nodo.endpoint }}</p>
@@ -54,7 +82,7 @@ function tiene(bit: number) {
             </div>
 
             <div v-for="accion in ACCIONES" :key="accion.bit" class="flex justify-center">
-                <Checkbox :checked="tiene(accion.bit)" @update:checked="(v) => emit('cambiar', nodo.id, accion.bit, v === true)" />
+                <Checkbox :model-value="tiene(accion.bit)" @update:model-value="(v) => emit('cambiar', nodo.id, accion.bit, v === true)" />
             </div>
 
             <div class="flex justify-end">
@@ -72,6 +100,7 @@ function tiene(bit: number) {
                 :depth="depth + 1"
                 @cambiar="(...args) => emit('cambiar', ...args)"
                 @quitar="(id) => emit('quitar', id)"
+                @modulo="(ids, activo) => emit('modulo', ids, activo)"
             />
         </div>
     </div>
