@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ChevronRight } from '@lucide/vue';
+import { reactive, watch } from 'vue';
 import {
     Collapsible,
     CollapsibleContent,
@@ -19,8 +20,37 @@ import {
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import type { MenuItem } from '@/types';
 
-defineProps<{ items: MenuItem[] }>();
-const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
+const props = defineProps<{ items: MenuItem[] }>();
+const { isCurrentUrl, isCurrentOrParentUrl, currentUrl } = useCurrentUrl();
+
+function containsCurrentRoute(item: MenuItem): boolean {
+    if (item.url && isCurrentOrParentUrl(item.url)) {
+        return true;
+    }
+    return item.hijos.some(containsCurrentRoute);
+}
+
+const openState = reactive<Record<number, boolean>>({});
+
+function seedOpenState(items: MenuItem[]) {
+    items.forEach((item) => {
+        if (item.hijos.length) {
+            openState[item.id] = containsCurrentRoute(item);
+            seedOpenState(item.hijos);
+        }
+    });
+}
+seedOpenState(props.items);
+
+// Al navegar, si el grupo contiene la ruta activa, lo forzamos a abrir
+// (pero no lo cerramos si el usuario lo abrió manualmente en otro contexto).
+watch(currentUrl, () => {
+    props.items.forEach((item) => {
+        if (item.hijos.length && containsCurrentRoute(item)) {
+            openState[item.id] = true;
+        }
+    });
+});
 </script>
 
 <template>
@@ -31,7 +61,7 @@ const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
                 <Collapsible
                     v-if="item.hijos.length"
                     as-child
-                    :default-open="item.url ? isCurrentOrParentUrl(item.url) : false"
+                    v-model:open="openState[item.id]"
                     class="group/collapsible"
                 >
                     <SidebarMenuItem>

@@ -1,7 +1,6 @@
-<!-- resources/js/components/PermisoTreeRow.vue -->
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { ChevronDown, ChevronRight } from '@lucide/vue';
+import { Check, ChevronDown, ChevronRight, Minus } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { PermisoNodo } from '@/types/roles';
@@ -14,7 +13,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    cambiar: [permisoId: number, bit: number, activo: boolean];
+    cambiar: [ids: number[], bit: number, activo: boolean];
     quitar: [permisoId: number];
 }>();
 
@@ -33,6 +32,58 @@ const ACCIONES = [
 function tiene(bit: number) {
     return (efectivo.value & bit) === bit;
 }
+
+function idsSubarbol(nodo: PermisoNodo): number[] {
+    return [nodo.id, ...nodo.hijos.flatMap(idsSubarbol)];
+}
+const propiosIds = computed(() => idsSubarbol(props.nodo));
+
+/**
+ * Estado agregado de un bit para todo el subárbol de `nodo`, usado para
+ * reflejar en un padre lo que ocurre en sus hijos aunque el padre no
+ * tenga asignación propia explícita.
+ */
+function estadoBit(nodo: PermisoNodo, bit: number, heredadoBit: boolean): 'on' | 'off' | 'mixed' {
+    const valor = props.valores[nodo.id];
+    const propioBit = valor !== undefined ? (valor & bit) === bit : undefined;
+
+    if (nodo.hijos.length === 0) {
+        return (propioBit ?? heredadoBit) ? 'on' : 'off';
+    }
+
+    if (propioBit !== undefined) {
+        return propioBit ? 'on' : 'off';
+    }
+
+    const estados = nodo.hijos.map((hijo) => estadoBit(hijo, bit, heredadoBit));
+    if (estados.every((e) => e === 'on')) return 'on';
+    if (estados.every((e) => e === 'off')) return 'off';
+    return 'mixed';
+}
+
+function estadoColumna(bit: number): boolean | 'indeterminate' {
+    if (!props.nodo.hijos.length) {
+        return tiene(bit);
+    }
+    const heredadoBit = ((props.heredado ?? 0) & bit) === bit;
+    const estado = estadoBit(props.nodo, bit, heredadoBit);
+    return estado === 'mixed' ? 'indeterminate' : estado === 'on';
+}
+
+function alternarBit(bit: number, activo: boolean) {
+    emit('cambiar', propiosIds.value, bit, activo);
+}
+
+const estadoModulo = computed<boolean | 'indeterminate'>(() => {
+    const estados = ACCIONES.map(({ bit }) => estadoColumna(bit));
+    if (estados.every((e) => e === true)) return true;
+    if (estados.every((e) => e === false)) return false;
+    return 'indeterminate';
+});
+
+function alternarModulo(activo: boolean) {
+    ACCIONES.forEach(({ bit }) => alternarBit(bit, activo));
+}
 </script>
 
 <template>
@@ -47,6 +98,19 @@ function tiene(bit: number) {
                     <ChevronRight v-else class="size-4" />
                 </button>
                 <span v-else class="inline-block w-4" />
+
+                <Checkbox
+                    v-if="nodo.hijos.length"
+                    :checked="estadoModulo"
+                    :aria-label="`Seleccionar todo el módulo ${nodo.nombre}`"
+                    @update:checked="(v) => alternarModulo(v === true)"
+                >
+                    <template #default="{ state }">
+                        <Minus v-if="state === 'indeterminate'" class="size-3.5" />
+                        <Check v-else class="size-3.5" />
+                    </template>
+                </Checkbox>
+
                 <div>
                     <p class="text-sm font-medium">{{ nodo.nombre }}</p>
                     <p v-if="nodo.endpoint" class="text-xs text-muted-foreground">/{{ nodo.endpoint }}</p>
@@ -54,7 +118,15 @@ function tiene(bit: number) {
             </div>
 
             <div v-for="accion in ACCIONES" :key="accion.bit" class="flex justify-center">
-                <Checkbox :checked="tiene(accion.bit)" @update:checked="(v) => emit('cambiar', nodo.id, accion.bit, v === true)" />
+                <Checkbox
+                    :checked="estadoColumna(accion.bit)"
+                    @update:checked="(v) => alternarBit(accion.bit, v === true)"
+                >
+                    <template v-if="nodo.hijos.length" #default="{ state }">
+                        <Minus v-if="state === 'indeterminate'" class="size-3.5" />
+                        <Check v-else class="size-3.5" />
+                    </template>
+                </Checkbox>
             </div>
 
             <div class="flex justify-end">
@@ -70,7 +142,7 @@ function tiene(bit: number) {
                 :valores="valores"
                 :heredado="efectivo"
                 :depth="depth + 1"
-                @cambiar="(...args) => emit('cambiar', ...args)"
+                @cambiar="(ids, bit, activo) => emit('cambiar', ids, bit, activo)"
                 @quitar="(id) => emit('quitar', id)"
             />
         </div>

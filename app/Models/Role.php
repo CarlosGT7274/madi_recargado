@@ -95,10 +95,10 @@ class Role extends Model
             ->get()
             ->map(function (Permiso $permiso) {
                 $hijos = $this->construirMenu($permiso->id);
+                $url = $this->resolverUrl($permiso->endpoint);
 
-                $tieneRuta = $permiso->endpoint !== null && Route::has($permiso->endpoint);
                 $visible = $hijos->isNotEmpty()
-                    || ($tieneRuta && $this->tienePermiso($permiso, Accion::READ));
+                    || ($url !== null && $this->tienePermiso($permiso, Accion::READ));
 
                 if (! $visible) {
                     return null;
@@ -109,12 +109,31 @@ class Role extends Model
                     'nombre' => $permiso->nombre,
                     'endpoint' => $permiso->endpoint,
                     'padre_id' => $permiso->padre_id,
-                    'url' => $tieneRuta ? route($permiso->endpoint) : null,
+                    'url' => $url,
                     'hijos' => $hijos->values(),
                 ];
             })
             ->filter()
             ->values();
+    }
+
+    protected function resolverUrl(?string $endpoint): ?string
+    {
+        if ($endpoint === null) {
+            return null;
+        }
+
+        $nombreRuta = "{$endpoint}.index";
+
+        if (! Route::has($nombreRuta)) {
+            return null;
+        }
+
+        try {
+            return route($nombreRuta);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function otorgar(Permiso $permiso, int $permisos): void
