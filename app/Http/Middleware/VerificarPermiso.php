@@ -7,23 +7,24 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Uso en rutas (números, no palabras):
+ * Uso en rutas (solo la acción; el recurso se detecta solo):
  *
- *   Route::middleware('permiso:usuarios,' . Accion::READ)->get(...);
- *   Route::middleware('permiso:usuarios,' . Accion::CREATE)->post(...);
+ *   Route::middleware('permiso:' . Accion::READ)->name('usuarios.index')->get(...);
+ *   Route::middleware('permiso:' . Accion::CREATE)->name('usuarios.store')->post(...);
  *
- * "usuarios" es el slug del recurso en la tabla `recursos` (dinámico,
- * no hardcodeado en enum). Este es el ÚNICO middleware de permisos —
- * el viejo `CheckPermiso` (que pedía 'READ'/'CREATE' como palabras) y el
- * `VerificarPermiso` anterior (que dependía de `permisos.endpoint`) quedan
- * eliminados.
+ * El endpoint se toma del nombre de la ruta actual (`$request->route()->getName()`)
+ * y se busca en `permisos.endpoint` — dinámico, en base de datos, nada
+ * hardcodeado aquí. Si la ruta no tiene nombre, o ningún permiso declara
+ * ese endpoint, se deniega por defecto.
  */
 class VerificarPermiso
 {
-    public function handle(Request $request, Closure $next, string $recursoSlug, string $accion): Response
+    public function handle(Request $request, Closure $next, string $accion): Response
     {
+        $endpoint = $request->route()?->getName();
+
         abort_unless(
-            $request->user()?->puede($recursoSlug, (int) $accion) === true,
+            $endpoint !== null && $request->user()?->puedePorEndpoint($endpoint, (int) $accion) === true,
             403,
         );
 

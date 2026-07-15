@@ -2,7 +2,7 @@
 
 namespace App\Concerns;
 
-use App\Models\Recurso;
+use App\Models\Permiso;
 use App\Models\Role;
 use App\Support\Accion;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,58 +10,76 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Se agrega al modelo User del starter kit con: `use HasBitmaskAuthorization;`
  * No reemplaza login/2FA/verificación/sesiones de Laravel — solo añade
- * autorización encima. El recurso se identifica por su `slug` (dinámico,
- * en la tabla `recursos`), nunca hardcodeado en un enum.
+ * autorización encima.
+ *
+ * Dos formas de resolver el permiso, ambas contra la misma tabla `permisos`:
+ *   - por `nombre`: para chequeos manuales (Gate, @can, controladores).
+ *   - por `endpoint`: para el middleware, que detecta la ruta actual y no
+ *     requiere que la escribas a mano en cada definición de ruta.
  */
 trait HasBitmaskAuthorization
 {
     /**
-     * @var array<string, Recurso|null>
+     * @var array<string, Permiso|null>
      */
-    protected array $recursosCache = [];
+    protected array $permisosPorNombreCache = [];
+
+    /**
+     * @var array<string, Permiso|null>
+     */
+    protected array $permisosPorEndpointCache = [];
 
     public function rol(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'rol_id');
     }
 
-    /**
-     * Verdad si el usuario puede realizar $accion (Accion::READ|CREATE|UPDATE|DELETE)
-     * sobre el recurso identificado por su slug.
-     */
-    public function puede(string $recursoSlug, int $accion): bool
+    public function puede(string $permisoNombre, int $accion): bool
     {
         if ($this->rol === null) {
             return false;
         }
 
-        if ($this->rol->es_superadmin) {
-            return true;
+        $permiso = $this->permisosPorNombreCache[$permisoNombre]
+            ??= Permiso::where('nombre', $permisoNombre)->first();
+
+        return $permiso !== null && $this->rol->tienePermiso($permiso, $accion);
+    }
+
+    /**
+     * Usado por el middleware `permiso`: resuelve el permiso a partir del
+     * endpoint (nombre de ruta) actual, sin que la ruta tenga que declarar
+     * a qué recurso pertenece.
+     */
+    public function puedePorEndpoint(string $endpoint, int $accion): bool
+    {
+        if ($this->rol === null) {
+            return false;
         }
 
-        $recurso = $this->recursosCache[$recursoSlug]
-            ??= Recurso::where('slug', $recursoSlug)->first();
+        $permiso = $this->permisosPorEndpointCache[$endpoint]
+            ??= Permiso::where('endpoint', $endpoint)->first();
 
-        return $recurso !== null && $this->rol->tienePermiso($recurso, $accion);
+        return $permiso !== null && $this->rol->tienePermiso($permiso, $accion);
     }
 
-    public function puedeLeer(string $recursoSlug): bool
+    public function puedeLeer(string $permisoNombre): bool
     {
-        return $this->puede($recursoSlug, Accion::READ);
+        return $this->puede($permisoNombre, Accion::READ);
     }
 
-    public function puedeCrear(string $recursoSlug): bool
+    public function puedeCrear(string $permisoNombre): bool
     {
-        return $this->puede($recursoSlug, Accion::CREATE);
+        return $this->puede($permisoNombre, Accion::CREATE);
     }
 
-    public function puedeActualizar(string $recursoSlug): bool
+    public function puedeActualizar(string $permisoNombre): bool
     {
-        return $this->puede($recursoSlug, Accion::UPDATE);
+        return $this->puede($permisoNombre, Accion::UPDATE);
     }
 
-    public function puedeEliminar(string $recursoSlug): bool
+    public function puedeEliminar(string $permisoNombre): bool
     {
-        return $this->puede($recursoSlug, Accion::DELETE);
+        return $this->puede($permisoNombre, Accion::DELETE);
     }
 }

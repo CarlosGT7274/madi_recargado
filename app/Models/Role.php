@@ -10,19 +10,16 @@ use Illuminate\Support\Collection;
 class Role extends Model
 {
     protected $fillable = [
-        'slug',
         'nombre',
-        'es_superadmin',
         'activo',
     ];
 
     protected $casts = [
-        'es_superadmin' => 'boolean',
         'activo' => 'boolean',
     ];
 
     /**
-     * Mapa en memoria recurso_id => permisos (bitmask) para esta instancia
+     * Mapa en memoria permiso_id => permisos (bitmask) para esta instancia
      * de rol. Se resuelve una sola vez, no una query por cada chequeo.
      */
     protected ?Collection $permisosMapa = null;
@@ -32,30 +29,29 @@ class Role extends Model
         return $this->hasMany(User::class, 'rol_id');
     }
 
-    public function recursos(): BelongsToMany
+    public function permisos(): BelongsToMany
     {
-        return $this->belongsToMany(Recurso::class, 'roles_recursos', 'rol_id', 'recurso_id')
-            ->withPivot('permisos')
-            ->withTimestamps();
+        return $this->belongsToMany(Permiso::class, 'roles_permisos', 'rol_id', 'permiso_id')
+            ->withPivot('permisos');
     }
 
     protected function permisosMapa(): Collection
     {
-        return $this->permisosMapa ??= $this->recursos()
+        return $this->permisosMapa ??= $this->permisos()
             ->get()
-            ->mapWithKeys(fn (Recurso $recurso): array => [
-                $recurso->id => (int) $recurso->pivot->permisos,
+            ->mapWithKeys(fn (Permiso $permiso): array => [
+                $permiso->id => (int) $permiso->pivot->permisos,
             ]);
     }
 
     /**
-     * Bitmask efectivo para un recurso, subiendo por `padre_id` hasta
+     * Bitmask efectivo para un permiso, subiendo por `padre_id` hasta
      * encontrar un grant explícito. 0 si no hay ninguno en toda la rama.
      */
-    public function permisosPara(Recurso $recurso): int
+    public function permisosPara(Permiso $permiso): int
     {
         $mapa = $this->permisosMapa();
-        $actual = $recurso;
+        $actual = $permiso;
 
         while ($actual !== null) {
             if ($mapa->has($actual->id)) {
@@ -68,13 +64,13 @@ class Role extends Model
         return 0;
     }
 
-    public function tienePermiso(Recurso $recurso, int $accion): bool
+    public function tienePermiso(Permiso $permiso, int $accion): bool
     {
-        return ($this->permisosPara($recurso) & $accion) === $accion;
+        return ($this->permisosPara($permiso) & $accion) === $accion;
     }
 
     /**
-     * recurso_id => permisos, expuesto para compartir con el frontend
+     * permiso_id => permisos, expuesto para compartir con el frontend
      * (Inertia) y hacer gating de UI sin ida y vuelta al servidor.
      *
      * @return array<int, int>
@@ -84,18 +80,18 @@ class Role extends Model
         return $this->permisosMapa()->all();
     }
 
-    public function otorgar(Recurso $recurso, int $permisos): void
+    public function otorgar(Permiso $permiso, int $permisos): void
     {
-        $this->recursos()->syncWithoutDetaching([
-            $recurso->id => ['permisos' => $permisos],
+        $this->permisos()->syncWithoutDetaching([
+            $permiso->id => ['permisos' => $permisos],
         ]);
 
         $this->permisosMapa = null;
     }
 
-    public function revocar(Recurso $recurso): void
+    public function revocar(Permiso $permiso): void
     {
-        $this->recursos()->detach($recurso->id);
+        $this->permisos()->detach($permiso->id);
 
         $this->permisosMapa = null;
     }

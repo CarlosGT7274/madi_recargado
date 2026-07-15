@@ -7,14 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Recurso extends Model
+class Permiso extends Model
 {
-    protected $table = 'recursos';
+    protected $table = 'permisos';
+
+    public $timestamps = false;
 
     protected $fillable = [
         'padre_id',
-        'slug',
         'nombre',
+        'endpoint',
         'activo',
     ];
 
@@ -37,8 +39,7 @@ class Recurso extends Model
 
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'roles_recursos', 'recurso_id', 'rol_id')
-            ->withPivot('permisos')
-            ->withTimestamps();
+        return $this->belongsToMany(Role::class, 'roles_permisos', 'permiso_id', 'rol_id')
+            ->withPivot('permisos');
     }
 }
