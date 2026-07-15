@@ -83,20 +83,37 @@ class Role extends Model
      */
     public function menuVisible(): Collection
     {
+        return $this->construirMenu(null);
+    }
+
+    protected function construirMenu(?int $padreId): Collection
+    {
         return Permiso::query()
             ->where('activo', true)
-            ->whereNotNull('endpoint')
+            ->where('padre_id', $padreId)
             ->orderBy('nombre')
             ->get()
-            ->filter(fn (Permiso $permiso): bool => Route::has($permiso->endpoint)
-                && $this->tienePermiso($permiso, Accion::READ))
-            ->map(fn (Permiso $permiso): array => [
-                'id' => $permiso->id,
-                'nombre' => $permiso->nombre,
-                'endpoint' => $permiso->endpoint,
-                'padre_id' => $permiso->padre_id,
-                'url' => route($permiso->endpoint),
-            ])
+            ->map(function (Permiso $permiso) {
+                $hijos = $this->construirMenu($permiso->id);
+
+                $tieneRuta = $permiso->endpoint !== null && Route::has($permiso->endpoint);
+                $visible = $hijos->isNotEmpty()
+                    || ($tieneRuta && $this->tienePermiso($permiso, Accion::READ));
+
+                if (! $visible) {
+                    return null;
+                }
+
+                return [
+                    'id' => $permiso->id,
+                    'nombre' => $permiso->nombre,
+                    'endpoint' => $permiso->endpoint,
+                    'padre_id' => $permiso->padre_id,
+                    'url' => $tieneRuta ? route($permiso->endpoint) : null,
+                    'hijos' => $hijos->values(),
+                ];
+            })
+            ->filter()
             ->values();
     }
 

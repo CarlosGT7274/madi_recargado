@@ -11,3 +11,10 @@ export type RoleResumen = {
     usuarios_count: number;
     permisos: Record<number, number>;
 };
+
+export type PermisoNodo = {
+    id: number;
+    nombre: string;
+    endpoint: string | null;
+    hijos: PermisoNodo[];
+};

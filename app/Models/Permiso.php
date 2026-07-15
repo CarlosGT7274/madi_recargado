@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Permiso extends Model
 {
@@ -41,5 +42,24 @@ class Permiso extends Model
     {
         return $this->belongsToMany(Role::class, 'roles_permisos', 'permiso_id', 'rol_id')
             ->withPivot('permisos');
+    }
+
+    public static function arbol(): Collection
+    {
+        return self::construirArbol(null);
+    }
+
+    protected static function construirArbol(?int $padreId): Collection
+    {
+        return self::where('activo', true)
+            ->where('padre_id', $padreId)
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn (self $p) => [
+                'id' => $p->id,
+                'nombre' => $p->nombre,
+                'endpoint' => $p->endpoint,
+                'hijos' => self::construirArbol($p->id),
+            ]);
     }
 }

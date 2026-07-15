@@ -25,17 +25,10 @@ class RoleController extends Controller
                 'nombre' => $role->nombre,
                 'activo' => $role->activo,
                 'usuarios_count' => $role->usuarios_count,
-                'permisos' => (object) $role->mapaPermisos(),
             ]);
-
-        $permisosDisponibles = Permiso::where('activo', true)
-            ->orderBy('padre_id')
-            ->orderBy('nombre')
-            ->get(['id', 'nombre', 'padre_id']);
 
         return Inertia::render('roles/Index', [
             'roles' => $roles,
-            'permisosDisponibles' => $permisosDisponibles,
         ]);
     }
 
@@ -86,5 +79,19 @@ class RoleController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Permisos actualizados.']);
 
         return back();
+    }
+
+    public function show(Role $role): Response
+    {
+        return Inertia::render('roles/Show', [
+            'role' => [
+                'id' => $role->id,
+                'nombre' => $role->nombre,
+                'activo' => $role->activo,
+                'usuarios_count' => $role->usuarios()->count(),
+            ],
+            'permisosArbol' => Permiso::arbol(),
+            'permisosAsignados' => (object) $role->mapaPermisos(),
+        ]);
     }
 }

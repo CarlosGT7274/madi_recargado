@@ -7,16 +7,6 @@ use App\Models\Role;
 use App\Support\Accion;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Se agrega al modelo User del starter kit con: `use HasBitmaskAuthorization;`
- * No reemplaza login/2FA/verificación/sesiones de Laravel — solo añade
- * autorización encima.
- *
- * Dos formas de resolver el permiso, ambas contra la misma tabla `permisos`:
- *   - por `nombre`: para chequeos manuales (Gate, @can, controladores).
- *   - por `endpoint`: para el middleware, que detecta la ruta actual y no
- *     requiere que la escribas a mano en cada definición de ruta.
- */
 trait HasBitmaskAuthorization
 {
     /**
@@ -47,9 +37,11 @@ trait HasBitmaskAuthorization
     }
 
     /**
-     * Usado por el middleware `permiso`: resuelve el permiso a partir del
-     * endpoint (nombre de ruta) actual, sin que la ruta tenga que declarar
-     * a qué recurso pertenece.
+     * Resuelve el permiso a partir del nombre de ruta actual. Un permiso
+     * cuyo `endpoint` sea `roles` cubre cualquier ruta `roles.*`
+     * (roles.index, roles.show, roles.store, etc.), tomando siempre el
+     * permiso con el prefijo más largo que matchee, para que un recurso
+     * anidado no se confunda con uno más corto.
      */
     public function puedePorEndpoint(string $endpoint, int $accion): bool
     {
@@ -58,9 +50,19 @@ trait HasBitmaskAuthorization
         }
 
         $permiso = $this->permisosPorEndpointCache[$endpoint]
-            ??= Permiso::where('endpoint', $endpoint)->first();
+            ??= $this->resolverPermisoPorEndpoint($endpoint);
 
         return $permiso !== null && $this->rol->tienePermiso($permiso, $accion);
+    }
+
+    protected function resolverPermisoPorEndpoint(string $endpoint): ?Permiso
+    {
+        return Permiso::whereNotNull('endpoint')
+            ->get()
+            ->filter(fn (Permiso $permiso): bool => $endpoint === $permiso->endpoint
+                || str_starts_with($endpoint, $permiso->endpoint.'.'))
+            ->sortByDesc(fn (Permiso $permiso): int => strlen($permiso->endpoint))
+            ->first();
     }
 
     public function puedeLeer(string $permisoNombre): bool

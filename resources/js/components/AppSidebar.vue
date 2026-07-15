@@ -20,16 +20,15 @@ import type { MenuItem, NavItem } from '@/types';
 
 const page = usePage();
 
-// Construido 100% a partir de lo que comparte el backend (menu.php en
-// HandleInertiaRequests). Ningún módulo aquí está hardcodeado: si el rol del
-// usuario no tiene permiso de lectura sobre un endpoint, ese item no existe.
-const mainNavItems = computed<NavItem[]>(() => {
-    const menu = (page.props.menu ?? []) as MenuItem[];
-
-    return menu.map((item) => ({
-        title: item.nombre,
-        href: item.url,
+function normalizarMenu(items: MenuItem[] | undefined | null): MenuItem[] {
+    return (items ?? []).map((item) => ({
+        ...item,
+        hijos: normalizarMenu(item.hijos),
     }));
+}
+
+const mainNavItems = computed<MenuItem[]>(() => {
+    return normalizarMenu(page.props.menu as MenuItem[] | undefined);
 });
 
 const footerNavItems: NavItem[] = [
@@ -37,11 +36,13 @@ const footerNavItems: NavItem[] = [
         title: 'Repository',
         href: 'https://github.com/laravel/vue-starter-kit',
         icon: FolderGit2,
+        hijos: [],
     },
     {
         title: 'Documentation',
         href: 'https://laravel.com/docs/starter-kits#vue',
         icon: BookOpen,
+        hijos: [],
     },
 ];
 </script>
@@ -59,11 +60,9 @@ const footerNavItems: NavItem[] = [
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarHeader>
-
         <SidebarContent>
             <NavMain :items="mainNavItems" />
         </SidebarContent>
-
         <SidebarFooter>
             <NavFooter :items="footerNavItems" />
             <NavUser />

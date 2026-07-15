@@ -8,7 +8,8 @@ export type BreadcrumbItem = {
 
 export type NavItem = {
     title: string;
-    href: NonNullable<InertiaLinkProps['href']>;
+    href: string | null;
+    hijos: NavItem[];
     icon?: LucideIcon;
     isActive?: boolean;
 };
@@ -16,7 +17,8 @@ export type NavItem = {
 export type MenuItem = {
     id: number;
     nombre: string;
-    endpoint: string;
+    endpoint: string | null;
     padre_id: number | null;
-    url: string;
+    url: string | null;
+    hijos: MenuItem[];
 };
