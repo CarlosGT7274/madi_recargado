@@ -55,8 +55,11 @@ watch(currentUrl, () => {
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
-        <SidebarMenu>
+        <SidebarGroupLabel
+            class="text-[0.7rem] font-semibold uppercase tracking-wider text-sidebar-foreground/55"
+            >Plataforma</SidebarGroupLabel
+        >
+        <SidebarMenu class="gap-1">
             <template v-for="item in items" :key="item.id">
                 <Collapsible
                     v-if="item.hijos.length"
@@ -66,7 +69,11 @@ watch(currentUrl, () => {
                 >
                     <SidebarMenuItem>
                         <CollapsibleTrigger as-child>
-                            <SidebarMenuButton :tooltip="item.nombre">
+                            <SidebarMenuButton
+                                class="font-medium"
+                                :is-active="containsCurrentRoute(item)"
+                                :tooltip="item.nombre"
+                            >
                                 <span>{{ item.nombre }}</span>
                                 <ChevronRight
                                     class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
@@ -89,7 +96,12 @@ watch(currentUrl, () => {
                 </Collapsible>
 
                 <SidebarMenuItem v-else>
-                    <SidebarMenuButton as-child :is-active="item.url ? isCurrentUrl(item.url) : false" :tooltip="item.nombre">
+                    <SidebarMenuButton
+                        class="font-medium"
+                        as-child
+                        :is-active="item.url ? isCurrentUrl(item.url) : false"
+                        :tooltip="item.nombre"
+                    >
                         <Link :href="item.url ?? '#'">{{ item.nombre }}</Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
