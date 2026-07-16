@@ -101,9 +101,9 @@ function alternarModulo(activo: boolean) {
 
                 <Checkbox
                     v-if="nodo.hijos.length"
-                    :checked="estadoModulo"
+                    :model-value="estadoModulo"
                     :aria-label="`Seleccionar todo el módulo ${nodo.nombre}`"
-                    @update:checked="(v) => alternarModulo(v === true)"
+                    @update:model-value="(v) => alternarModulo(v === true)"
                 >
                     <template #default="{ state }">
                         <Minus v-if="state === 'indeterminate'" class="size-3.5" />
@@ -119,8 +119,8 @@ function alternarModulo(activo: boolean) {
 
             <div v-for="accion in ACCIONES" :key="accion.bit" class="flex justify-center">
                 <Checkbox
-                    :checked="estadoColumna(accion.bit)"
-                    @update:checked="(v) => alternarBit(accion.bit, v === true)"
+                    :model-value="estadoColumna(accion.bit)"
+                    @update:model-value="(v) => alternarBit(accion.bit, v === true)"
                 >
                     <template v-if="nodo.hijos.length" #default="{ state }">
                         <Minus v-if="state === 'indeterminate'" class="size-3.5" />
