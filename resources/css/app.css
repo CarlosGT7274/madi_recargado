@@ -98,41 +98,41 @@
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(351 14% 11%);
 
-    /* MADI red */
-    --primary: hsl(351 72% 33%);
+    /* MADI red — vibrant #FF2C2C */
+    --primary: hsl(0 100% 59%);
     --primary-foreground: hsl(0 0% 100%);
 
-    --secondary: hsl(351 16% 95.5%);
-    --secondary-foreground: hsl(351 32% 20%);
-    --muted: hsl(351 12% 96%);
-    --muted-foreground: hsl(351 6% 42%);
-    --accent: hsl(351 58% 96.5%);
-    --accent-foreground: hsl(351 72% 33%);
-    --destructive: hsl(0 74% 47%);
+    --secondary: hsl(0 20% 95.5%);
+    --secondary-foreground: hsl(0 40% 22%);
+    --muted: hsl(0 12% 96%);
+    --muted-foreground: hsl(0 5% 42%);
+    --accent: hsl(0 90% 96.5%);
+    --accent-foreground: hsl(0 90% 45%);
+    --destructive: hsl(0 84% 50%);
     --destructive-foreground: hsl(0 0% 100%);
-    --border: hsl(351 12% 90%);
-    --input: hsl(351 12% 87%);
-    --ring: hsl(351 72% 42%);
-    --chart-1: hsl(351 72% 42%);
+    --border: hsl(0 12% 90%);
+    --input: hsl(0 12% 87%);
+    --ring: hsl(0 100% 59%);
+    --chart-1: hsl(0 100% 59%);
     --chart-2: hsl(210 70% 48%);
     --chart-3: hsl(38 92% 50%);
     --chart-4: hsl(160 60% 40%);
-    --chart-5: hsl(351 45% 62%);
+    --chart-5: hsl(0 70% 70%);
     --radius: 0.75rem;
 
     /* Elevation */
-    --shadow-color: 351 30% 12%;
+    --shadow-color: 0 40% 20%;
 
-    /* Sidebar — MADI maroon (persistent brand) */
-    --sidebar-background: hsl(351 70% 21%);
-    --sidebar-foreground: hsl(351 26% 90%);
-    --sidebar-primary: hsl(351 84% 47%);
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(351 54% 31%);
+    /* Sidebar — brilliant MADI red (persistent brand) */
+    --sidebar-background: hsl(0 90% 45%);
+    --sidebar-foreground: hsl(0 40% 97%);
+    --sidebar-primary: hsl(0 0% 100%);
+    --sidebar-primary-foreground: hsl(0 90% 45%);
+    --sidebar-accent: hsl(0 95% 56%);
     --sidebar-accent-foreground: hsl(0 0% 100%);
-    --sidebar-border: hsl(351 42% 30%);
-    --sidebar-ring: hsl(351 84% 58%);
-    --sidebar: hsl(351 70% 21%);
+    --sidebar-border: hsl(0 80% 58%);
+    --sidebar-ring: hsl(0 100% 70%);
+    --sidebar: hsl(0 90% 45%);
 }
 
 .dark {
@@ -144,39 +144,39 @@
     --popover: hsl(351 10% 10.5%);
     --popover-foreground: hsl(351 10% 95%);
 
-    --primary: hsl(351 74% 46%);
+    --primary: hsl(0 100% 60%);
     --primary-foreground: hsl(0 0% 100%);
 
-    --secondary: hsl(351 8% 16%);
-    --secondary-foreground: hsl(351 10% 95%);
-    --muted: hsl(351 8% 15%);
-    --muted-foreground: hsl(351 6% 62%);
-    --accent: hsl(351 42% 20%);
-    --accent-foreground: hsl(351 10% 96%);
-    --destructive: hsl(0 74% 53%);
+    --secondary: hsl(0 8% 16%);
+    --secondary-foreground: hsl(0 10% 95%);
+    --muted: hsl(0 8% 15%);
+    --muted-foreground: hsl(0 6% 62%);
+    --accent: hsl(0 50% 22%);
+    --accent-foreground: hsl(0 10% 96%);
+    --destructive: hsl(0 90% 58%);
     --destructive-foreground: hsl(0 0% 100%);
-    --border: hsl(351 8% 18%);
-    --input: hsl(351 8% 20%);
-    --ring: hsl(351 74% 52%);
-    --chart-1: hsl(351 74% 52%);
+    --border: hsl(0 8% 18%);
+    --input: hsl(0 8% 20%);
+    --ring: hsl(0 100% 60%);
+    --chart-1: hsl(0 100% 60%);
     --chart-2: hsl(210 70% 55%);
     --chart-3: hsl(38 92% 55%);
     --chart-4: hsl(160 60% 45%);
-    --chart-5: hsl(351 45% 65%);
+    --chart-5: hsl(0 70% 70%);
 
     /* Elevation */
     --shadow-color: 0 0% 0%;
 
-    /* Sidebar — keep MADI maroon in dark mode too */
-    --sidebar-background: hsl(351 64% 18%);
-    --sidebar-foreground: hsl(351 22% 88%);
-    --sidebar-primary: hsl(351 82% 48%);
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(351 50% 27%);
+    /* Sidebar — brilliant MADI red in dark mode too */
+    --sidebar-background: hsl(0 82% 40%);
+    --sidebar-foreground: hsl(0 30% 97%);
+    --sidebar-primary: hsl(0 0% 100%);
+    --sidebar-primary-foreground: hsl(0 85% 42%);
+    --sidebar-accent: hsl(0 88% 50%);
     --sidebar-accent-foreground: hsl(0 0% 100%);
-    --sidebar-border: hsl(351 38% 26%);
-    --sidebar-ring: hsl(351 82% 58%);
-    --sidebar: hsl(351 64% 18%);
+    --sidebar-border: hsl(0 70% 52%);
+    --sidebar-ring: hsl(0 100% 68%);
+    --sidebar: hsl(0 82% 40%);
 }
 
 @layer base {
