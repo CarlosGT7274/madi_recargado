@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { ChevronRight } from '@lucide/vue';
+import {
+    Boxes,
+    ChevronRight,
+    ClipboardList,
+    Cog,
+    LayoutDashboard,
+    Package,
+    ShieldCheck,
+    ShoppingCart,
+    Wrench,
+    type LucideIcon,
+} from '@lucide/vue';
 import { reactive, watch } from 'vue';
 import {
     Collapsible,
@@ -22,6 +33,31 @@ import type { MenuItem } from '@/types';
 
 const props = defineProps<{ items: MenuItem[] }>();
 const { isCurrentUrl, isCurrentOrParentUrl, currentUrl } = useCurrentUrl();
+
+const iconoPorClave: Record<string, LucideIcon> = {
+    dashboard: LayoutDashboard,
+    almacen: Package,
+    inventario: Boxes,
+    herramientas: Wrench,
+    ingenierias: ClipboardList,
+    compras: ShoppingCart,
+    administracion: Cog,
+    seguridad: ShieldCheck,
+    requisiciones: ClipboardList,
+};
+
+function iconoDe(item: MenuItem): LucideIcon {
+    const clave = (item.endpoint ?? item.nombre ?? '')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z]/g, '');
+    for (const [nombre, icono] of Object.entries(iconoPorClave)) {
+        if (clave.includes(nombre)) {
+            return icono;
+        }
+    }
+    return Package;
+}
 
 function containsCurrentRoute(item: MenuItem): boolean {
     if (item.url && isCurrentOrParentUrl(item.url)) {
@@ -74,6 +110,7 @@ watch(currentUrl, () => {
                                 :is-active="containsCurrentRoute(item)"
                                 :tooltip="item.nombre"
                             >
+                                <component :is="iconoDe(item)" class="size-4 shrink-0" />
                                 <span>{{ item.nombre }}</span>
                                 <ChevronRight
                                     class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
@@ -102,7 +139,10 @@ watch(currentUrl, () => {
                         :is-active="item.url ? isCurrentUrl(item.url) : false"
                         :tooltip="item.nombre"
                     >
-                        <Link :href="item.url ?? '#'">{{ item.nombre }}</Link>
+                        <Link :href="item.url ?? '#'">
+                            <component :is="iconoDe(item)" class="size-4 shrink-0" />
+                            <span>{{ item.nombre }}</span>
+                        </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </template>

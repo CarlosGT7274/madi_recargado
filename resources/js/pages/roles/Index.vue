@@ -6,9 +6,18 @@ import {
     store as storeRole,
     update as updateRole,
 } from '@/actions/App/Http/Controllers/RoleController';
+import { KeyRound, Pencil, Plus, Trash2, Users } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -87,12 +96,15 @@ function confirmarEliminar() {
 
 <template>
     <Head title="Roles" />
-    <div class="flex flex-col gap-6 p-4">
-        <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-6 p-4 md:p-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
             <Heading title="Roles" description="Administra los roles del sistema y sus permisos" />
             <Dialog v-model:open="dialogRolAbierto">
                 <DialogTrigger as-child>
-                    <Button @click="abrirCrear">Nuevo rol</Button>
+                    <Button class="gap-2" @click="abrirCrear">
+                        <Plus class="size-4" />
+                        Nuevo rol
+                    </Button>
                 </DialogTrigger>
                 <DialogContent>
                     <DialogHeader>
@@ -121,39 +133,67 @@ function confirmarEliminar() {
                 </DialogContent>
             </Dialog>
         </div>
-        <div class="overflow-hidden rounded-xl border">
-            <table class="w-full text-sm">
-                <thead class="bg-muted/50 text-left">
-                    <tr>
-                        <th class="px-4 py-2 font-medium">Nombre</th>
-                        <th class="px-4 py-2 font-medium">Estado</th>
-                        <th class="px-4 py-2 font-medium">Usuarios</th>
-                        <th class="px-4 py-2 text-right font-medium">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="role in roles" :key="role.id" class="border-t">
-                        <td class="px-4 py-2 font-medium">{{ role.nombre }}</td>
-                        <td class="px-4 py-2">{{ role.activo ? 'Activo' : 'Inactivo' }}</td>
-                        <td class="px-4 py-2">{{ role.usuarios_count }}</td>
-                        <td class="px-4 py-2">
-                            <div class="flex justify-end gap-2">
-                                <Link :href="rolesShow(role.id)">
-                                    <Button variant="outline" size="sm">Permisos</Button>
-                                </Link>
-                                <Button variant="outline" size="sm" @click="abrirEditar(role)">Editar</Button>
-                                <Button variant="destructive" size="sm" @click="rolAEliminar = role">Eliminar</Button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr v-if="roles.length === 0">
-                        <td colspan="4" class="px-4 py-6 text-center text-muted-foreground">
-                            Aún no hay roles registrados.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <Card class="overflow-hidden py-0 shadow-sm">
+            <CardHeader class="border-b bg-muted/30 py-4">
+                <CardTitle class="text-base">Roles del sistema</CardTitle>
+                <CardDescription>{{ roles.length }} rol(es) registrados</CardDescription>
+            </CardHeader>
+            <CardContent class="p-0">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                            <th class="px-6 py-3 font-semibold">Nombre</th>
+                            <th class="px-6 py-3 font-semibold">Estado</th>
+                            <th class="px-6 py-3 font-semibold">Usuarios</th>
+                            <th class="px-6 py-3 text-right font-semibold">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="role in roles"
+                            :key="role.id"
+                            class="border-b transition-colors last:border-0 hover:bg-muted/40"
+                        >
+                            <td class="px-6 py-4 font-semibold text-foreground">{{ role.nombre }}</td>
+                            <td class="px-6 py-4">
+                                <Badge :variant="role.activo ? 'default' : 'secondary'">
+                                    {{ role.activo ? 'Activo' : 'Inactivo' }}
+                                </Badge>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center gap-1.5 text-muted-foreground">
+                                    <Users class="size-4" />
+                                    <span class="tabular-nums">{{ role.usuarios_count }}</span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex justify-end gap-2">
+                                    <Link :href="rolesShow(role.id)">
+                                        <Button variant="outline" size="sm" class="gap-1.5">
+                                            <KeyRound class="size-3.5" />
+                                            Permisos
+                                        </Button>
+                                    </Link>
+                                    <Button variant="outline" size="sm" class="gap-1.5" @click="abrirEditar(role)">
+                                        <Pencil class="size-3.5" />
+                                        Editar
+                                    </Button>
+                                    <Button variant="destructive" size="sm" class="gap-1.5" @click="rolAEliminar = role">
+                                        <Trash2 class="size-3.5" />
+                                        Eliminar
+                                    </Button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="roles.length === 0">
+                            <td colspan="4" class="px-6 py-12 text-center text-muted-foreground">
+                                Aún no hay roles registrados.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </CardContent>
+        </Card>
     </div>
     <Dialog :open="!!rolAEliminar" @update:open="(open) => { if (!open) rolAEliminar = null; }">
         <DialogContent>
