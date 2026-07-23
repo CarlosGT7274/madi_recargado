@@ -37,10 +37,11 @@ trait HasBitmaskAuthorization
     }
 
     /**
-     * Resuelve el permiso a partir del nombre de ruta actual. Un permiso
-     * cuyo `endpoint` sea `roles` cubre cualquier ruta `roles.*`
-     * (roles.index, roles.show, roles.store, etc.), tomando siempre el
-     * permiso con el prefijo más largo que matchee, para que un recurso
+     * Resuelve el permiso a partir del nombre de ruta actual. El endpoint
+     * completo de cada permiso se deriva de su jerarquía (`endpointCompleto`),
+     * de modo que el permiso `Roles` (segmento `roles` bajo `seguridad`)
+     * resuelve a `seguridad.roles` y cubre cualquier ruta `seguridad.roles.*`.
+     * Se toma siempre el prefijo más largo que matchee, para que un recurso
      * anidado no se confunda con uno más corto.
      */
     public function puedePorEndpoint(string $endpoint, int $accion): bool
@@ -57,12 +58,17 @@ trait HasBitmaskAuthorization
 
     protected function resolverPermisoPorEndpoint(string $endpoint): ?Permiso
     {
-        return Permiso::whereNotNull('endpoint')
+        return Permiso::with('padre.padre.padre')
             ->get()
-            ->filter(fn (Permiso $permiso): bool => $endpoint === $permiso->endpoint
-                || str_starts_with($endpoint, $permiso->endpoint.'.'))
-            ->sortByDesc(fn (Permiso $permiso): int => strlen($permiso->endpoint))
-            ->first();
+            ->map(fn (Permiso $permiso): array => [
+                'permiso' => $permiso,
+                'completo' => $permiso->endpointCompleto(),
+            ])
+            ->filter(fn (array $item): bool => $item['completo'] !== null
+                && ($endpoint === $item['completo']
+                    || str_starts_with($endpoint, $item['completo'].'.')))
+            ->sortByDesc(fn (array $item): int => strlen($item['completo']))
+            ->first()['permiso'] ?? null;
     }
 
     public function puedeLeer(string $permisoNombre): bool

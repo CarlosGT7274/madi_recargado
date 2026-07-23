@@ -44,22 +44,59 @@ class Permiso extends Model
             ->withPivot('permisos');
     }
 
+    /**
+     * Une un prefijo heredado con un segmento propio, ignorando los vacíos.
+     * Regla única de composición de endpoints en todo el sistema:
+     * `seguridad` + `roles` => `seguridad.roles`.
+     */
+    public static function componerEndpoint(?string $prefijo, ?string $segmento): ?string
+    {
+        $partes = array_filter([$prefijo, $segmento], fn (?string $v): bool => filled($v));
+
+        return $partes === [] ? null : implode('.', $partes);
+    }
+
+    /**
+     * Endpoint completo derivado de la jerarquía (padre_id). Cada registro
+     * solo almacena su propio segmento; el path completo se reconstruye
+     * recorriendo los padres. La BD es la única fuente de verdad.
+     */
+    public function endpointCompleto(): ?string
+    {
+        $segmentos = [];
+        $actual = $this;
+
+        while ($actual !== null) {
+            if (filled($actual->endpoint)) {
+                array_unshift($segmentos, $actual->endpoint);
+            }
+
+            $actual = $actual->padre;
+        }
+
+        return $segmentos === [] ? null : implode('.', $segmentos);
+    }
+
     public static function arbol(): Collection
     {
         return self::construirArbol(null);
     }
 
-    protected static function construirArbol(?int $padreId): Collection
+    protected static function construirArbol(?int $padreId, ?string $prefijoPadre = null): Collection
     {
         return self::where('activo', true)
             ->where('padre_id', $padreId)
             ->orderBy('nombre')
             ->get()
-            ->map(fn (self $p) => [
-                'id' => $p->id,
-                'nombre' => $p->nombre,
-                'endpoint' => $p->endpoint,
-                'hijos' => self::construirArbol($p->id),
-            ]);
+            ->map(function (self $p) use ($prefijoPadre) {
+                $endpointCompleto = self::componerEndpoint($prefijoPadre, $p->endpoint);
+
+                return [
+                    'id' => $p->id,
+                    'nombre' => $p->nombre,
+                    'endpoint' => $endpointCompleto,
+                    'hijos' => self::construirArbol($p->id, $endpointCompleto),
+                ];
+            });
     }
 }

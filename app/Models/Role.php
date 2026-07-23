@@ -86,16 +86,17 @@ class Role extends Model
         return $this->construirMenu(null);
     }
 
-    protected function construirMenu(?int $padreId): Collection
+    protected function construirMenu(?int $padreId, ?string $prefijoPadre = null): Collection
     {
         return Permiso::query()
             ->where('activo', true)
             ->where('padre_id', $padreId)
             ->orderBy('nombre')
             ->get()
-            ->map(function (Permiso $permiso) {
-                $hijos = $this->construirMenu($permiso->id);
-                $url = $this->resolverUrl($permiso->endpoint);
+            ->map(function (Permiso $permiso) use ($prefijoPadre) {
+                $endpointCompleto = Permiso::componerEndpoint($prefijoPadre, $permiso->endpoint);
+                $hijos = $this->construirMenu($permiso->id, $endpointCompleto);
+                $url = $this->resolverUrl($endpointCompleto);
 
                 $visible = $hijos->isNotEmpty()
                     || ($url !== null && $this->tienePermiso($permiso, Accion::READ));
@@ -107,7 +108,7 @@ class Role extends Model
                 return [
                     'id' => $permiso->id,
                     'nombre' => $permiso->nombre,
-                    'endpoint' => $permiso->endpoint,
+                    'endpoint' => $endpointCompleto,
                     'padre_id' => $permiso->padre_id,
                     'url' => $url,
                     'hijos' => $hijos->values(),
