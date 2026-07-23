@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { index as rolesIndex, show as rolesShow } from '@/routes/roles';
+import { index as rolesIndex, show as rolesShow } from '@/routes/seguridad/roles';
 import type { RoleResumen } from '@/types';
 
 defineOptions({

@@ -32,12 +32,12 @@ class RolesPermisosSeeder extends Seeder
 
         $roles = Permiso::updateOrCreate(
             ['nombre' => 'Roles'],
-            ['padre_id' => $seguridad->id, 'endpoint' => 'roles', 'activo' => true]
+            ['padre_id' => $seguridad->id, 'endpoint' => 'seguridad.roles', 'activo' => true]
         );
 
         $usuarios = Permiso::updateOrCreate(
             ['nombre' => 'Usuarios'],
-            ['padre_id' => $seguridad->id, 'endpoint' => 'usuarios', 'activo' => true]
+            ['padre_id' => $seguridad->id, 'endpoint' => 'seguridad.usuarios', 'activo' => true]
         );
 
         $superAdmin->otorgar($seguridad, Accion::ALL);
