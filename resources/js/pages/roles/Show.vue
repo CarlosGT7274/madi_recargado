@@ -1,6 +1,6 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { index as rolesIndex } from '@/routes/roles';
+import { index as rolesIndex } from '@/routes/seguridad/roles';
 
 export default {
     layout: () => ({
@@ -192,3 +192,4 @@ const guardar = () => {
         </div>
     </div>
 </template>
+

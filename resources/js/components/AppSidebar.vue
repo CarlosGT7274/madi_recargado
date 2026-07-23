@@ -11,14 +11,14 @@ import {
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { MenuItem, NavItem } from '@/types';
 
 const page = usePage();
+
+const appName = computed(() => page.props.name ?? 'MADI');
+const currentUser = computed(() => page.props.auth?.user);
 
 function normalizarMenu(items: MenuItem[] | undefined | null): MenuItem[] {
     return (items ?? []).map((item) => ({
@@ -49,16 +49,15 @@ const footerNavItems: NavItem[] = [
 
 <template>
     <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
-                            <AppLogo />
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+        <SidebarHeader
+            class="border-b border-sidebar-border/60 px-3 py-4 group-data-[collapsible=icon]:px-2"
+        >
+            <Link
+                :href="dashboard()"
+                class="flex items-center overflow-hidden"
+            >
+                <AppLogo :title="appName" :subtitle="currentUser?.name" />
+            </Link>
         </SidebarHeader>
         <SidebarContent>
             <NavMain :items="mainNavItems" />

@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { ChevronRight } from '@lucide/vue';
+import {
+    Boxes,
+    ChevronRight,
+    ClipboardList,
+    Cog,
+    LayoutDashboard,
+    Package,
+    ShieldCheck,
+    ShoppingCart,
+    Wrench,
+    type LucideIcon,
+} from '@lucide/vue';
 import { reactive, watch } from 'vue';
 import {
     Collapsible,
@@ -22,6 +33,31 @@ import type { MenuItem } from '@/types';
 
 const props = defineProps<{ items: MenuItem[] }>();
 const { isCurrentUrl, isCurrentOrParentUrl, currentUrl } = useCurrentUrl();
+
+const iconoPorClave: Record<string, LucideIcon> = {
+    dashboard: LayoutDashboard,
+    almacen: Package,
+    inventario: Boxes,
+    herramientas: Wrench,
+    ingenierias: ClipboardList,
+    compras: ShoppingCart,
+    administracion: Cog,
+    seguridad: ShieldCheck,
+    requisiciones: ClipboardList,
+};
+
+function iconoDe(item: MenuItem): LucideIcon {
+    const clave = (item.endpoint ?? item.nombre ?? '')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z]/g, '');
+    for (const [nombre, icono] of Object.entries(iconoPorClave)) {
+        if (clave.includes(nombre)) {
+            return icono;
+        }
+    }
+    return Package;
+}
 
 function containsCurrentRoute(item: MenuItem): boolean {
     if (item.url && isCurrentOrParentUrl(item.url)) {
@@ -55,8 +91,11 @@ watch(currentUrl, () => {
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
-        <SidebarMenu>
+        <SidebarGroupLabel
+            class="text-[0.7rem] font-semibold uppercase tracking-wider text-sidebar-foreground/55"
+            >Plataforma</SidebarGroupLabel
+        >
+        <SidebarMenu class="gap-1">
             <template v-for="item in items" :key="item.id">
                 <Collapsible
                     v-if="item.hijos.length"
@@ -66,7 +105,12 @@ watch(currentUrl, () => {
                 >
                     <SidebarMenuItem>
                         <CollapsibleTrigger as-child>
-                            <SidebarMenuButton :tooltip="item.nombre">
+                            <SidebarMenuButton
+                                class="font-medium"
+                                :is-active="containsCurrentRoute(item)"
+                                :tooltip="item.nombre"
+                            >
+                                <component :is="iconoDe(item)" class="size-4 shrink-0" />
                                 <span>{{ item.nombre }}</span>
                                 <ChevronRight
                                     class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
@@ -89,11 +133,20 @@ watch(currentUrl, () => {
                 </Collapsible>
 
                 <SidebarMenuItem v-else>
-                    <SidebarMenuButton as-child :is-active="item.url ? isCurrentUrl(item.url) : false" :tooltip="item.nombre">
-                        <Link :href="item.url ?? '#'">{{ item.nombre }}</Link>
+                    <SidebarMenuButton
+                        class="font-medium"
+                        as-child
+                        :is-active="item.url ? isCurrentUrl(item.url) : false"
+                        :tooltip="item.nombre"
+                    >
+                        <Link :href="item.url ?? '#'">
+                            <component :is="iconoDe(item)" class="size-4 shrink-0" />
+                            <span>{{ item.nombre }}</span>
+                        </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </template>
         </SidebarMenu>
     </SidebarGroup>
 </template>
+

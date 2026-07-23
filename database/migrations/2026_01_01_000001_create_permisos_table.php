@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -20,8 +21,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('padre_id')->nullable()->constrained('permisos')->nullOnDelete();
             $table->string('nombre', 150);
-            $table->string('endpoint', 150)->nullable()->unique();
+            // Solo el segmento propio (p. ej. `seguridad`, `roles`). El endpoint
+            // completo (`seguridad.roles`) se deriva de la jerarquía en código.
+            // Un segmento es único dentro de su padre, no en todo el sistema.
+            $table->string('endpoint', 150)->nullable();
             $table->boolean('activo')->default(true);
+
+            $table->unique(['padre_id', 'endpoint']);
         });
     }
 

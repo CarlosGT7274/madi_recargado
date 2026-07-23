@@ -27,7 +27,7 @@ class RolesPermisosSeeder extends Seeder
 
         $seguridad = Permiso::updateOrCreate(
             ['nombre' => 'Seguridad'],
-            ['padre_id' => null, 'endpoint' => null, 'activo' => true]
+            ['padre_id' => null, 'endpoint' => 'seguridad', 'activo' => true]
         );
 
         $roles = Permiso::updateOrCreate(
