@@ -1,6 +1,6 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { index as rolesIndex } from '@/routes/seguridad/roles';
+import { index as rolesIndex } from '@/routes/roles';
 
 export default {
     layout: () => ({
@@ -20,7 +20,7 @@ import Heading from '@/components/Heading.vue';
 import PermisoTreeRow from '@/components/PermisoTreeRow.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { permisos as permisosRole } from '@/actions/App/Http/Controllers/RoleController';
+import { permisos as permisosRole } from '@/actions/App/Http/Controllers/Seguridad/RoleController';
 import type { PermisoNodo } from '@/types/roles';
 
 const props = defineProps<{

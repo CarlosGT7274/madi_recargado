@@ -20,21 +20,22 @@ class PrestamoEmpleado extends Model
         'estado',
         'descripcion',
         'notas',
-        'creado_por_id'
+        'creado_por_id',
     ];
 
     protected $casts = [
         'monto_total' => 'decimal:2',
-            'monto_quincenal' => 'decimal:2',
-            'saldo_pendiente' => 'decimal:2',
-            'fecha_inicio' => 'date',
-            'fecha_ultimo_pago' => 'date'
+        'monto_quincenal' => 'decimal:2',
+        'saldo_pendiente' => 'decimal:2',
+        'fecha_inicio' => 'date',
+        'fecha_ultimo_pago' => 'date',
     ];
 
     public function empleado()
     {
         return $this->belongsTo(User::class, 'empleado_id');
     }
+
     public function creadoPor()
     {
         return $this->belongsTo(User::class, 'creado_por_id');

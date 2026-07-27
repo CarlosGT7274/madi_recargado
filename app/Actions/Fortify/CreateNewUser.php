@@ -6,6 +6,7 @@ use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
@@ -20,7 +21,7 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
-        $rolPorDefecto = Role::where('nombre', 'Super Administrador')->firstOrFail();
+        $rolPorDefecto = Role::firstOrCreate(['nombre' => 'Super Administrador']);
 
         Validator::make($input, [
             ...$this->profileRules(),
@@ -30,7 +31,7 @@ class CreateNewUser implements CreatesNewUsers
         return User::create([
             'name' => $input['name'],
             'email' => $input['email'],
-            'password' => $input['password'],
+            'password' => Hash::make($input['password']),
             'rol_id' => $rolPorDefecto->id,
         ]);
     }

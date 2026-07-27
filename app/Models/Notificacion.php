@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Notificacion extends Model
 {
     protected $table = 'notificaciones';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -18,12 +19,12 @@ class Notificacion extends Model
         'entidad_id',
         'usuario_id',
         'es_general',
-        'fecha'
+        'fecha',
     ];
 
     protected $casts = [
         'leida' => 'boolean',
-            'es_general' => 'boolean'
+        'es_general' => 'boolean',
     ];
 
     public function usuario()

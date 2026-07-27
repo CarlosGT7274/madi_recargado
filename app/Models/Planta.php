@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class Planta extends Model
 {
     protected $table = 'plantas';
+
     const CREATED_AT = 'fecha_creacion';
+
     const UPDATED_AT = 'fecha_modificacion';
 
     protected $fillable = [
@@ -16,11 +18,11 @@ class Planta extends Model
         'direccion',
         'descripcion',
         'activa',
-        'usuario_id'
+        'usuario_id',
     ];
 
     protected $casts = [
-        'activa' => 'boolean'
+        'activa' => 'boolean',
     ];
 
     public function usuario()

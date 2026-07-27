@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Folio extends Model
 {
     protected $table = 'folios';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -14,11 +15,10 @@ class Folio extends Model
         'tipo',
         'prefijo',
         'ultimo_numero',
-        'fecha_actualizacion'
+        'fecha_actualizacion',
     ];
 
     protected $casts = [
-        
-    ];
 
+    ];
 }

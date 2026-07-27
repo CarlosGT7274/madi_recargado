@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Bitacora extends Model
 {
     protected $table = 'bitacora';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -14,11 +15,11 @@ class Bitacora extends Model
         'accion',
         'descripcion',
         'ip',
-        'fecha_hora'
+        'fecha_hora',
     ];
 
     protected $casts = [
-        
+
     ];
 
     public function usuario()

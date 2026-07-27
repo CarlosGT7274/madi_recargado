@@ -12,21 +12,23 @@ class CompraSeguimiento extends Model
         'compra_orden_id',
         'requisicion_material_id',
         'via',
-        'cantidad_aprobada'
+        'cantidad_aprobada',
     ];
 
     protected $casts = [
-        
+
     ];
 
     public function compraOrden()
     {
         return $this->belongsTo(CompraOrden::class, 'compra_orden_id');
     }
+
     public function requisicionMaterial()
     {
         return $this->belongsTo(RequisicionMaterial::class, 'requisicion_material_id');
     }
+
     public function inventarioItem()
     {
         return $this->belongsTo(InventarioItem::class, 'inventario_item_id');

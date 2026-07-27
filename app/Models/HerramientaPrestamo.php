@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class HerramientaPrestamo extends Model
 {
     protected $table = 'herramientas_prestamos';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -21,18 +22,19 @@ class HerramientaPrestamo extends Model
         'observaciones',
         'fecha_entrega',
         'fecha_devolucion',
-        'ultima_actualizacion'
+        'ultima_actualizacion',
     ];
 
     protected $casts = [
         'fecha_entrega' => 'date',
-            'fecha_devolucion' => 'date'
+        'fecha_devolucion' => 'date',
     ];
 
     public function empleado()
     {
         return $this->belongsTo(User::class, 'empleado_id');
     }
+
     public function inventarioItem()
     {
         return $this->belongsTo(InventarioItem::class, 'inventario_item_id');

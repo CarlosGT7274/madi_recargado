@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class SysConfiguracion extends Model
 {
     protected $table = 'sys_configuracion';
+
     const CREATED_AT = 'fecha_creacion';
+
     const UPDATED_AT = 'fecha_modificacion';
 
     protected $fillable = [
@@ -16,11 +18,10 @@ class SysConfiguracion extends Model
         'tipo',
         'categoria',
         'descripcion',
-        'editable'
+        'editable',
     ];
 
     protected $casts = [
-        'editable' => 'boolean'
+        'editable' => 'boolean',
     ];
-
 }

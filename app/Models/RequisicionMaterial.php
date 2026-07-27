@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class RequisicionMaterial extends Model
 {
     protected $table = 'requisicion_materiales';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -26,20 +27,21 @@ class RequisicionMaterial extends Model
         'cantidad_entregada',
         'sugerencia_compra',
         'importe',
-        'enviado_a_compras'
+        'enviado_a_compras',
     ];
 
     protected $casts = [
         'material_distinto_a_autorizado' => 'boolean',
-            'fecha_llegada' => 'date',
-            'importe' => 'decimal:2',
-            'enviado_a_compras' => 'boolean'
+        'fecha_llegada' => 'date',
+        'importe' => 'decimal:2',
+        'enviado_a_compras' => 'boolean',
     ];
 
     public function requisicion()
     {
         return $this->belongsTo(Requisicion::class, 'requisicion_id');
     }
+
     public function insumo()
     {
         return $this->belongsTo(Insumo::class, 'insumo_id');

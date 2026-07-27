@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class Archivo extends Model
 {
     protected $table = 'archivos';
+
     const CREATED_AT = 'fecha_creacion';
+
     const UPDATED_AT = null;
 
     protected $fillable = [
@@ -23,11 +25,11 @@ class Archivo extends Model
         'storage_driver',
         'descripcion',
         'orden',
-        'usuario_id'
+        'usuario_id',
     ];
 
     protected $casts = [
-        
+
     ];
 
     public function usuario()

@@ -19,17 +19,18 @@ class CompraOrden extends Model
         'fecha_entrega',
         'observaciones',
         'usuario_registro_id',
-        'usuario_modificacion_id'
+        'usuario_modificacion_id',
     ];
 
     protected $casts = [
-        'fecha_estimada_entrega' => 'date'
+        'fecha_estimada_entrega' => 'date',
     ];
 
     public function usuarioRegistro()
     {
         return $this->belongsTo(User::class, 'usuario_registro_id');
     }
+
     public function usuarioModificacion()
     {
         return $this->belongsTo(User::class, 'usuario_modificacion_id');

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Roles;
+namespace App\Http\Requests\Seguridad\Roles;
 
 use App\Models\Permiso;
 use App\Support\Accion;

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Requisicion extends Model
 {
     protected $table = 'requisiciones';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -21,7 +22,7 @@ class Requisicion extends Model
         'enviada_a_compras',
         'fecha_solicitud',
         'fecha_actualizacion',
-        'fecha_cierre'
+        'fecha_cierre',
     ];
 
     protected $casts = [
@@ -33,10 +34,12 @@ class Requisicion extends Model
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
+
     public function cotizacion()
     {
         return $this->belongsTo(Cotizacion::class, 'cotizacion_id');
     }
+
     public function empleado()
     {
         return $this->belongsTo(User::class, 'empleado_id');
