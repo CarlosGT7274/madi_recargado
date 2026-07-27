@@ -3,7 +3,8 @@
     use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/settings.php';
-require __DIR__.'/roles.php';
+require __DIR__.'/seguridad.php';
+require __DIR__.'/ingenierias.php';
 
 Route::inertia('/', 'Welcome')->name('home');
 

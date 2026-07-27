@@ -1,0 +1,4 @@
+Borra estos dos archivos manualmente en tu repo (ya no se usan):
+
+- app/Domain/  (carpeta completa, incluye Ingenierias/Proyectos/PlantaService.php)
+- app/Http/Controllers/Ingenierias/ProyectoController.php  (reemplazado por PlantaController.php)

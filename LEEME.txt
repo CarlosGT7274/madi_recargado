@@ -1,0 +1,28 @@
+PASOS PARA APLICAR ESTOS CAMBIOS (en tu repo real):
+
+1) Copia todos los archivos de este zip sobre tu repo, respetando rutas.
+   routes/web.php, database/seeders/RolesPermisosSeeder.php y routes/seguridad.php
+   reemplazan por completo a los tuyos (ya incluyen tu contenido original + los cambios).
+
+2) Borra estos archivos, ya no se usan:
+   - app/Domain/                                        (carpeta completa)
+   - app/Http/Controllers/Ingenierias/ProyectoController.php
+   - routes/roles.php   (fue renombrado a routes/seguridad.php, mismo contenido)
+
+3) Corre:
+   php artisan migrate:fresh --seed
+   php artisan wayfinder:generate --with-form --no-interaction
+   npm run dev   (o npm run build)
+
+NOTA: Los route names de Roles (roles.index, roles.show, etc.) NO cambiaron,
+solo el archivo .php que los contiene y su require en web.php. Por eso el
+import `@/routes/roles` en resources/js/pages/roles/Show.vue sigue funcionando
+sin cambios.
+
+BUG PENDIENTE (no corregido en este patch, ver explicación en el chat):
+El módulo Seguridad no aparece en el sidebar dinámico porque sus route names
+son planos (roles.index) en vez de jerárquicos (seguridad.roles.index), que es
+lo que espera Role::menuVisible()/resolverUrl(). Ingenierías sí aparece porque
+sus rutas ya se nombraron de forma jerárquica (ingenierias.plantas.index).
+Corregir esto implica renombrar los route names de Roles y ajustar el import
+en roles/Show.vue -- pendiente de tu confirmación explícita.
