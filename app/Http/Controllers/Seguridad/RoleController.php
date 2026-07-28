@@ -19,7 +19,7 @@ class RoleController extends Controller
 {
     public function index(RolesAction $roleAction): Response
     {
-        return Inertia::render('roles/Index', [
+        return Inertia::render('seguridad/roles/Index', [
             'roles' => $roleAction->list(),
         ]);
     }
@@ -73,12 +73,9 @@ class RoleController extends Controller
     {
         $detalle = $roleAction->detail($role);
 
-        return Inertia::render('roles/Show', [
+        return Inertia::render('seguridad/roles/Show', [
             'role' => $detalle['role'],
             'permisosArbol' => $detalle['permisosArbol'],
-            // Cast a objeto: si no hay permisos asignados, el array vacío debe
-            // serializar como `{}` en JSON, no como `[]` — el front-end espera
-            // un Record<number, number>, no una lista.
             'permisosAsignados' => (object) $detalle['permisosAsignados'],
         ]);
     }

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { index as rolesIndex } from '@/routes/roles';
+import { index as rolesIndex } from '@/routes/seguridad/roles';
 
 export default {
     layout: () => ({
@@ -20,8 +20,8 @@ import Heading from '@/components/Heading.vue';
 import PermisoTreeRow from '@/components/PermisoTreeRow.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { permisos as permisosRole } from '@/actions/App/Http/Controllers/Seguridad/RoleController';
 import type { PermisoNodo } from '@/types/roles';
+import { permisos as permisosRole } from '@/actions/App/Http/Controllers/Seguridad/RoleController';
 
 const props = defineProps<{
     role: { id: number; nombre: string; activo: boolean; usuarios_count: number };
@@ -40,14 +40,12 @@ const TODAS = 15;
 const valores = reactive<Record<number, number>>({ ...props.permisosAsignados });
 const procesando = ref(false);
 
-// Utilidades de árbol
 const idsSubarbol = (nodo: PermisoNodo): number[] => {
     return [nodo.id, ...nodo.hijos.flatMap(idsSubarbol)];
 };
 
 const idsTodos = computed(() => props.permisosArbol.flatMap(idsSubarbol));
 
-// Operaciones de permisos
 const cambiar = (ids: number[], bit: number, activo: boolean) => {
     ids.forEach((id) => {
         const actual = valores[id] ?? 0;
@@ -64,7 +62,6 @@ const quitar = (permisoId: number) => {
     delete valores[permisoId];
 };
 
-// Estados de checkbox
 type EstadoCheck = boolean | 'indeterminate';
 
 const calcularEstado = (coincidencias: number, total: number): EstadoCheck => {
@@ -73,7 +70,6 @@ const calcularEstado = (coincidencias: number, total: number): EstadoCheck => {
     return 'indeterminate';
 };
 
-// Estado global (todos los permisos)
 const estadoGlobal = computed<EstadoCheck>(() => {
     const total = idsTodos.value.length;
     const completos = idsTodos.value.filter(id => (valores[id] ?? 0) === TODAS).length;
@@ -88,7 +84,6 @@ const limpiarTodo = () => {
     Object.keys(valores).forEach(key => delete valores[Number(key)]);
 };
 
-// Estado por columna (acción específica)
 const estadoColumna = (bit: number): EstadoCheck => {
     const total = idsTodos.value.length;
     const activos = idsTodos.value.filter(id => ((valores[id] ?? 0) & bit) === bit).length;
@@ -99,7 +94,6 @@ const alternarColumna = (bit: number, activo: boolean) => {
     idsTodos.value.forEach(id => cambiar([id], bit, activo));
 };
 
-// Estado por módulo (subárbol completo)
 const alternarModulo = (ids: number[], activo: boolean) => {
     ids.forEach(id => {
         if (activo) {
@@ -110,7 +104,6 @@ const alternarModulo = (ids: number[], activo: boolean) => {
     });
 };
 
-// Guardar cambios
 const guardar = () => {
     procesando.value = true;
     router.put(permisosRole.url(props.role.id), { permisos: valores }, {
@@ -123,7 +116,6 @@ const guardar = () => {
 <template>
     <Head :title="`Rol: ${role.nombre}`" />
     <div class="flex flex-col gap-6 p-4">
-        <!-- Header -->
         <div class="flex flex-wrap items-center justify-between gap-3">
             <Heading
                 :title="role.nombre"
@@ -142,9 +134,7 @@ const guardar = () => {
             </div>
         </div>
 
-        <!-- Tabla de permisos -->
         <div class="overflow-hidden rounded-xl border">
-            <!-- Header de columnas -->
             <div class="grid grid-cols-[1fr_repeat(4,80px)_90px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
                 <div class="flex items-center gap-2">
                     <Checkbox
@@ -179,7 +169,6 @@ const guardar = () => {
                 <span />
             </div>
 
-            <!-- Filas del árbol -->
             <PermisoTreeRow
                 v-for="nodo in permisosArbol"
                 :key="nodo.id"
@@ -192,4 +181,3 @@ const guardar = () => {
         </div>
     </div>
 </template>
-

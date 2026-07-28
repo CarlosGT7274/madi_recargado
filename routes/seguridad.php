@@ -5,16 +5,18 @@ use App\Support\Accion;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::middleware('permiso:'.Accion::READ)
-        ->name('roles.index')
-        ->get('seguridad/roles', [RoleController::class, 'index']);
+    Route::name('seguridad.roles.')->prefix('seguridad/roles')->group(function () {
+        Route::middleware('permiso:'.Accion::READ)
+            ->get('/', [RoleController::class, 'index'])
+            ->name('index');
 
-    Route::middleware('permiso:'.Accion::READ)
-        ->get('seguridad/roles/{role}', [RoleController::class, 'show'])
-        ->name('roles.show');
+        Route::middleware('permiso:'.Accion::READ)
+            ->get('/{role}', [RoleController::class, 'show'])
+            ->name('show');
 
-    Route::post('seguridad/roles', [RoleController::class, 'store'])->name('roles.store');
-    Route::put('seguridad/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
-    Route::delete('seguridad/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
-    Route::put('seguridad/roles/{role}/permisos', [RoleController::class, 'permisos'])->name('roles.permisos.update');
+        Route::post('/', [RoleController::class, 'store'])->name('store');
+        Route::put('/{role}', [RoleController::class, 'update'])->name('update');
+        Route::delete('/{role}', [RoleController::class, 'destroy'])->name('destroy');
+        Route::put('/{role}/permisos', [RoleController::class, 'permisos'])->name('permisos.update');
+    });
 });
