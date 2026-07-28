@@ -29,4 +29,9 @@ class Planta extends Model
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
+
+    public function levantamientos()
+    {
+        return $this->hasMany(Levantamiento::class, 'planta_id');
+    }
 }

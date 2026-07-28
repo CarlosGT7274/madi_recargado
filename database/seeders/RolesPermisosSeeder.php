@@ -50,6 +50,11 @@ class RolesPermisosSeeder extends Seeder
             ['padre_id' => $ingenierias->id, 'endpoint' => 'plantas', 'activo' => true]
         );
 
+        $levantamientos = Permiso::updateOrCreate(
+            ['nombre' => 'Levantamientos'],
+            ['padre_id' => $plantas->id, 'endpoint' => 'levantamientos', 'activo' => true]
+        );
+
         $superAdmin->otorgar($seguridad, Accion::ALL);
         $superAdmin->otorgar($sistema, Accion::READ);
         $superAdmin->otorgar($inventario, Accion::ALL);
@@ -57,6 +62,7 @@ class RolesPermisosSeeder extends Seeder
         $superAdmin->otorgar($usuarios, Accion::ALL);
         $superAdmin->otorgar($ingenierias, Accion::READ);
         $superAdmin->otorgar($plantas, Accion::ALL);
+        $superAdmin->otorgar($levantamientos, Accion::ALL);
 
         $supervisor->otorgar($sistema, Accion::READ);
         $supervisor->otorgar($inventario, Accion::READ | Accion::UPDATE);
