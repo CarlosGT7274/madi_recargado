@@ -50,17 +50,6 @@ class RolesPermisosSeeder extends Seeder
             ['padre_id' => $ingenierias->id, 'endpoint' => 'plantas', 'activo' => true]
         );
 
-        // Los levantamientos viven bajo `ingenierias/plantas/{planta}/levantamientos`
-        // pero sus rutas se nombran `ingenierias.levantamientos.*`. Por eso el
-        // endpoint completo de este permiso debe resolver a `ingenierias.levantamientos`
-        // (hijo de Ingenierías con segmento `levantamientos`), de modo que el
-        // middleware `permiso:*`, el Gate del controlador y el mapa de permisos
-        // del frontend puedan encontrarlo.
-        $levantamientos = Permiso::updateOrCreate(
-            ['nombre' => 'Levantamientos'],
-            ['padre_id' => $ingenierias->id, 'endpoint' => 'levantamientos', 'activo' => true]
-        );
-
         $superAdmin->otorgar($seguridad, Accion::ALL);
         $superAdmin->otorgar($sistema, Accion::READ);
         $superAdmin->otorgar($inventario, Accion::ALL);
@@ -68,7 +57,6 @@ class RolesPermisosSeeder extends Seeder
         $superAdmin->otorgar($usuarios, Accion::ALL);
         $superAdmin->otorgar($ingenierias, Accion::READ);
         $superAdmin->otorgar($plantas, Accion::ALL);
-        $superAdmin->otorgar($levantamientos, Accion::ALL);
 
         $supervisor->otorgar($sistema, Accion::READ);
         $supervisor->otorgar($inventario, Accion::READ | Accion::UPDATE);
