@@ -64,8 +64,7 @@ class LevantamientoController extends Controller
 
     public function destroy(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse
     {
-        Gate::authorize('permiso', ['Levantamientos', Accion::DELETE]);
-
+        // Autorización garantizada por el middleware `permiso:DELETE` de la ruta.
         $action->delete($levantamiento);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Levantamiento eliminado.']);
