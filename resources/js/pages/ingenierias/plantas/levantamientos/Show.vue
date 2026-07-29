@@ -26,6 +26,7 @@ import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft } from '@lucide/vue';
 import { ref } from 'vue';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
+import { usePermissions } from '@/composables/usePermissions';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
+import PageLayout from '@/components/PageLayout.vue';
+
 type PlantaResumen = {
     id: number;
     nombre: string;
@@ -73,6 +76,8 @@ const props = defineProps<{
     planta: PlantaResumen;
     levantamiento: LevantamientoDetalle;
 }>();
+
+const { hasPermission, Accion } = usePermissions();
 
 const dialogOpen = ref(false);
 
@@ -120,26 +125,26 @@ function eliminar() {
 <template>
     <Head :title="`Levantamiento: ${levantamiento.nombre}`" />
 
-    <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="LevantamientoController.index(planta.id)"
-                    class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                >
-                    <ArrowLeft class="size-4" />
-                </Link>
-                <Heading
-                    :title="levantamiento.nombre"
-                    :description="`Folio ${levantamiento.folio}`"
-                />
-            </div>
-            <div class="flex items-center gap-2">
-                <Dialog v-model:open="dialogOpen">
-                    <DialogTrigger as-child>
-                        <Button variant="outline">Editar</Button>
-                    </DialogTrigger>
-                    <DialogContent>
+    <PageLayout
+        :title="levantamiento.nombre"
+        :description="`Folio ${levantamiento.folio}`"
+        endpoint="ingenierias.levantamientos"
+        with-edit
+        with-delete
+        @edit="dialogOpen = true"
+        @delete="eliminar"
+    >
+        <template #breadcrumbs>
+            <Link
+                :href="LevantamientoController.index(planta.id)"
+                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+                <ArrowLeft class="size-4" />
+            </Link>
+        </template>
+
+        <Dialog v-model:open="dialogOpen">
+            <DialogContent>
                         <Form
                             v-bind="LevantamientoController.update.form({ planta: planta.id, levantamiento: levantamiento.id })"
                             :options="{ preserveScroll: true }"
@@ -214,11 +219,7 @@ function eliminar() {
                         </Form>
                     </DialogContent>
                 </Dialog>
-
-                <Button variant="destructive" @click="eliminar">Eliminar</Button>
-            </div>
-        </div>
-
+        
         <div class="grid gap-6 rounded-xl border p-6 md:grid-cols-2">
             <div class="space-y-1">
                 <p class="text-xs font-medium text-muted-foreground">Folio</p>
@@ -262,5 +263,5 @@ function eliminar() {
                 <p class="text-sm">{{ levantamiento.modificado ?? '—' }}</p>
             </div>
         </div>
-    </div>
+    </PageLayout>
 </template>

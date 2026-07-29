@@ -1,9 +1,9 @@
 <?php
 
 use App\Models\Levantamiento;
+use App\Models\Permiso;
 use App\Models\Planta;
 use App\Models\Role;
-use App\Models\Permiso;
 use App\Models\User;
 use App\Support\Accion;
 
@@ -29,9 +29,9 @@ test('users with permission can view levantamientos list', function () {
         ->get("/ingenierias/plantas/{$planta->id}/levantamientos")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('ingenierias/levantamientos/Index')
-            ->has('levantamientos', 3)
+            ->component('ingenierias/plantas/levantamientos/Index')
             ->where('planta.id', $planta->id)
+            ->has('levantamientos', 3)
         );
 });
 
@@ -42,7 +42,7 @@ test('users with permission can view levantamiento details', function () {
         ->get("/ingenierias/plantas/{$levantamiento->planta_id}/levantamientos/{$levantamiento->id}")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('ingenierias/levantamientos/Show')
+            ->component('ingenierias/plantas/levantamientos/Show')
             ->where('levantamiento.id', $levantamiento->id)
             ->where('planta.id', $levantamiento->planta_id)
         );

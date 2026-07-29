@@ -75,6 +75,21 @@ class Role extends Model
     }
 
     /**
+     * @return array<string, int>
+     */
+    public function mapaPermisosPorEndpoint(): array
+    {
+        return $this->permisos()
+            ->with('padre.padre.padre')
+            ->get()
+            ->mapWithKeys(function (Permiso $permiso) {
+                $endpoint = $permiso->endpointCompleto();
+
+                return $endpoint ? [$endpoint => (int) $permiso->pivot->permisos] : [];
+            })->all();
+    }
+
+    /**
      * Módulos visibles en el sidebar para este rol: solo permisos activos,
      * con endpoint definido, con ruta registrada, y con bit READ concedido
      * (heredado o directo).

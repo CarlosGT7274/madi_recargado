@@ -16,7 +16,7 @@ export default {
 import { Head, router } from '@inertiajs/vue3';
 import { Check, Minus } from '@lucide/vue';
 import { computed, reactive, ref } from 'vue';
-import Heading from '@/components/Heading.vue';
+import PageLayout from '@/components/PageLayout.vue';
 import PermisoTreeRow from '@/components/PermisoTreeRow.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -115,24 +115,22 @@ const guardar = () => {
 
 <template>
     <Head :title="`Rol: ${role.nombre}`" />
-    <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <Heading
-                :title="role.nombre"
-                :description="`${role.usuarios_count} usuarios con este rol`"
-            />
-            <div class="flex items-center gap-2">
-                <Button variant="outline" size="sm" @click="seleccionarTodo">
-                    Seleccionar todo
-                </Button>
-                <Button variant="outline" size="sm" @click="limpiarTodo">
-                    Limpiar todo
-                </Button>
-                <Button :disabled="procesando" @click="guardar">
-                    Guardar permisos
-                </Button>
-            </div>
-        </div>
+    <PageLayout
+        :title="role.nombre"
+        :description="`${role.usuarios_count} usuarios con este rol`"
+        endpoint="seguridad.roles"
+    >
+        <template #actions>
+            <Button variant="outline" size="sm" @click="seleccionarTodo">
+                Seleccionar todo
+            </Button>
+            <Button variant="outline" size="sm" @click="limpiarTodo">
+                Limpiar todo
+            </Button>
+            <Button :disabled="procesando" @click="guardar">
+                Guardar permisos
+            </Button>
+        </template>
 
         <div class="overflow-hidden rounded-xl border">
             <div class="grid grid-cols-[1fr_repeat(4,80px)_90px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
@@ -179,5 +177,5 @@ const guardar = () => {
                 @modulo="alternarModulo"
             />
         </div>
-    </div>
+    </PageLayout>
 </template>

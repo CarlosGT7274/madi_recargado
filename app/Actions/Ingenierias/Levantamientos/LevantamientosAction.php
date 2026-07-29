@@ -25,6 +25,9 @@ class LevantamientosAction
                 'creado' => $l->fecha_creacion
                     ? Carbon::parse($l->fecha_creacion)->format('d/m/Y')
                     : null,
+                'creado_iso' => $l->fecha_creacion
+                    ? Carbon::parse($l->fecha_creacion)->format('Y-m-d')
+                    : null,
             ]);
     }
 

@@ -18,7 +18,7 @@ class LevantamientoController extends Controller
 {
     public function index(Planta $planta, LevantamientosAction $action): Response
     {
-        return Inertia::render('ingenierias/levantamientos/Index', [
+        return Inertia::render('ingenierias/plantas/levantamientos/Index', [
             'planta' => [
                 'id' => $planta->id,
                 'nombre' => $planta->nombre,
@@ -28,9 +28,14 @@ class LevantamientoController extends Controller
         ]);
     }
 
+    public function data(Planta $planta, LevantamientosAction $action)
+    {
+        return response()->json($action->list($planta));
+    }
+
     public function show(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action): Response
     {
-        return Inertia::render('ingenierias/levantamientos/Show', [
+        return Inertia::render('ingenierias/plantas/levantamientos/Show', [
             'planta' => [
                 'id' => $planta->id,
                 'nombre' => $planta->nombre,

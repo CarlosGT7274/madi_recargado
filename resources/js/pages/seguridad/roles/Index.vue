@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { Plus } from '@lucide/vue';
 import { ref } from 'vue';
 import RoleController from '@/actions/App/Http/Controllers/Seguridad/RoleController';
 import { index as rolesIndex } from '@/routes/seguridad/roles';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -15,7 +14,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,52 +38,45 @@ const dialogOpen = ref(false);
 <template>
     <Head title="Roles" />
 
-    <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <Heading
-                title="Roles"
-                description="Roles y permisos del sistema"
-            />
+    <PageLayout
+        title="Roles"
+        description="Roles y permisos del sistema"
+        endpoint="seguridad.roles"
+        with-create
+        @create="dialogOpen = true"
+    >
+        <Dialog v-model:open="dialogOpen">
+            <DialogContent>
+                <Form
+                    v-bind="RoleController.store.form()"
+                    reset-on-success
+                    :options="{ preserveScroll: true }"
+                    @success="dialogOpen = false"
+                    v-slot="{ errors, processing }"
+                    class="space-y-4"
+                >
+                    <DialogHeader>
+                        <DialogTitle>Nuevo rol</DialogTitle>
+                        <DialogDescription>
+                            Crea un nuevo rol para asignar permisos.
+                        </DialogDescription>
+                    </DialogHeader>
 
-            <Dialog v-model:open="dialogOpen">
-                <DialogTrigger as-child>
-                    <Button>
-                        <Plus class="mr-2 size-4" />
-                        Nuevo rol
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <Form
-                        v-bind="RoleController.store.form()"
-                        reset-on-success
-                        :options="{ preserveScroll: true }"
-                        @success="dialogOpen = false"
-                        v-slot="{ errors, processing }"
-                        class="space-y-4"
-                    >
-                        <DialogHeader>
-                            <DialogTitle>Nuevo rol</DialogTitle>
-                            <DialogDescription>
-                                Crea un nuevo rol para asignar permisos.
-                            </DialogDescription>
-                        </DialogHeader>
+                    <div class="grid gap-2">
+                        <Label for="nombre">Nombre</Label>
+                        <Input id="nombre" name="nombre" placeholder="Nombre del rol" />
+                        <InputError :message="errors.nombre" />
+                    </div>
 
-                        <div class="grid gap-2">
-                            <Label for="nombre">Nombre</Label>
-                            <Input id="nombre" name="nombre" placeholder="Nombre del rol" />
-                            <InputError :message="errors.nombre" />
-                        </div>
-
-                        <DialogFooter class="gap-2">
-                            <DialogClose as-child>
-                                <Button variant="secondary">Cancelar</Button>
-                            </DialogClose>
-                            <Button type="submit" :disabled="processing">Guardar</Button>
-                        </DialogFooter>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-        </div>
+                    <DialogFooter class="gap-2">
+                        <DialogClose as-child>
+                            <Button variant="secondary">Cancelar</Button>
+                        </DialogClose>
+                        <Button type="submit" :disabled="processing">Guardar</Button>
+                    </DialogFooter>
+                </Form>
+            </DialogContent>
+        </Dialog>
 
         <div class="overflow-hidden rounded-xl border">
             <div
@@ -113,5 +104,5 @@ const dialogOpen = ref(false);
                 Aún no hay roles registrados.
             </p>
         </div>
-    </div>
+    </PageLayout>
 </template>

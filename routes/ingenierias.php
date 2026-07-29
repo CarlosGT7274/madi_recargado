@@ -10,7 +10,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Grupo de Plantas
     Route::name('ingenierias.plantas.')
         ->prefix('ingenierias/plantas')
-        ->middleware('permiso:' . Accion::READ)
+        ->middleware('permiso:'.Accion::READ)
         ->group(function () {
             Route::get('/', [PlantaController::class, 'index'])->name('index');
             Route::get('/{planta}', [PlantaController::class, 'show'])->name('show');
@@ -23,8 +23,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::name('ingenierias.levantamientos.')
         ->prefix('ingenierias/plantas/{planta}/levantamientos')
         ->scopeBindings()
-        ->middleware('permiso:' . Accion::READ)
+        ->middleware('permiso:'.Accion::READ)
         ->group(function () {
+            Route::get('/data', [LevantamientoController::class, 'data'])->name('data');
             Route::get('/', [LevantamientoController::class, 'index'])->name('index');
             Route::get('/{levantamiento}', [LevantamientoController::class, 'show'])->name('show');
             Route::post('/', [LevantamientoController::class, 'store'])->name('store');

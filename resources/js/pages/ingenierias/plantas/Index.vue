@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import { Plus } from '@lucide/vue';
 import { ref } from 'vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -14,7 +13,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,64 +44,57 @@ const dialogOpen = ref(false);
 <template>
     <Head title="Plantas" />
 
-    <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <Heading
-                title="Plantas"
-                description="Plantas registradas en Ingenierías"
-            />
+    <PageLayout
+        title="Plantas"
+        description="Plantas registradas en Ingenierías"
+        endpoint="ingenierias.plantas"
+        with-create
+        @create="dialogOpen = true"
+    >
+        <Dialog v-model:open="dialogOpen">
+            <DialogContent>
+                <Form
+                    v-bind="PlantaController.store.form()"
+                    reset-on-success
+                    :options="{ preserveScroll: true }"
+                    @success="dialogOpen = false"
+                    v-slot="{ errors, processing }"
+                    class="space-y-4"
+                >
+                    <DialogHeader>
+                        <DialogTitle>Nueva planta</DialogTitle>
+                        <DialogDescription>
+                            Registra una nueva planta para el módulo de Ingenierías.
+                        </DialogDescription>
+                    </DialogHeader>
 
-            <Dialog v-model:open="dialogOpen">
-                <DialogTrigger as-child>
-                    <Button>
-                        <Plus class="mr-2 size-4" />
-                        Nueva planta
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <Form
-                        v-bind="PlantaController.store.form()"
-                        reset-on-success
-                        :options="{ preserveScroll: true }"
-                        @success="dialogOpen = false"
-                        v-slot="{ errors, processing }"
-                        class="space-y-4"
-                    >
-                        <DialogHeader>
-                            <DialogTitle>Nueva planta</DialogTitle>
-                            <DialogDescription>
-                                Registra una nueva planta para el módulo de Ingenierías.
-                            </DialogDescription>
-                        </DialogHeader>
+                    <div class="grid gap-2">
+                        <Label for="folio">Folio</Label>
+                        <Input id="folio" name="folio" placeholder="PLT-0001" />
+                        <InputError :message="errors.folio" />
+                    </div>
 
-                        <div class="grid gap-2">
-                            <Label for="folio">Folio</Label>
-                            <Input id="folio" name="folio" placeholder="PLT-0001" />
-                            <InputError :message="errors.folio" />
-                        </div>
+                    <div class="grid gap-2">
+                        <Label for="nombre">Nombre</Label>
+                        <Input id="nombre" name="nombre" placeholder="Nombre de la planta" />
+                        <InputError :message="errors.nombre" />
+                    </div>
 
-                        <div class="grid gap-2">
-                            <Label for="nombre">Nombre</Label>
-                            <Input id="nombre" name="nombre" placeholder="Nombre de la planta" />
-                            <InputError :message="errors.nombre" />
-                        </div>
+                    <div class="grid gap-2">
+                        <Label for="direccion">Dirección</Label>
+                        <Input id="direccion" name="direccion" placeholder="Dirección (opcional)" />
+                        <InputError :message="errors.direccion" />
+                    </div>
 
-                        <div class="grid gap-2">
-                            <Label for="direccion">Dirección</Label>
-                            <Input id="direccion" name="direccion" placeholder="Dirección (opcional)" />
-                            <InputError :message="errors.direccion" />
-                        </div>
-
-                        <DialogFooter class="gap-2">
-                            <DialogClose as-child>
-                                <Button variant="secondary">Cancelar</Button>
-                            </DialogClose>
-                            <Button type="submit" :disabled="processing">Guardar</Button>
-                        </DialogFooter>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-        </div>
+                    <DialogFooter class="gap-2">
+                        <DialogClose as-child>
+                            <Button variant="secondary">Cancelar</Button>
+                        </DialogClose>
+                        <Button type="submit" :disabled="processing">Guardar</Button>
+                    </DialogFooter>
+                </Form>
+            </DialogContent>
+        </Dialog>
 
         <div class="overflow-hidden rounded-xl border">
             <div
@@ -137,5 +128,5 @@ const dialogOpen = ref(false);
                 Aún no hay plantas registradas.
             </p>
         </div>
-    </div>
+    </PageLayout>
 </template>
