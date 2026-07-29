@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Planta extends Model
 {
+    use HasFactory;
+
     protected $table = 'plantas';
 
     const CREATED_AT = 'fecha_creacion';
@@ -28,5 +32,10 @@ class Planta extends Model
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    public function levantamientos(): HasMany
+    {
+        return $this->hasMany(Levantamiento::class, 'planta_id');
     }
 }

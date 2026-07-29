@@ -13,9 +13,10 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { Form, Head, router } from '@inertiajs/vue3';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
+import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,9 @@ function eliminar() {
                 :description="`Folio ${planta.folio}`"
             />
             <div class="flex items-center gap-2">
+                <Button variant="secondary" as-child>
+                    <Link :href="LevantamientoController.index(planta.id)">Ver levantamientos</Link>
+                </Button>
                 <Dialog v-model:open="dialogOpen">
                     <DialogTrigger as-child>
                         <Button variant="outline">Editar</Button>

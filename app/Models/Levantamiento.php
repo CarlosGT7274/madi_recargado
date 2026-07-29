@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Levantamiento extends Model
 {
+    use HasFactory;
+
     protected $table = 'levantamientos';
 
     const CREATED_AT = 'fecha_creacion';
@@ -52,30 +56,38 @@ class Levantamiento extends Model
         'usuario_id',
     ];
 
-    protected $casts = [
-        'fecha_solicitud' => 'date',
-        'trabajos_alturas_certificado' => 'boolean',
-        'espacios_confinados_aplica' => 'boolean',
-        'espacios_confinados_certificado' => 'boolean',
-        'corte_soldadura_aplica' => 'boolean',
-        'corte_soldadura_certificado' => 'boolean',
-        'izaje_aplica' => 'boolean',
-        'izaje_certificado' => 'boolean',
-        'apertura_lineas_aplica' => 'boolean',
-        'apertura_lineas_certificado' => 'boolean',
-        'excavacion_aplica' => 'boolean',
-        'excavacion_certificado' => 'boolean',
-        'fecha_levantamiento_programada' => 'date',
-        'fecha_envio_cotizacion_programada' => 'date',
-        'fecha_cotizacion_enviada' => 'date',
+    protected $attributes = [
+        'estatus_admin' => 'recibida',
+        'prioridad' => 'normal',
     ];
 
-    public function planta()
+    protected function casts(): array
+    {
+        return [
+            'fecha_solicitud' => 'date',
+            'trabajos_alturas_certificado' => 'boolean',
+            'espacios_confinados_aplica' => 'boolean',
+            'espacios_confinados_certificado' => 'boolean',
+            'corte_soldadura_aplica' => 'boolean',
+            'corte_soldadura_certificado' => 'boolean',
+            'izaje_aplica' => 'boolean',
+            'izaje_certificado' => 'boolean',
+            'apertura_lineas_aplica' => 'boolean',
+            'apertura_lineas_certificado' => 'boolean',
+            'excavacion_aplica' => 'boolean',
+            'excavacion_certificado' => 'boolean',
+            'fecha_levantamiento_programada' => 'date',
+            'fecha_envio_cotizacion_programada' => 'date',
+            'fecha_cotizacion_enviada' => 'date',
+        ];
+    }
+
+    public function planta(): BelongsTo
     {
         return $this->belongsTo(Planta::class, 'planta_id');
     }
 
-    public function usuario()
+    public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
