@@ -1,8 +1,8 @@
 [[io.buildpacks.group]]
-id = "paketo-buildpacks/nodejs"
+id = "paketo-buildpacks/php"
 
 [[io.buildpacks.group]]
-id = "paketo-buildpacks/php"
+id = "paketo-buildpacks/nodejs"
 
 [[io.buildpacks.build.env]]
 name = "BP_NODE_RUN_SCRIPTS"
