@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Levantamiento extends Model
 {
@@ -90,5 +91,21 @@ class Levantamiento extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    public function cotizaciones(): HasMany
+    {
+        return $this->hasMany(Cotizacion::class, 'levantamiento_id');
+    }
+
+    /**
+     * Alias para el route model binding anidado (scopeBindings()).
+     * Laravel pluraliza "Cotizacion" con reglas de inglés y busca
+     * cotizacions() en vez de cotizaciones() — este método solo
+     * reenvía a la relación real para que el binding funcione.
+     */
+    public function cotizacions(): HasMany
+    {
+        return $this->cotizaciones();
     }
 }

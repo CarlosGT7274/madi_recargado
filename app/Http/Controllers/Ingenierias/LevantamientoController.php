@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\Ingenierias;
 
+use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Levantamientos\LevantamientosAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\StoreLevantamientoRequest;
 use App\Http\Requests\Ingenierias\UpdateLevantamientoRequest;
 use App\Models\Levantamiento;
 use App\Models\Planta;
-use App\Support\Accion;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,7 +32,7 @@ class LevantamientoController extends Controller
         return response()->json($action->list($planta));
     }
 
-    public function show(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action): Response
+    public function show(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action, CotizacionesAction $cotizacionesAction): Response
     {
         return Inertia::render('ingenierias/plantas/levantamientos/Show', [
             'planta' => [
@@ -41,6 +40,9 @@ class LevantamientoController extends Controller
                 'nombre' => $planta->nombre,
             ],
             'levantamiento' => $action->detail($levantamiento),
+            'cotizaciones' => Inertia::defer(
+                fn () => $cotizacionesAction->list($levantamiento)
+            ),
         ]);
     }
 
@@ -64,8 +66,6 @@ class LevantamientoController extends Controller
 
     public function destroy(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse
     {
-        Gate::authorize('permiso', ['Levantamientos', Accion::DELETE]);
-
         $action->delete($levantamiento);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Levantamiento eliminado.']);

@@ -2,15 +2,19 @@
 
 namespace App\Http\Requests\Ingenierias\Plantas;
 
-use App\Support\Accion;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdatePlantaRequest extends FormRequest
 {
+    /**
+     * La autorización la resuelve el middleware `permiso` de la ruta contra el
+     * árbol de permisos de la BD (acción UPDATE sobre `ingenierias.plantas`).
+     * Aquí no se duplica la lógica.
+     */
     public function authorize(): bool
     {
-        return $this->user()?->puede('Plantas', Accion::UPDATE) ?? false;
+        return true;
     }
 
     /**

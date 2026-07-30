@@ -13,7 +13,7 @@ class Cotizacion extends Model
     const UPDATED_AT = 'fecha_modificacion';
 
     protected $fillable = [
-        'proyecto_id',
+        'levantamiento_id',
         'folio',
         'fecha',
         'para',
@@ -55,9 +55,9 @@ class Cotizacion extends Model
         'presupuesto_consumido' => 'decimal:2',
     ];
 
-    public function proyecto()
+    public function levantamiento()
     {
-        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+        return $this->belongsTo(Levantamiento::class, 'levantamiento_id');
     }
 
     public function usuario()

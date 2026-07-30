@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Ingenierias;
 
+use App\Actions\Ingenierias\Levantamientos\LevantamientosAction;
 use App\Actions\Ingenierias\Plantas\PlantasAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Plantas\StorePlantaRequest;
@@ -22,10 +23,13 @@ class PlantaController extends Controller
         ]);
     }
 
-    public function show(Planta $planta, PlantasAction $plantasAction): Response
+    public function show(Planta $planta, PlantasAction $plantasAction, LevantamientosAction $levantamientosAction): Response
     {
         return Inertia::render('ingenierias/plantas/Show', [
             'planta' => $plantasAction->detail($planta),
+            'levantamientos' => Inertia::defer(
+                fn () => $levantamientosAction->list($planta)
+            ),
         ]);
     }
 

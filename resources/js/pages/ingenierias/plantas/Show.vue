@@ -13,18 +13,16 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { Form, Head, router } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { Deferred, Form, Head, Link, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import {
     Building2,
-    Calendar as CalendarIcon,
     ChevronLeft,
     ChevronRight,
     CircleCheck,
     Clock,
     FileText,
     Plus,
-    Trash2,
 } from '@lucide/vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
@@ -75,23 +73,10 @@ type LevantamientoResumen = {
 
 const props = defineProps<{
     planta: PlantaDetalle;
+    // Deferred: llega undefined en el render inicial, Inertia la pide sola
+    // en una segunda petición y actualiza esta prop cuando responde.
+    levantamientos?: LevantamientoResumen[];
 }>();
-
-const levantamientos = ref<LevantamientoResumen[]>([]);
-const cargando = ref(true);
-
-onMounted(async () => {
-    try {
-        const response = await fetch(LevantamientoController.data(props.planta.id).url);
-        if (response.ok) {
-            levantamientos.value = await response.json();
-        }
-    } catch (e) {
-        console.error(e);
-    } finally {
-        cargando.value = false;
-    }
-});
 
 const editDialogOpen = ref(false);
 const createDialogOpen = ref(false);
@@ -123,7 +108,6 @@ const estatusLabel: Record<string, string> = {
     cancelada: 'Cancelada',
 };
 
-// Agrupación visual para badges de estatus. Ajusta si tu criterio de negocio difiere.
 const estatusGrupo: Record<string, 'aprobado' | 'pendiente' | 'negativo'> = {
     recibida: 'pendiente',
     levantamiento_proceso: 'pendiente',
@@ -154,7 +138,7 @@ function prioridadVariant(prioridad: string) {
 // --- Calendario ---
 const hoy = new Date();
 const mesActual = ref(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-const fechaSeleccionada = ref<string | null>(null); // 'YYYY-MM-DD'
+const fechaSeleccionada = ref<string | null>(null);
 
 function toIso(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -162,7 +146,7 @@ function toIso(d: Date): string {
 
 const diasConLevantamientos = computed(() => {
     const set = new Set<string>();
-    for (const lev of levantamientos.value) {
+    for (const lev of props.levantamientos ?? []) {
         if (lev.creado_iso) set.add(lev.creado_iso);
     }
     return set;
@@ -172,7 +156,7 @@ const diasDelMes = computed(() => {
     const year = mesActual.value.getFullYear();
     const month = mesActual.value.getMonth();
     const primerDia = new Date(year, month, 1);
-    const inicioOffset = (primerDia.getDay() + 6) % 7; // lunes = 0
+    const inicioOffset = (primerDia.getDay() + 6) % 7;
     const totalDias = new Date(year, month + 1, 0).getDate();
 
     const celdas: { fecha: Date | null; iso: string | null }[] = [];
@@ -195,8 +179,9 @@ function seleccionarDia(iso: string | null) {
 }
 
 const levantamientosFiltrados = computed(() => {
-    if (!fechaSeleccionada.value) return levantamientos.value;
-    return levantamientos.value.filter((l) => l.creado_iso === fechaSeleccionada.value);
+    const lista = props.levantamientos ?? [];
+    if (!fechaSeleccionada.value) return lista;
+    return lista.filter((l) => l.creado_iso === fechaSeleccionada.value);
 });
 
 const totales = computed(() => {
@@ -343,7 +328,7 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
         </Dialog>
 
         <div class="space-y-6">
-            <!-- Header: planta + resumen + acción nuevo levantamiento -->
+            <!-- Header: planta + acción nuevo levantamiento -->
             <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b bg-muted/30 px-6 py-5">
                     <div class="flex items-center gap-4">
@@ -364,26 +349,37 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                     </Button>
                 </div>
 
-                <div class="grid grid-cols-3 divide-x border-b">
-                    <div class="flex flex-col items-center gap-1 py-4">
-                        <span class="flex items-center gap-1 text-2xl font-bold text-emerald-600">
-                            <CircleCheck class="size-5" />
-                            {{ totales.aprobados }}
-                        </span>
-                        <span class="text-xs uppercase tracking-wide text-muted-foreground">Aprobados</span>
+                <!-- Totales: solo tienen sentido una vez que llegó la data diferida -->
+                <Deferred data="levantamientos">
+                    <template #fallback>
+                        <div class="grid grid-cols-3 divide-x border-b py-6 text-center text-sm text-muted-foreground">
+                            <div>Cargando…</div>
+                            <div>Cargando…</div>
+                            <div>Cargando…</div>
+                        </div>
+                    </template>
+
+                    <div class="grid grid-cols-3 divide-x border-b">
+                        <div class="flex flex-col items-center gap-1 py-4">
+                            <span class="flex items-center gap-1 text-2xl font-bold text-emerald-600">
+                                <CircleCheck class="size-5" />
+                                {{ totales.aprobados }}
+                            </span>
+                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Aprobados</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 py-4">
+                            <span class="flex items-center gap-1 text-2xl font-bold text-amber-600">
+                                <Clock class="size-5" />
+                                {{ totales.pendientes }}
+                            </span>
+                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Pendientes</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 py-4">
+                            <span class="text-2xl font-bold">{{ totales.total }}</span>
+                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Total</span>
+                        </div>
                     </div>
-                    <div class="flex flex-col items-center gap-1 py-4">
-                        <span class="flex items-center gap-1 text-2xl font-bold text-amber-600">
-                            <Clock class="size-5" />
-                            {{ totales.pendientes }}
-                        </span>
-                        <span class="text-xs uppercase tracking-wide text-muted-foreground">Pendientes</span>
-                    </div>
-                    <div class="flex flex-col items-center gap-1 py-4">
-                        <span class="text-2xl font-bold">{{ totales.total }}</span>
-                        <span class="text-xs uppercase tracking-wide text-muted-foreground">Total</span>
-                    </div>
-                </div>
+                </Deferred>
             </div>
 
             <div class="grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -435,54 +431,64 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                 </div>
 
                 <!-- Lista filtrada -->
-                <div class="space-y-3">
-                    <div
-                        v-for="lev in levantamientosFiltrados"
-                        :key="lev.id"
-                        class="flex items-start gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent/50"
-                    >
-                        <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                            <FileText class="size-5" />
+                <Deferred data="levantamientos">
+                    <template #fallback>
+                        <div class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm">
+                            <FileText class="size-8 text-muted-foreground" />
+                            <p class="text-sm font-medium text-muted-foreground">Cargando levantamientos…</p>
                         </div>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-semibold">{{ lev.folio }}</p>
-                                <span
-                                    class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
-                                    :class="estatusBadgeClass(lev.estatus_admin)"
-                                >
-                                    {{ estatusLabel[lev.estatus_admin] ?? lev.estatus_admin }}
-                                </span>
-                            </div>
-                            <p class="mt-1 truncate text-sm">{{ lev.nombre }}</p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                <span>Cliente: {{ lev.cliente }}</span>
-                                <span class="flex items-center gap-1">
-                                    <Badge :variant="prioridadVariant(lev.prioridad)" class="text-[10px]">
-                                        {{ prioridadLabel[lev.prioridad] ?? lev.prioridad }}
-                                    </Badge>
-                                </span>
-                            </div>
-                            <p class="mt-1 text-xs text-muted-foreground">Creado: {{ lev.creado ?? '—' }}</p>
-                        </div>
-                    </div>
+                    </template>
 
-                    <div
-                        v-if="!levantamientosFiltrados.length"
-                        class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm"
-                    >
-                        <FileText class="size-8 text-muted-foreground" />
-                        <p class="text-sm font-medium">No hay levantamientos para esta fecha</p>
-                        <button
-                            v-if="fechaSeleccionada"
-                            type="button"
-                            class="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                            @click="fechaSeleccionada = null"
+                    <div class="space-y-3">
+                        <Link
+                            v-for="lev in levantamientosFiltrados"
+                            :key="lev.id"
+                            :href="LevantamientoController.show({ planta: planta.id, levantamiento: lev.id })"
+                            class="flex items-start gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent/50"
                         >
-                            Ver todos
-                        </button>
+                            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                                <FileText class="size-5" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="font-semibold">{{ lev.folio }}</p>
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
+                                        :class="estatusBadgeClass(lev.estatus_admin)"
+                                    >
+                                        {{ estatusLabel[lev.estatus_admin] ?? lev.estatus_admin }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 truncate text-sm">{{ lev.nombre }}</p>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                    <span>Cliente: {{ lev.cliente }}</span>
+                                    <span class="flex items-center gap-1">
+                                        <Badge :variant="prioridadVariant(lev.prioridad)" class="text-[10px]">
+                                            {{ prioridadLabel[lev.prioridad] ?? lev.prioridad }}
+                                        </Badge>
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-xs text-muted-foreground">Creado: {{ lev.creado ?? '—' }}</p>
+                            </div>
+                        </Link>
+
+                        <div
+                            v-if="!levantamientosFiltrados.length"
+                            class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm"
+                        >
+                            <FileText class="size-8 text-muted-foreground" />
+                            <p class="text-sm font-medium">No hay levantamientos para esta fecha</p>
+                            <button
+                                v-if="fechaSeleccionada"
+                                type="button"
+                                class="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                                @click="fechaSeleccionada = null"
+                            >
+                                Ver todos
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </Deferred>
             </div>
         </div>
     </PageLayout>
