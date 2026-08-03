@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchivos;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Levantamiento extends Model
 {
+    use HasArchivos;
     use HasFactory;
 
     protected $table = 'levantamientos';
@@ -19,6 +21,7 @@ class Levantamiento extends Model
 
     protected $fillable = [
         'planta_id',
+        'proyecto_id',
         'folio',
         'nombre',
         'cliente',
@@ -86,6 +89,11 @@ class Levantamiento extends Model
     public function planta(): BelongsTo
     {
         return $this->belongsTo(Planta::class, 'planta_id');
+    }
+
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
 
     public function usuario(): BelongsTo

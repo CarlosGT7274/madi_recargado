@@ -72,4 +72,19 @@ class CotizacionesAction
     {
         $cotizacion->delete();
     }
+
+    public function recalcularTotales(Cotizacion $cotizacion): void
+    {
+        $subtotal = (float) $cotizacion->partidas()->sum('importe');
+        $costoHoraTotal = (float) $cotizacion->partidas()
+            ->selectRaw('SUM(costo_hora * cantidad) as total')
+            ->value('total');
+
+        $cotizacion->update([
+            'subtotal' => $subtotal,
+            'total' => $subtotal + (float) $cotizacion->iva, // iva se queda como esté, se captura a mano
+            'costo_hora_total' => $costoHoraTotal ?? 0,
+            'tiene_partidas' => $cotizacion->partidas()->exists(),
+        ]);
+    }
 }

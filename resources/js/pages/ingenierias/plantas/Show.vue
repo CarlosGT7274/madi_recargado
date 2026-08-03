@@ -1,15 +1,12 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
+import { breadcrumbsPlanta, type PlantaRef, pageLayout } from '@/lib/breadcrumbs';
 
-export default {
-    layout: () => ({
-        breadcrumbs: [
-            { title: 'Plantas', href: PlantaController.index() },
-            { title: (usePage().props.planta as { nombre: string })?.nombre ?? '', href: '' },
-        ],
-    }),
-};
+interface Props {
+    planta: PlantaRef;
+}
+
+export default pageLayout(() => breadcrumbsPlanta(usePage<Props>().props.planta));
 </script>
 
 <script setup lang="ts">
@@ -21,11 +18,11 @@ import {
     ChevronRight,
     CircleCheck,
     Clock,
-    FileText,
+    FolderOpen,
     Plus,
 } from '@lucide/vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
-import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
+import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import PageLayout from '@/components/PageLayout.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -41,13 +38,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 
 type PlantaDetalle = {
     id: number;
@@ -60,26 +50,23 @@ type PlantaDetalle = {
     modificada: string | null;
 };
 
-type LevantamientoResumen = {
+type ProyectoResumen = {
     id: number;
     folio: string;
     nombre: string;
-    cliente: string;
-    prioridad: string;
-    estatus_admin: string;
+    tipo: string;
+    estado: string;
+    bloqueado: boolean;
     creado: string | null;
-    creado_iso: string | null; // 'YYYY-MM-DD'
+    creado_iso: string | null;
 };
 
 const props = defineProps<{
     planta: PlantaDetalle;
-    // Deferred: llega undefined en el render inicial, Inertia la pide sola
-    // en una segunda petición y actualiza esta prop cuando responde.
-    levantamientos?: LevantamientoResumen[];
+    proyectos?: ProyectoResumen[];
 }>();
 
 const editDialogOpen = ref(false);
-const createDialogOpen = ref(false);
 
 function eliminarPlanta() {
     if (!confirm(`¿Eliminar la planta "${props.planta.nombre}"? Esta acción no se puede deshacer.`)) {
@@ -88,51 +75,34 @@ function eliminarPlanta() {
     router.delete(PlantaController.destroy(props.planta.id).url);
 }
 
-const prioridadLabel: Record<string, string> = {
-    urgente: 'Urgente',
-    normal: 'Normal',
-    grande_compleja: 'Grande / Compleja',
-};
-
 const estatusLabel: Record<string, string> = {
-    recibida: 'Recibida',
-    levantamiento_proceso: 'En proceso',
-    levantamiento_listo: 'Listo',
-    cotizando: 'Cotizando',
-    revision_residente: 'Revisión',
-    correcciones: 'Correcciones',
-    lista_enviar: 'Lista enviar',
-    enviada: 'Enviada',
-    ganada: 'Ganada',
-    perdida: 'Perdida',
-    cancelada: 'Cancelada',
+    activo: 'Activo',
+    terminado: 'Terminado',
+    cancelado: 'Cancelado',
 };
 
 const estatusGrupo: Record<string, 'aprobado' | 'pendiente' | 'negativo'> = {
-    recibida: 'pendiente',
-    levantamiento_proceso: 'pendiente',
-    levantamiento_listo: 'pendiente',
-    cotizando: 'pendiente',
-    revision_residente: 'pendiente',
-    correcciones: 'pendiente',
-    lista_enviar: 'pendiente',
-    enviada: 'pendiente',
-    ganada: 'aprobado',
-    perdida: 'negativo',
-    cancelada: 'negativo',
+    activo: 'pendiente',
+    terminado: 'aprobado',
+    cancelado: 'negativo',
 };
 
-function estatusBadgeClass(estatus: string) {
-    const grupo = estatusGrupo[estatus] ?? 'pendiente';
+function estatusBadgeClass(estado: string) {
+    const grupo = estatusGrupo[estado] ?? 'pendiente';
     if (grupo === 'aprobado') return 'bg-emerald-500/10 text-emerald-600';
     if (grupo === 'negativo') return 'bg-red-500/10 text-red-600';
     return 'bg-amber-500/10 text-amber-600';
 }
 
-function prioridadVariant(prioridad: string) {
-    if (prioridad === 'urgente') return 'destructive';
-    if (prioridad === 'grande_compleja') return 'outline';
+function tipoVariant(tipo: string) {
+    if (tipo === 'grande') return 'default';
     return 'secondary';
+}
+
+function tipoLabel(tipo: string) {
+    if (tipo === 'grande') return 'Con Levantamiento';
+    if (tipo === 'chico') return 'Directo a Actividades';
+    return tipo;
 }
 
 // --- Calendario ---
@@ -144,10 +114,10 @@ function toIso(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const diasConLevantamientos = computed(() => {
+const diasConProyectos = computed(() => {
     const set = new Set<string>();
-    for (const lev of props.levantamientos ?? []) {
-        if (lev.creado_iso) set.add(lev.creado_iso);
+    for (const pry of props.proyectos ?? []) {
+        if (pry.creado_iso) set.add(pry.creado_iso);
     }
     return set;
 });
@@ -178,17 +148,17 @@ function seleccionarDia(iso: string | null) {
     fechaSeleccionada.value = fechaSeleccionada.value === iso ? null : iso;
 }
 
-const levantamientosFiltrados = computed(() => {
-    const lista = props.levantamientos ?? [];
+const proyectosFiltrados = computed(() => {
+    const lista = props.proyectos ?? [];
     if (!fechaSeleccionada.value) return lista;
     return lista.filter((l) => l.creado_iso === fechaSeleccionada.value);
 });
 
 const totales = computed(() => {
-    const lista = levantamientosFiltrados.value;
-    const aprobados = lista.filter((l) => estatusGrupo[l.estatus_admin] === 'aprobado').length;
-    const pendientes = lista.filter((l) => (estatusGrupo[l.estatus_admin] ?? 'pendiente') === 'pendiente').length;
-    return { aprobados, pendientes, total: lista.length };
+    const lista = proyectosFiltrados.value;
+    const terminados = lista.filter((l) => estatusGrupo[l.estado] === 'aprobado').length;
+    const activos = lista.filter((l) => (estatusGrupo[l.estado] ?? 'pendiente') === 'pendiente').length;
+    return { terminados, activos, total: lista.length };
 });
 
 const nombreMes = computed(() =>
@@ -253,82 +223,8 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
             </DialogContent>
         </Dialog>
 
-        <!-- Dialog: nuevo levantamiento -->
-        <Dialog v-model:open="createDialogOpen">
-            <DialogContent>
-                <Form
-                    v-bind="LevantamientoController.store.form(planta.id)"
-                    reset-on-success
-                    :options="{ preserveScroll: true }"
-                    @success="createDialogOpen = false"
-                    v-slot="{ errors, processing }"
-                    class="space-y-4"
-                >
-                    <DialogHeader>
-                        <DialogTitle>Nuevo levantamiento</DialogTitle>
-                        <DialogDescription>
-                            Registra un nuevo levantamiento para la planta {{ planta.nombre }}.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div class="grid gap-2">
-                        <Label for="folio">Folio</Label>
-                        <Input id="folio" name="folio" placeholder="LEV-0001" />
-                        <InputError :message="errors.folio" />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="nombre">Nombre</Label>
-                        <Input id="nombre" name="nombre" placeholder="Nombre del levantamiento" />
-                        <InputError :message="errors.nombre" />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="cliente">Cliente</Label>
-                        <Input id="cliente" name="cliente" placeholder="Nombre del cliente" />
-                        <InputError :message="errors.cliente" />
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="grid gap-2">
-                            <Label for="obra">Obra</Label>
-                            <Input id="obra" name="obra" placeholder="Obra (opcional)" />
-                            <InputError :message="errors.obra" />
-                        </div>
-                        <div class="grid gap-2">
-                            <Label for="solicitante">Solicitante</Label>
-                            <Input id="solicitante" name="solicitante" placeholder="Solicitante (opcional)" />
-                            <InputError :message="errors.solicitante" />
-                        </div>
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="prioridad">Prioridad</Label>
-                        <Select name="prioridad" default-value="normal">
-                            <SelectTrigger id="prioridad">
-                                <SelectValue placeholder="Seleccionar prioridad" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="normal">Normal</SelectItem>
-                                <SelectItem value="urgente">Urgente</SelectItem>
-                                <SelectItem value="grande_compleja">Grande / Compleja</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError :message="errors.prioridad" />
-                    </div>
-
-                    <DialogFooter class="gap-2">
-                        <DialogClose as-child>
-                            <Button variant="secondary">Cancelar</Button>
-                        </DialogClose>
-                        <Button type="submit" :disabled="processing">Guardar</Button>
-                    </DialogFooter>
-                </Form>
-            </DialogContent>
-        </Dialog>
-
         <div class="space-y-6">
-            <!-- Header: planta + acción nuevo levantamiento -->
+            <!-- Header: planta + acción nuevo proyecto -->
             <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b bg-muted/30 px-6 py-5">
                     <div class="flex items-center gap-4">
@@ -343,14 +239,15 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                         </div>
                     </div>
 
-                    <Button @click="createDialogOpen = true">
-                        <Plus class="size-4" />
-                        Nuevo Levantamiento
-                    </Button>
+                    <Link :href="ProyectoController.create(planta.id)">
+                        <Button>
+                            <Plus class="size-4" />
+                            Nuevo Proyecto
+                        </Button>
+                    </Link>
                 </div>
 
-                <!-- Totales: solo tienen sentido una vez que llegó la data diferida -->
-                <Deferred data="levantamientos">
+                <Deferred data="proyectos">
                     <template #fallback>
                         <div class="grid grid-cols-3 divide-x border-b py-6 text-center text-sm text-muted-foreground">
                             <div>Cargando…</div>
@@ -363,16 +260,16 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                         <div class="flex flex-col items-center gap-1 py-4">
                             <span class="flex items-center gap-1 text-2xl font-bold text-emerald-600">
                                 <CircleCheck class="size-5" />
-                                {{ totales.aprobados }}
+                                {{ totales.terminados }}
                             </span>
-                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Aprobados</span>
+                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Terminados</span>
                         </div>
                         <div class="flex flex-col items-center gap-1 py-4">
                             <span class="flex items-center gap-1 text-2xl font-bold text-amber-600">
                                 <Clock class="size-5" />
-                                {{ totales.pendientes }}
+                                {{ totales.activos }}
                             </span>
-                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Pendientes</span>
+                            <span class="text-xs uppercase tracking-wide text-muted-foreground">Activos</span>
                         </div>
                         <div class="flex flex-col items-center gap-1 py-4">
                             <span class="text-2xl font-bold">{{ totales.total }}</span>
@@ -414,7 +311,7 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                         >
                             {{ celda.fecha?.getDate() }}
                             <span
-                                v-if="celda.iso && diasConLevantamientos.has(celda.iso) && fechaSeleccionada !== celda.iso"
+                                v-if="celda.iso && diasConProyectos.has(celda.iso) && fechaSeleccionada !== celda.iso"
                                 class="absolute bottom-1 size-1 rounded-full bg-primary"
                             />
                         </button>
@@ -426,58 +323,57 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                         class="mt-3 w-full rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
                         @click="fechaSeleccionada = null"
                     >
-                        Ver todos los levantamientos
+                        Ver todos los proyectos
                     </button>
                 </div>
 
                 <!-- Lista filtrada -->
-                <Deferred data="levantamientos">
+                <Deferred data="proyectos">
                     <template #fallback>
                         <div class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm">
-                            <FileText class="size-8 text-muted-foreground" />
-                            <p class="text-sm font-medium text-muted-foreground">Cargando levantamientos…</p>
+                            <FolderOpen class="size-8 text-muted-foreground" />
+                            <p class="text-sm font-medium text-muted-foreground">Cargando proyectos…</p>
                         </div>
                     </template>
 
                     <div class="space-y-3">
                         <Link
-                            v-for="lev in levantamientosFiltrados"
-                            :key="lev.id"
-                            :href="LevantamientoController.show({ planta: planta.id, levantamiento: lev.id })"
+                            v-for="pry in proyectosFiltrados"
+                            :key="pry.id"
+                            :href="ProyectoController.show([planta.id, pry.id])"
                             class="flex items-start gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent/50"
                         >
                             <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                                <FileText class="size-5" />
+                                <FolderOpen class="size-5" />
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <p class="font-semibold">{{ lev.folio }}</p>
+                                    <p class="font-semibold">{{ pry.folio }}</p>
                                     <span
                                         class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
-                                        :class="estatusBadgeClass(lev.estatus_admin)"
+                                        :class="estatusBadgeClass(pry.estado)"
                                     >
-                                        {{ estatusLabel[lev.estatus_admin] ?? lev.estatus_admin }}
+                                        {{ estatusLabel[pry.estado] ?? pry.estado }}
                                     </span>
                                 </div>
-                                <p class="mt-1 truncate text-sm">{{ lev.nombre }}</p>
+                                <p class="mt-1 truncate text-sm">{{ pry.nombre ?? '—' }}</p>
                                 <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                    <span>Cliente: {{ lev.cliente }}</span>
                                     <span class="flex items-center gap-1">
-                                        <Badge :variant="prioridadVariant(lev.prioridad)" class="text-[10px]">
-                                            {{ prioridadLabel[lev.prioridad] ?? lev.prioridad }}
+                                        <Badge :variant="tipoVariant(pry.tipo)" class="text-[10px]">
+                                            {{ tipoLabel(pry.tipo) }}
                                         </Badge>
                                     </span>
                                 </div>
-                                <p class="mt-1 text-xs text-muted-foreground">Creado: {{ lev.creado ?? '—' }}</p>
+                                <p class="mt-1 text-xs text-muted-foreground">Creado: {{ pry.creado ?? '—' }}</p>
                             </div>
                         </Link>
 
                         <div
-                            v-if="!levantamientosFiltrados.length"
+                            v-if="!proyectosFiltrados.length"
                             class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm"
                         >
-                            <FileText class="size-8 text-muted-foreground" />
-                            <p class="text-sm font-medium">No hay levantamientos para esta fecha</p>
+                            <FolderOpen class="size-8 text-muted-foreground" />
+                            <p class="text-sm font-medium">No hay proyectos para esta fecha</p>
                             <button
                                 v-if="fechaSeleccionada"
                                 type="button"

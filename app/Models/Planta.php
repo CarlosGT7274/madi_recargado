@@ -38,4 +38,9 @@ class Planta extends Model
     {
         return $this->hasMany(Levantamiento::class, 'planta_id');
     }
+
+    public function proyectos(): HasMany
+    {
+        return $this->hasMany(Proyecto::class, 'planta_id');
+    }
 }

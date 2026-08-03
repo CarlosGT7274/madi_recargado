@@ -1,39 +1,27 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
-import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
+import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, pageLayout } from '@/lib/breadcrumbs';
 
-export default {
-    layout: () => ({
-        breadcrumbs: [
-            { title: 'Plantas', href: PlantaController.index() },
-            {
-                title: (usePage().props.planta as { nombre: string })?.nombre ?? '',
-                href: PlantaController.show((usePage().props.planta as { id: number })?.id),
-            },
-            {
-                title: (usePage().props.levantamiento as { folio: string })?.folio ?? '',
-                href: LevantamientoController.show({
-                    planta: (usePage().props.planta as { id: number })?.id,
-                    levantamiento: (usePage().props.levantamiento as { id: number })?.id,
-                }),
-            },
-            {
-                title: (usePage().props.cotizacion as { folio: string })?.folio ?? '',
-                href: '',
-            },
-        ],
-    }),
-};
+interface Props {
+    planta: PlantaRef;
+    levantamiento: LevantamientoRef;
+    cotizacion: CotizacionRef;
+}
+
+export default pageLayout(() => {
+    const { planta, levantamiento, cotizacion } = usePage<Props>().props;
+    return breadcrumbsCotizacion(planta, levantamiento, cotizacion);
+});
 </script>
 
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
-import { ArrowLeft, Calendar, FileSpreadsheet, MapPin } from '@lucide/vue';
+import { ArrowLeft, Calendar, FileSpreadsheet, MapPin, Download, Plus, Upload } from '@lucide/vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
+import PartidaController from '@/actions/App/Http/Controllers/Ingenierias/PartidaController';
 import PageLayout from '@/components/PageLayout.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -85,11 +73,41 @@ type CotizacionDetalle = {
     modificado: string | null;
 };
 
+interface PartidaResumen {
+    id: number;
+    numeroPartida: number;
+    descripcion: string;
+    cantidad: number;
+    unidad: string | null;
+    precioUnitario: number;
+    importe: number;
+    costoHora: number | null;
+}
+
 const props = defineProps<{
     planta: PlantaResumen;
     levantamiento: LevantamientoResumen;
     cotizacion: CotizacionDetalle;
+    partidas: PartidaResumen[];
 }>();
+
+const nuevaPartidaDialogOpen = ref(false);
+const archivoPartidasInput = ref<HTMLInputElement | null>(null);
+
+function subirPlantillaPartidas(): void {
+    const archivo = archivoPartidasInput.value?.files?.[0];
+    if (!archivo) return;
+
+    router.post(
+        PartidaController.importar({ planta: props.planta.id, proyecto: props.levantamiento.id, levantamiento: props.levantamiento.id, cotizacion: props.cotizacion.id }).url,
+        { archivo },
+        { forceFormData: true },
+    );
+}
+
+function formatoMonedaPartida(valor: number): string {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
+}
 
 const editDialogOpen = ref(false);
 
@@ -181,14 +199,14 @@ function formatoMoneda(valor: number | null) {
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="grid gap-2">
-                            <Label for="edit-folio">Folio</Label>
-                            <Input id="edit-folio" name="folio" :default-value="cotizacion.folio" />
-                            <InputError :message="errors.folio" />
-                        </div>
-                        <div class="grid gap-2">
                             <Label for="edit-fecha">Fecha</Label>
                             <Input id="edit-fecha" name="fecha" type="date" :default-value="cotizacion.fecha ?? ''" />
                             <InputError :message="errors.fecha" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="edit-para">Para</Label>
+                            <Input id="edit-para" name="para" :default-value="cotizacion.para ?? ''" placeholder="Atención de..." />
+                            <InputError :message="errors.para" />
                         </div>
                     </div>
 
@@ -198,34 +216,50 @@ function formatoMoneda(valor: number | null) {
                         <InputError :message="errors.cliente" />
                     </div>
 
+                    <div class="grid gap-2">
+                        <Label for="edit-direccion">Dirección</Label>
+                        <Input id="edit-direccion" name="direccion" :default-value="cotizacion.direccion ?? ''" placeholder="Dirección (opcional)" />
+                        <InputError :message="errors.direccion" />
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div class="grid gap-2">
                             <Label for="edit-vendedor">Vendedor</Label>
-                            <Input id="edit-vendedor" name="vendedor" :default-value="cotizacion.vendedor ?? ''" />
+                            <Input id="edit-vendedor" name="vendedor" :default-value="cotizacion.vendedor ?? ''" placeholder="Vendedor (opcional)" />
                             <InputError :message="errors.vendedor" />
                         </div>
                         <div class="grid gap-2">
                             <Label for="edit-proveedor">Proveedor</Label>
-                            <Input id="edit-proveedor" name="proveedor" :default-value="cotizacion.proveedor ?? ''" />
+                            <Input id="edit-proveedor" name="proveedor" :default-value="cotizacion.proveedor ?? ''" placeholder="Proveedor (opcional)" />
                             <InputError :message="errors.proveedor" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="grid gap-2">
+                            <Label for="edit-correo-vendedor">Correo Vendedor</Label>
+                            <Input id="edit-correo-vendedor" name="correo_vendedor" type="email" :default-value="cotizacion.correo_vendedor ?? ''" placeholder="opcional" />
+                            <InputError :message="errors.correo_vendedor" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="edit-iva">IVA (monto)</Label>
+                            <Input id="edit-iva" name="iva" type="number" step="0.01" :default-value="cotizacion.iva ?? 0" placeholder="0.00" />
+                            <InputError :message="errors.iva" />
                         </div>
                     </div>
 
                     <div class="grid grid-cols-3 gap-4">
                         <div class="grid gap-2">
-                            <Label for="edit-subtotal">Subtotal</Label>
-                            <Input id="edit-subtotal" name="subtotal" type="number" step="0.01" :default-value="cotizacion.subtotal ?? 0" />
-                            <InputError :message="errors.subtotal" />
+                            <Label for="edit-tiempo-entrega">Tiempo Entrega</Label>
+                            <Input id="edit-tiempo-entrega" name="tiempo_entrega" :default-value="cotizacion.tiempo_entrega ?? ''" placeholder="opcional" />
                         </div>
                         <div class="grid gap-2">
-                            <Label for="edit-iva">IVA</Label>
-                            <Input id="edit-iva" name="iva" type="number" step="0.01" :default-value="cotizacion.iva ?? 0" />
-                            <InputError :message="errors.iva" />
+                            <Label for="edit-dias-credito">Días Crédito</Label>
+                            <Input id="edit-dias-credito" name="dias_credito" :default-value="cotizacion.dias_credito ?? ''" placeholder="opcional" />
                         </div>
                         <div class="grid gap-2">
-                            <Label for="edit-total">Total</Label>
-                            <Input id="edit-total" name="total" type="number" step="0.01" :default-value="cotizacion.total ?? 0" />
-                            <InputError :message="errors.total" />
+                            <Label for="edit-vigencia">Vigencia</Label>
+                            <Input id="edit-vigencia" name="vigencia_cotizacion" :default-value="cotizacion.vigencia_cotizacion ?? ''" placeholder="opcional" />
                         </div>
                     </div>
 
@@ -341,6 +375,113 @@ function formatoMoneda(valor: number | null) {
                     <p class="text-sm">{{ cotizacion.notas }}</p>
                 </div>
             </div>
+        </div>
+
+        <Dialog v-model:open="nuevaPartidaDialogOpen">
+            <DialogContent>
+                <Form
+                    v-bind="PartidaController.store.form({ planta: planta.id, proyecto: levantamiento.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id })"
+                    reset-on-success
+                    :options="{ preserveScroll: true }"
+                    @success="nuevaPartidaDialogOpen = false"
+                    v-slot="{ errors, processing }"
+                    class="space-y-4"
+                >
+                    <DialogHeader>
+                        <DialogTitle>Nueva partida</DialogTitle>
+                    </DialogHeader>
+
+                    <div class="grid gap-2">
+                        <Label for="p-descripcion">Descripción</Label>
+                        <Input id="p-descripcion" name="descripcion" />
+                        <InputError :message="errors.descripcion" />
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="grid gap-2">
+                            <Label for="p-cantidad">Cantidad</Label>
+                            <Input id="p-cantidad" name="cantidad" type="number" step="0.01" />
+                            <InputError :message="errors.cantidad" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="p-unidad">Unidad</Label>
+                            <Input id="p-unidad" name="unidad" placeholder="pza, m2, etc." />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="p-precio">Precio Unitario</Label>
+                            <Input id="p-precio" name="precio_unitario" type="number" step="0.01" />
+                            <InputError :message="errors.precio_unitario" />
+                        </div>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="p-costo-hora">Costo por Hora (estimado)</Label>
+                        <Input id="p-costo-hora" name="costo_hora" type="number" step="0.01" placeholder="opcional" />
+                    </div>
+
+                    <DialogFooter class="gap-2">
+                        <DialogClose as-child>
+                            <Button variant="secondary">Cancelar</Button>
+                        </DialogClose>
+                        <Button type="submit" :disabled="processing">Guardar</Button>
+                    </DialogFooter>
+                </Form>
+            </DialogContent>
+        </Dialog>
+
+        <div class="mt-6 rounded-2xl border bg-card p-5 shadow-sm">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-medium text-muted-foreground">Partidas ({{ partidas?.length || 0 }})</p>
+                <div class="flex items-center gap-2">
+                    <a :href="PartidaController.plantilla({ planta: planta.id, proyecto: levantamiento.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id }).url">
+                        <Button variant="outline" size="sm">
+                            <Download class="mr-2 size-4" />
+                            Plantilla
+                        </Button>
+                    </a>
+                    <label class="cursor-pointer">
+                        <Button variant="outline" size="sm" as="span">
+                            <Upload class="mr-2 size-4" />
+                            Importar Excel
+                        </Button>
+                        <input
+                            ref="archivoPartidasInput"
+                            type="file"
+                            accept=".xlsx,.xls"
+                            class="hidden"
+                            @change="subirPlantillaPartidas"
+                        />
+                    </label>
+                    <Button size="sm" @click="nuevaPartidaDialogOpen = true">
+                        <Plus class="mr-2 size-4" />
+                        Nueva
+                    </Button>
+                </div>
+            </div>
+
+            <div v-if="partidas?.length" class="overflow-hidden rounded-xl border">
+                <div class="grid grid-cols-[50px_1fr_90px_80px_110px_110px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+                    <span>#</span>
+                    <span>Descripción</span>
+                    <span>Cant.</span>
+                    <span>Unidad</span>
+                    <span class="text-right">P. Unit.</span>
+                    <span class="text-right">Importe</span>
+                </div>
+                <div
+                    v-for="partida in partidas"
+                    :key="partida.id"
+                    class="grid grid-cols-[50px_1fr_90px_80px_110px_110px] items-center gap-2 border-t px-4 py-3 text-sm"
+                >
+                    <span class="text-muted-foreground">{{ partida.numeroPartida }}</span>
+                    <span class="truncate">{{ partida.descripcion }}</span>
+                    <span>{{ partida.cantidad }}</span>
+                    <span class="text-muted-foreground">{{ partida.unidad ?? '—' }}</span>
+                    <span class="text-right">{{ formatoMonedaPartida(partida.precioUnitario) }}</span>
+                    <span class="text-right font-medium">{{ formatoMonedaPartida(partida.importe) }}</span>
+                </div>
+            </div>
+            <p v-else class="py-8 text-center text-sm text-muted-foreground">Aún no hay partidas.</p>
         </div>
     </PageLayout>
 </template>

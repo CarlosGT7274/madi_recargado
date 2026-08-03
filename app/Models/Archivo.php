@@ -36,4 +36,18 @@ class Archivo extends Model
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
+
+    public function archivable()
+    {
+        return $this->morphTo();
+    }
+
+    public function urlPublica(): ?string
+    {
+        if ($this->almacenamiento !== 'url' || ! $this->url) {
+            return null;
+        }
+
+        return Storage::disk($this->storage_driver ?? 'public')->url($this->url);
+    }
 }

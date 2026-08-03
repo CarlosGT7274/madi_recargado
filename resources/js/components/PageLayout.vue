@@ -30,7 +30,7 @@ function can(accion: number): boolean {
 </script>
 
 <template>
-    <div class="flex flex-col gap-6 p-4">
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3">
                 <slot name="breadcrumbs"></slot>
@@ -39,26 +39,26 @@ function can(accion: number): boolean {
 
             <div class="flex items-center gap-2">
                 <!-- Standard Actions -->
-                <Button 
-                    v-if="withCreate && can(Accion.CREATE)" 
+                <Button
+                    v-if="withCreate && can(Accion.CREATE)"
                     @click="emit('create')"
                 >
                     <Plus class="mr-2 size-4" />
                     Nuevo
                 </Button>
 
-                <Button 
-                    v-if="withEdit && can(Accion.UPDATE)" 
-                    variant="outline" 
+                <Button
+                    v-if="withEdit && can(Accion.UPDATE)"
+                    variant="outline"
                     @click="emit('edit')"
                 >
                     <Pencil class="mr-2 size-4" />
                     Editar
                 </Button>
 
-                <Button 
-                    v-if="withDelete && can(Accion.DELETE)" 
-                    variant="destructive" 
+                <Button
+                    v-if="withDelete && can(Accion.DELETE)"
+                    variant="destructive"
                     @click="emit('delete')"
                 >
                     <Trash class="mr-2 size-4" />

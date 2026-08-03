@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Levantamiento;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +29,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureAuthorization();
+        Relation::morphMap([
+            'levantamiento' => Levantamiento::class,
+            // agrega aquí el alias de cada módulo nuevo que use imágenes
+        ]);
     }
 
     /**

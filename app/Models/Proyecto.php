@@ -13,7 +13,9 @@ class Proyecto extends Model
     const UPDATED_AT = 'fecha_modificacion';
 
     protected $fillable = [
-        'levantamiento_id',
+        'planta_id',
+        'folio',
+        'tipo',
         'nombre',
         'descripcion',
         'estado',
@@ -24,13 +26,28 @@ class Proyecto extends Model
         'usuario_id',
     ];
 
-    protected $casts = [
-        'bloqueado' => 'boolean',
+    protected $attributes = [
+        'tipo' => 'grande',
+        'estado' => 'activo',
+        'bloqueado' => false,
     ];
 
-    public function levantamiento()
+    protected function casts(): array
     {
-        return $this->belongsTo(Levantamiento::class, 'levantamiento_id');
+        return [
+            'bloqueado' => 'boolean',
+            'fecha_bloqueo' => 'datetime',
+        ];
+    }
+
+    public function planta()
+    {
+        return $this->belongsTo(Planta::class, 'planta_id');
+    }
+
+    public function levantamientos()
+    {
+        return $this->hasMany(Levantamiento::class, 'proyecto_id');
     }
 
     public function usuario()

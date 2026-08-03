@@ -4,40 +4,56 @@ namespace App\Http\Controllers\Ingenierias;
 
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Levantamientos\LevantamientosAction;
+use App\Exports\LevantamientoPlantillaExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Ingenierias\ImportLevantamientosRequest;
 use App\Http\Requests\Ingenierias\StoreLevantamientoRequest;
 use App\Http\Requests\Ingenierias\UpdateLevantamientoRequest;
+use App\Imports\LevantamientosImport;
 use App\Models\Levantamiento;
 use App\Models\Planta;
+use App\Models\Proyecto;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LevantamientoController extends Controller
 {
-    public function index(Planta $planta, LevantamientosAction $action): Response
+    public function index(Planta $planta, Proyecto $proyecto, LevantamientosAction $action): Response
     {
-        return Inertia::render('ingenierias/plantas/levantamientos/Index', [
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/Index', [
             'planta' => [
                 'id' => $planta->id,
                 'nombre' => $planta->nombre,
                 'folio' => $planta->folio,
             ],
-            'levantamientos' => $action->list($planta),
+            'proyecto' => [
+                'id' => $proyecto->id,
+                'nombre' => $proyecto->nombre,
+                'folio' => $proyecto->folio,
+            ],
+            'levantamientos' => $action->list($proyecto),
         ]);
     }
 
-    public function data(Planta $planta, LevantamientosAction $action)
+    public function data(Planta $planta, Proyecto $proyecto, LevantamientosAction $action)
     {
-        return response()->json($action->list($planta));
+        return response()->json($action->list($proyecto));
     }
 
-    public function show(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action, CotizacionesAction $cotizacionesAction): Response
+    public function show(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, LevantamientosAction $action, CotizacionesAction $cotizacionesAction): Response
     {
-        return Inertia::render('ingenierias/plantas/levantamientos/Show', [
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/Show', [
             'planta' => [
                 'id' => $planta->id,
                 'nombre' => $planta->nombre,
+            ],
+            'proyecto' => [
+                'id' => $proyecto->id,
+                'nombre' => $proyecto->nombre,
+                'folio' => $proyecto->folio,
             ],
             'levantamiento' => $action->detail($levantamiento),
             'cotizaciones' => Inertia::defer(
@@ -46,16 +62,16 @@ class LevantamientoController extends Controller
         ]);
     }
 
-    public function store(StoreLevantamientoRequest $request, Planta $planta, LevantamientosAction $action): RedirectResponse
+    public function store(StoreLevantamientoRequest $request, Planta $planta, Proyecto $proyecto, LevantamientosAction $action): RedirectResponse
     {
-        $action->create($planta, $request->validated());
+        $action->create($proyecto, $request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Levantamiento creado.']);
 
         return back();
     }
 
-    public function update(UpdateLevantamientoRequest $request, Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse
+    public function update(UpdateLevantamientoRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse
     {
         $action->update($levantamiento, $request->validated());
 
@@ -64,11 +80,62 @@ class LevantamientoController extends Controller
         return back();
     }
 
-    public function destroy(Planta $planta, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse
+    public function destroy(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse
     {
         $action->delete($levantamiento);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Levantamiento eliminado.']);
+
+        return back();
+    }
+
+    public function create(Planta $planta, Proyecto $proyecto): Response
+    {
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/Create', [
+            'planta' => [
+                'id' => $planta->id,
+                'nombre' => $planta->nombre,
+                'folio' => $planta->folio,
+            ],
+            'proyecto' => [
+                'id' => $proyecto->id,
+                'nombre' => $proyecto->nombre,
+                'folio' => $proyecto->folio,
+            ],
+        ]);
+    }
+
+    public function plantilla(Planta $planta, Proyecto $proyecto): BinaryFileResponse
+    {
+        return Excel::download(
+            new LevantamientoPlantillaExport,
+            "plantilla-levantamientos-{$planta->folio}.xlsx",
+        );
+    }
+
+    public function importar(
+        ImportLevantamientosRequest $request,
+        Planta $planta,
+        Proyecto $proyecto,
+        LevantamientosAction $action,
+    ): RedirectResponse {
+        $import = new LevantamientosImport($proyecto, $action);
+        Excel::import($import, $request->file('archivo'));
+
+        if (! empty($import->errores())) {
+            Inertia::flash('toast', [
+                'type' => 'warning',
+                'message' => "{$import->creados()} creados. Algunas filas tuvieron errores.",
+            ]);
+
+            // Opcional: guardar $import->errores() en sesión para mostrarlos en la UI
+            return back()->with('erroresImportacion', $import->errores());
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => "{$import->creados()} levantamientos creados.",
+        ]);
 
         return back();
     }
