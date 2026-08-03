@@ -46,8 +46,7 @@ class ProyectosAction
             'nombre' => $proyecto->nombre,
             'descripcion' => $proyecto->descripcion,
             'estado' => $proyecto->estado,
-            'bloqueado' => $proyecto->bloqueado,
-            'motivo_bloqueo' => $proyecto->motivo_bloqueo,
+            'completado' => $proyecto->estaCompletado(),
             'creado' => $proyecto->fecha_creacion
                 ? Carbon::parse($proyecto->fecha_creacion)->format('d/m/Y H:i')
                 : null,

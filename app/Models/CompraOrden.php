@@ -35,4 +35,9 @@ class CompraOrden extends Model
     {
         return $this->belongsTo(User::class, 'usuario_modificacion_id');
     }
+
+    public function cotizacion()
+    {
+        return $this->belongsTo(Cotizacion::class, 'cotizacion_id');
+    }
 }

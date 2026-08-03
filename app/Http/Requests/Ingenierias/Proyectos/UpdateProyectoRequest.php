@@ -22,8 +22,6 @@ class UpdateProyectoRequest extends FormRequest
             'nombre' => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
             'estado' => ['nullable', 'string', 'max:255'],
-            'bloqueado' => ['nullable', 'boolean'],
-            'motivo_bloqueo' => ['nullable', 'string'],
         ];
     }
 }

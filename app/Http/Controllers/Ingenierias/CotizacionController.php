@@ -30,6 +30,7 @@ class CotizacionController extends Controller
                 'id' => $proyecto->id,
                 'nombre' => $proyecto->nombre,
                 'folio' => $proyecto->folio,
+                'completado' => $proyecto->estaCompletado(),
             ],
             'levantamiento' => [
                 'id' => $levantamiento->id,
@@ -86,7 +87,14 @@ class CotizacionController extends Controller
         return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Index', [
             'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
             'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
-            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
+            'levantamiento' => [
+                'id' => $levantamiento->id,
+                'folio' => $levantamiento->folio,
+                'nombre' => $levantamiento->nombre,
+                'cliente' => $levantamiento->cliente,
+                'estatus_admin' => $levantamiento->estatus_admin,
+                'creado' => $levantamiento->fecha_creacion?->format('d M Y'),
+            ],
             'resumen' => $action->resumen($levantamiento),
             'cotizaciones' => $action->list($levantamiento),
         ]);

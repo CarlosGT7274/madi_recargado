@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchivos;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Cotizacion extends Model
 {
+    use HasArchivos;
+
     protected $table = 'cotizaciones';
 
     const CREATED_AT = 'fecha_creacion';
@@ -69,5 +73,30 @@ class Cotizacion extends Model
     public function partidas(): HasMany
     {
         return $this->hasMany(Partida::class, 'cotizacion_id');
+    }
+
+    public function insumos(): HasMany
+    {
+        return $this->hasMany(Insumo::class, 'cotizacion_id');
+    }
+
+    public function ordenCompra(): HasOne
+    {
+        return $this->hasOne(CompraOrden::class, 'cotizacion_id');
+    }
+
+    public function tieneInsumos(): bool
+    {
+        return $this->insumos()->exists();
+    }
+
+    public function tieneOrdenAprobada(): bool
+    {
+        return $this->ordenCompra?->estatus_compra === 'aprobado';
+    }
+
+    public function estaCompletada(): bool
+    {
+        return $this->tieneInsumos() && $this->tieneOrdenAprobada();
     }
 }

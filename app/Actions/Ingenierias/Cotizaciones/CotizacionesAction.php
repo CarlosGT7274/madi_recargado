@@ -19,6 +19,7 @@ class CotizacionesAction
     public function list(Levantamiento $levantamiento): Collection
     {
         return $levantamiento->cotizaciones()
+            ->with('archivos')
             ->latest('id')
             ->get()
             ->map(fn (Cotizacion $c) => [
@@ -29,6 +30,13 @@ class CotizacionesAction
                 'vendedor' => $c->vendedor,
                 'total' => $c->total,
                 'estado' => $c->estado,
+                'tienePartidas' => $c->tiene_partidas,
+                'tieneInsumos' => $c->tieneInsumos(),
+                'archivoExcelUrl' => $c->archivos
+                    ->where('tipo_archivo', 'excel')
+                    ->sortByDesc('fecha_creacion')
+                    ->first()
+                    ?->urlPublica(),
             ]);
     }
 
@@ -57,6 +65,9 @@ class CotizacionesAction
             'estado' => $cotizacion->estado,
             'creado' => $cotizacion->created_at?->format('d/m/Y H:i'),
             'modificado' => $cotizacion->updated_at?->format('d/m/Y H:i'),
+            'tiene_insumos' => $cotizacion->tieneInsumos(),
+            'tiene_orden_compra' => $cotizacion->tieneOrdenAprobada(),
+            'completada' => $cotizacion->estaCompletada(),
         ];
     }
 

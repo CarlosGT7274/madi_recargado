@@ -54,4 +54,13 @@ class Proyecto extends Model
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
+
+    public function estaCompletado(): bool
+    {
+        return $this->levantamientos()
+            ->with('cotizaciones.ordenCompra', 'cotizaciones.insumos')
+            ->get()
+            ->flatMap->cotizaciones
+            ->contains(fn (Cotizacion $c) => $c->estaCompletada());
+    }
 }
