@@ -23,11 +23,9 @@ import { ref } from 'vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
-
-import PartidaController from '@/actions/App/Http/Controllers/Ingenierias/PartidaController';
+import PartidaController from '@/actions/App/Http/Controllers/Ingenierias/Cotizaciones/PartidaController';
 import PageLayout from '@/components/PageLayout.vue';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -153,18 +151,12 @@ function formatoMoneda(valor: number | null): string {
                 </DialogHeader>
 
                 <label
-                    class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent"
-                >
+                    class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">
                     <Upload class="size-5" />
                     <span class="text-primary">Seleccionar Excel</span>
                     <span class="text-xs">Formatos: .xlsx, .xls</span>
-                    <input
-                        ref="archivoCotizacionInput"
-                        type="file"
-                        accept=".xlsx,.xls"
-                        class="hidden"
-                        @change="subirCotizacionExcel"
-                    />
+                    <input ref="archivoCotizacionInput" type="file" accept=".xlsx,.xls" class="hidden"
+                        @change="subirCotizacionExcel" />
                 </label>
 
                 <DialogFooter>
@@ -193,7 +185,8 @@ function formatoMoneda(valor: number | null): string {
                     Cotizaciones
                 </div>
                 <div class="flex items-center gap-2">
-                    <a :href="PartidaController.plantillaGenerica({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }).url">
+                    <a
+                        :href="PartidaController.plantillaGenerica({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }).url">
                         <Button variant="outline" size="sm">
                             <Download class="mr-2 size-4" />
                             Descargar Plantilla

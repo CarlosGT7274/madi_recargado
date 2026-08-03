@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cotizacion extends Model
 {
@@ -63,5 +64,10 @@ class Cotizacion extends Model
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    public function partidas(): HasMany
+    {
+        return $this->hasMany(Partida::class, 'cotizacion_id');
     }
 }

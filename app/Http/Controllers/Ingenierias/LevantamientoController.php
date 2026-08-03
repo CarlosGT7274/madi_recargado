@@ -64,11 +64,13 @@ class LevantamientoController extends Controller
 
     public function store(StoreLevantamientoRequest $request, Planta $planta, Proyecto $proyecto, LevantamientosAction $action): RedirectResponse
     {
-        $action->create($proyecto, $request->validated());
+        $levantamiento = $action->create($proyecto, $request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Levantamiento creado.']);
 
-        return back();
+        return redirect()->route('ingenierias.plantas.proyectos.levantamientos.show', [
+            $planta->id, $proyecto->id, $levantamiento->id,
+        ]);
     }
 
     public function update(UpdateLevantamientoRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, LevantamientosAction $action): RedirectResponse

@@ -1,6 +1,7 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { breadcrumbsLevantamientoNuevo, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
+import GaleriaImagenes from '@/components/GaleriaImagenes.vue';
 
 interface Props {
     planta: PlantaRef;
@@ -29,13 +30,16 @@ const props = defineProps<{
     proyecto: { id: number; nombre: string; folio: string };
 }>();
 
+
+const page = usePage<{ auth: { user: { name: string } } }>();
+
 const datosIniciales: LevantamientoFormData = {
     folio: '',
     nombre: '',
     cliente: '',
     obra: null,
-    solicitante: null,
-    fecha_solicitud: null,
+    solicitante: page.props.auth?.user?.name ?? null,
+    fecha_solicitud: new Date().toISOString().slice(0, 10),
     usuario_requiriente: null,
     correo_usuario: null,
     area_trabajo: null,
@@ -71,9 +75,11 @@ const form = useForm<LevantamientoFormData>(datosIniciales);
 function actualizar(payload: LevantamientoFormData) {
     Object.assign(form, payload);
 }
+const imagenesPendientes = ref<File[]>([]);
 
 function guardar() {
-    form.post(LevantamientoController.store({ planta: props.planta.id, proyecto: props.proyecto.id }).url);
+    form.transform((data) => ({ ...data, imagenes: imagenesPendientes.value }))
+        .post(LevantamientoController.store({ planta: props.planta.id, proyecto: props.proyecto.id }).url);
 }
 
 const archivoInput = ref<HTMLInputElement | null>(null);
@@ -91,14 +97,13 @@ function subirPlantilla(): void {
 </script>
 
 <template>
+
     <Head title="Nuevo Levantamiento" />
 
     <PageLayout title="Nuevo Levantamiento" description="Captura manual o sube tu plantilla en bulto">
         <template #breadcrumbs>
-            <Link
-                :href="ProyectoController.show([planta.id, proyecto.id])"
-                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
+            <Link :href="ProyectoController.show([planta.id, proyecto.id])"
+                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft class="size-4" />
             </Link>
         </template>
@@ -108,7 +113,8 @@ function subirPlantilla(): void {
                 <div>
                     <p class="font-medium">Captura en bulto (plantilla Excel)</p>
                     <p class="text-sm text-muted-foreground">
-                        Descarga la plantilla, llénala (una fila por levantamiento) y súbela para crearlos todos de un jalón.
+                        Descarga la plantilla, llénala (una fila por levantamiento) y súbela para crearlos todos de un
+                        jalón.
                     </p>
                 </div>
                 <a :href="LevantamientoController.plantilla({ planta: planta.id, proyecto: proyecto.id }).url">
@@ -120,26 +126,17 @@ function subirPlantilla(): void {
             </div>
 
             <label
-                class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 py-6 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-            >
+                class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 py-6 text-sm font-medium text-emerald-700 hover:bg-emerald-100">
                 <Upload class="size-4" />
                 Subir Plantilla Llena
-                <input
-                    ref="archivoInput"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    class="hidden"
-                    @change="subirPlantilla"
-                />
+                <input ref="archivoInput" type="file" accept=".xlsx,.xls" class="hidden" @change="subirPlantilla" />
             </label>
         </div>
 
-        <LevantamientoForm
-            mode="create"
-            :data="form"
-            :errors="form.errors"
-            @update="actualizar"
-        />
+        <LevantamientoForm mode="create" :data="form" :errors="form.errors" @update="actualizar" />
+
+        <GaleriaImagenes class="mt-6" archivable-type="levantamiento" :archivable-id="null" :imagenes="[]"
+            v-model:pendientes="imagenesPendientes" />
 
         <div class="mt-6 flex justify-end gap-2">
             <Link :href="ProyectoController.show([planta.id, proyecto.id])">

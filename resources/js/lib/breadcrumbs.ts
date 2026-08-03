@@ -56,6 +56,13 @@ export function breadcrumbsLevantamientoNuevo(planta: PlantaRef, proyecto: Proye
     return [...breadcrumbsProyecto(planta, proyecto), { title: 'Nuevo Levantamiento', href: '' }];
 }
 
+export function breadcrumbsCotizaciones(planta: PlantaRef, proyecto: ProyectoRef, levantamiento: LevantamientoRef): BreadcrumbItem[] {
+    return [
+        ...breadcrumbsLevantamiento(planta, proyecto, levantamiento),
+        { title: 'Cotizaciones', href: CotizacionController.index({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }) },
+    ];
+}
+
 export function breadcrumbsCotizacion(
     planta: PlantaRef,
     proyecto: ProyectoRef,
@@ -63,7 +70,7 @@ export function breadcrumbsCotizacion(
     cotizacion: CotizacionRef,
 ): BreadcrumbItem[] {
     return [
-        ...breadcrumbsLevantamiento(planta, proyecto, levantamiento),
+        ...breadcrumbsCotizaciones(planta, proyecto, levantamiento),
         { title: cotizacion.folio, href: '' },
     ];
 }

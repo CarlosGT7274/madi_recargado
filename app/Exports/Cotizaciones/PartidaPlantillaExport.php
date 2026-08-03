@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Exports;
+namespace App\Exports\Cotizaciones;
 
 use App\Models\Cotizacion;
 use Maatwebsite\Excel\Concerns\FromArray;

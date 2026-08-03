@@ -21,6 +21,7 @@ export interface CampoConfig {
     colSpan?: 1 | 2;
     /** Si es true, el campo solo se muestra en modo view (nunca editable). */
     soloLectura?: boolean;
+    disabled?: boolean;
 }
 
 export interface SeccionConfig {
@@ -59,7 +60,6 @@ function seccionRiesgo(prefijo: string, titulo: string): SeccionConfig {
                 label: 'Notas',
                 type: 'textarea',
                 colSpan: 2,
-                dependsOn: { key: `${prefijo}_aplica`, equals: true },
             },
         ],
     };
@@ -77,14 +77,14 @@ export const seccionesLevantamiento: SeccionConfig[] = [
     {
         titulo: 'Datos Generales',
         campos: [
-            { key: 'solicitante', label: 'Solicitante', type: 'text', required: true },
-            { key: 'fecha_solicitud', label: 'Fecha Solicitud', type: 'date' },
+            { key: 'solicitante', label: 'Solicitante', type: 'text', required: true, disabled: true },
+            { key: 'fecha_solicitud', label: 'Fecha Solicitud', type: 'date', disabled: true },
             { key: 'usuario_requiriente', label: 'Usuario Requiriente', type: 'text' },
             { key: 'fecha_levantamiento_programada', label: 'Fecha Lev. Prog.', type: 'date' },
             { key: 'correo_usuario', label: 'Correo', type: 'email' },
             { key: 'fecha_envio_cotizacion_programada', label: 'Fecha Envío Prog.', type: 'date' },
             { key: 'area_trabajo', label: 'Área Trabajo', type: 'text' },
-            { key: 'fecha_cotizacion_enviada', label: 'Fecha Cotización Enviada', type: 'date' },
+            { key: 'fecha_cotizacion_enviada', label: 'Fecha Cotización Enviada', type: 'date', disabled: true },
             { key: 'titulo_cotizacion', label: 'Título Cotización', type: 'text', colSpan: 2 },
             { key: 'medio_solicitud', label: 'Medio de Solicitud', type: 'select', options: medioSolicitudOptions },
         ],

@@ -1,16 +1,17 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, pageLayout } from '@/lib/breadcrumbs';
+import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
 
 interface Props {
     planta: PlantaRef;
+    proyecto: ProyectoRef;
     levantamiento: LevantamientoRef;
     cotizacion: CotizacionRef;
 }
 
 export default pageLayout(() => {
-    const { planta, levantamiento, cotizacion } = usePage<Props>().props;
-    return breadcrumbsCotizacion(planta, levantamiento, cotizacion);
+    const { planta, proyecto, levantamiento, cotizacion } = usePage<Props>().props;
+    return breadcrumbsCotizacion(planta, proyecto, levantamiento, cotizacion);
 });
 </script>
 
@@ -21,7 +22,7 @@ import { ArrowLeft, Calendar, FileSpreadsheet, MapPin, Download, Plus, Upload } 
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
-import PartidaController from '@/actions/App/Http/Controllers/Ingenierias/PartidaController';
+import PartidaController from '@/actions/App/Http/Controllers/Ingenierias/Cotizaciones/PartidaController';
 import PageLayout from '@/components/PageLayout.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,12 @@ import { Label } from '@/components/ui/label';
 type PlantaResumen = {
     id: number;
     nombre: string;
+};
+
+type ProyectoResumen = {
+    id: number;
+    nombre: string;
+    folio: string;
 };
 
 type LevantamientoResumen = {
@@ -86,6 +93,7 @@ interface PartidaResumen {
 
 const props = defineProps<{
     planta: PlantaResumen;
+    proyecto: ProyectoResumen;
     levantamiento: LevantamientoResumen;
     cotizacion: CotizacionDetalle;
     partidas: PartidaResumen[];
@@ -99,7 +107,12 @@ function subirPlantillaPartidas(): void {
     if (!archivo) return;
 
     router.post(
-        PartidaController.importar({ planta: props.planta.id, proyecto: props.levantamiento.id, levantamiento: props.levantamiento.id, cotizacion: props.cotizacion.id }).url,
+        PartidaController.importar({
+            planta: props.planta.id,
+            proyecto: props.proyecto.id,
+            levantamiento: props.levantamiento.id,
+            cotizacion: props.cotizacion.id,
+        }).url,
         { archivo },
         { forceFormData: true },
     );
@@ -118,12 +131,13 @@ function eliminarCotizacion() {
     router.delete(
         CotizacionController.destroy({
             planta: props.planta.id,
+            proyecto: props.proyecto.id,
             levantamiento: props.levantamiento.id,
             cotizacion: props.cotizacion.id,
         }).url,
         {
             onSuccess: () =>
-                router.visit(LevantamientoController.show({ planta: props.planta.id, levantamiento: props.levantamiento.id }).url),
+                router.visit(LevantamientoController.show({ planta: props.planta.id, proyecto: props.proyecto.id, levantamiento: props.levantamiento.id }).url),
         },
     );
 }
@@ -156,22 +170,16 @@ function formatoMoneda(valor: number | null) {
 </script>
 
 <template>
+
     <Head :title="`Cotización ${cotizacion.folio}`" />
 
-    <PageLayout
-        :title="cotizacion.folio"
-        :description="cotizacion.cliente ?? ''"
-        endpoint="ingenierias.plantas.levantamientos.cotizaciones"
-        with-edit
-        with-delete
-        @edit="editDialogOpen = true"
-        @delete="eliminarCotizacion"
-    >
+    <PageLayout :title="cotizacion.folio" :description="cotizacion.cliente ?? ''"
+        endpoint="ingenierias.plantas.levantamientos.cotizaciones" with-edit with-delete @edit="editDialogOpen = true"
+        @delete="eliminarCotizacion">
         <template #breadcrumbs>
             <Link
-                :href="LevantamientoController.show({ planta: planta.id, levantamiento: levantamiento.id })"
-                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
+                :href="LevantamientoController.show({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id })"
+                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft class="size-4" />
             </Link>
         </template>
@@ -179,19 +187,14 @@ function formatoMoneda(valor: number | null) {
         <!-- Dialog: editar cotización -->
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form
-                    v-bind="
-                        CotizacionController.update.form({
-                            planta: planta.id,
-                            levantamiento: levantamiento.id,
-                            cotizacion: cotizacion.id,
-                        })
-                    "
-                    :options="{ preserveScroll: true }"
-                    @success="editDialogOpen = false"
-                    v-slot="{ errors, processing }"
-                    class="space-y-4"
-                >
+                <Form v-bind="CotizacionController.update.form({
+                    planta: planta.id,
+                    proyecto: proyecto.id,
+                    levantamiento: levantamiento.id,
+                    cotizacion: cotizacion.id,
+                })
+                    " :options="{ preserveScroll: true }" @success="editDialogOpen = false"
+                    v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Editar cotización</DialogTitle>
                         <DialogDescription>Actualiza los datos de esta cotización.</DialogDescription>
@@ -205,7 +208,8 @@ function formatoMoneda(valor: number | null) {
                         </div>
                         <div class="grid gap-2">
                             <Label for="edit-para">Para</Label>
-                            <Input id="edit-para" name="para" :default-value="cotizacion.para ?? ''" placeholder="Atención de..." />
+                            <Input id="edit-para" name="para" :default-value="cotizacion.para ?? ''"
+                                placeholder="Atención de..." />
                             <InputError :message="errors.para" />
                         </div>
                     </div>
@@ -218,19 +222,22 @@ function formatoMoneda(valor: number | null) {
 
                     <div class="grid gap-2">
                         <Label for="edit-direccion">Dirección</Label>
-                        <Input id="edit-direccion" name="direccion" :default-value="cotizacion.direccion ?? ''" placeholder="Dirección (opcional)" />
+                        <Input id="edit-direccion" name="direccion" :default-value="cotizacion.direccion ?? ''"
+                            placeholder="Dirección (opcional)" />
                         <InputError :message="errors.direccion" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="grid gap-2">
                             <Label for="edit-vendedor">Vendedor</Label>
-                            <Input id="edit-vendedor" name="vendedor" :default-value="cotizacion.vendedor ?? ''" placeholder="Vendedor (opcional)" />
+                            <Input id="edit-vendedor" name="vendedor" :default-value="cotizacion.vendedor ?? ''"
+                                placeholder="Vendedor (opcional)" />
                             <InputError :message="errors.vendedor" />
                         </div>
                         <div class="grid gap-2">
                             <Label for="edit-proveedor">Proveedor</Label>
-                            <Input id="edit-proveedor" name="proveedor" :default-value="cotizacion.proveedor ?? ''" placeholder="Proveedor (opcional)" />
+                            <Input id="edit-proveedor" name="proveedor" :default-value="cotizacion.proveedor ?? ''"
+                                placeholder="Proveedor (opcional)" />
                             <InputError :message="errors.proveedor" />
                         </div>
                     </div>
@@ -238,12 +245,14 @@ function formatoMoneda(valor: number | null) {
                     <div class="grid grid-cols-2 gap-4">
                         <div class="grid gap-2">
                             <Label for="edit-correo-vendedor">Correo Vendedor</Label>
-                            <Input id="edit-correo-vendedor" name="correo_vendedor" type="email" :default-value="cotizacion.correo_vendedor ?? ''" placeholder="opcional" />
+                            <Input id="edit-correo-vendedor" name="correo_vendedor" type="email"
+                                :default-value="cotizacion.correo_vendedor ?? ''" placeholder="opcional" />
                             <InputError :message="errors.correo_vendedor" />
                         </div>
                         <div class="grid gap-2">
                             <Label for="edit-iva">IVA (monto)</Label>
-                            <Input id="edit-iva" name="iva" type="number" step="0.01" :default-value="cotizacion.iva ?? 0" placeholder="0.00" />
+                            <Input id="edit-iva" name="iva" type="number" step="0.01"
+                                :default-value="cotizacion.iva ?? 0" placeholder="0.00" />
                             <InputError :message="errors.iva" />
                         </div>
                     </div>
@@ -251,15 +260,18 @@ function formatoMoneda(valor: number | null) {
                     <div class="grid grid-cols-3 gap-4">
                         <div class="grid gap-2">
                             <Label for="edit-tiempo-entrega">Tiempo Entrega</Label>
-                            <Input id="edit-tiempo-entrega" name="tiempo_entrega" :default-value="cotizacion.tiempo_entrega ?? ''" placeholder="opcional" />
+                            <Input id="edit-tiempo-entrega" name="tiempo_entrega"
+                                :default-value="cotizacion.tiempo_entrega ?? ''" placeholder="opcional" />
                         </div>
                         <div class="grid gap-2">
                             <Label for="edit-dias-credito">Días Crédito</Label>
-                            <Input id="edit-dias-credito" name="dias_credito" :default-value="cotizacion.dias_credito ?? ''" placeholder="opcional" />
+                            <Input id="edit-dias-credito" name="dias_credito"
+                                :default-value="cotizacion.dias_credito ?? ''" placeholder="opcional" />
                         </div>
                         <div class="grid gap-2">
                             <Label for="edit-vigencia">Vigencia</Label>
-                            <Input id="edit-vigencia" name="vigencia_cotizacion" :default-value="cotizacion.vigencia_cotizacion ?? ''" placeholder="opcional" />
+                            <Input id="edit-vigencia" name="vigencia_cotizacion"
+                                :default-value="cotizacion.vigencia_cotizacion ?? ''" placeholder="opcional" />
                         </div>
                     </div>
 
@@ -284,16 +296,15 @@ function formatoMoneda(valor: number | null) {
             <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b bg-muted/30 px-6 py-5">
                     <div class="flex items-center gap-4">
-                        <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <div
+                            class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                             <FileSpreadsheet class="size-6" />
                         </div>
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="text-lg font-semibold leading-tight">{{ cotizacion.folio }}</p>
-                                <span
-                                    class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
-                                    :class="estadoBadgeClass(cotizacion.estado)"
-                                >
+                                <span class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
+                                    :class="estadoBadgeClass(cotizacion.estado)">
                                     {{ estadoLabel[cotizacion.estado] ?? cotizacion.estado }}
                                 </span>
                             </div>
@@ -380,13 +391,9 @@ function formatoMoneda(valor: number | null) {
         <Dialog v-model:open="nuevaPartidaDialogOpen">
             <DialogContent>
                 <Form
-                    v-bind="PartidaController.store.form({ planta: planta.id, proyecto: levantamiento.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id })"
-                    reset-on-success
-                    :options="{ preserveScroll: true }"
-                    @success="nuevaPartidaDialogOpen = false"
-                    v-slot="{ errors, processing }"
-                    class="space-y-4"
-                >
+                    v-bind="PartidaController.store.form({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id })"
+                    reset-on-success :options="{ preserveScroll: true }" @success="nuevaPartidaDialogOpen = false"
+                    v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Nueva partida</DialogTitle>
                     </DialogHeader>
@@ -433,7 +440,8 @@ function formatoMoneda(valor: number | null) {
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <p class="text-sm font-medium text-muted-foreground">Partidas ({{ partidas?.length || 0 }})</p>
                 <div class="flex items-center gap-2">
-                    <a :href="PartidaController.plantilla({ planta: planta.id, proyecto: levantamiento.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id }).url">
+                    <a
+                        :href="PartidaController.plantilla({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id }).url">
                         <Button variant="outline" size="sm">
                             <Download class="mr-2 size-4" />
                             Plantilla
@@ -444,13 +452,8 @@ function formatoMoneda(valor: number | null) {
                             <Upload class="mr-2 size-4" />
                             Importar Excel
                         </Button>
-                        <input
-                            ref="archivoPartidasInput"
-                            type="file"
-                            accept=".xlsx,.xls"
-                            class="hidden"
-                            @change="subirPlantillaPartidas"
-                        />
+                        <input ref="archivoPartidasInput" type="file" accept=".xlsx,.xls" class="hidden"
+                            @change="subirPlantillaPartidas" />
                     </label>
                     <Button size="sm" @click="nuevaPartidaDialogOpen = true">
                         <Plus class="mr-2 size-4" />
@@ -460,7 +463,8 @@ function formatoMoneda(valor: number | null) {
             </div>
 
             <div v-if="partidas?.length" class="overflow-hidden rounded-xl border">
-                <div class="grid grid-cols-[50px_1fr_90px_80px_110px_110px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+                <div
+                    class="grid grid-cols-[50px_1fr_90px_80px_110px_110px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
                     <span>#</span>
                     <span>Descripción</span>
                     <span>Cant.</span>
@@ -468,11 +472,8 @@ function formatoMoneda(valor: number | null) {
                     <span class="text-right">P. Unit.</span>
                     <span class="text-right">Importe</span>
                 </div>
-                <div
-                    v-for="partida in partidas"
-                    :key="partida.id"
-                    class="grid grid-cols-[50px_1fr_90px_80px_110px_110px] items-center gap-2 border-t px-4 py-3 text-sm"
-                >
+                <div v-for="partida in partidas" :key="partida.id"
+                    class="grid grid-cols-[50px_1fr_90px_80px_110px_110px] items-center gap-2 border-t px-4 py-3 text-sm">
                     <span class="text-muted-foreground">{{ partida.numeroPartida }}</span>
                     <span class="truncate">{{ partida.descripcion }}</span>
                     <span>{{ partida.cantidad }}</span>

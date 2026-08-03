@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\Ingenierias;
+namespace App\Support\Ingenierias\Cotizaciones;
 
 class PartidaCampos
 {

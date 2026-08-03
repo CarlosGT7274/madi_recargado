@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Ingenierias\Partidas;
+namespace App\Actions\Ingenierias\Cotizaciones\Partidas;
 
 use App\Models\Cotizacion;
 use App\Models\Partida;

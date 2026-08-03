@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Support\Ingenierias;
+namespace App\Support\Ingenierias\Cotizaciones;
+
+use Illuminate\Validation\Rule;
 
 class CotizacionRules
 {
@@ -23,8 +25,8 @@ class CotizacionRules
             'dias_credito' => ['nullable', 'string', 'max:50'],
             'vigencia_cotizacion' => ['nullable', 'string', 'max:100'],
             'notas' => ['nullable', 'string'],
-            // iva: monto libre, lo captura la persona; no se deriva del subtotal
             'iva' => ['nullable', 'numeric', 'min:0'],
+            'estado' => ['nullable', 'string', Rule::in(['borrador', 'enviada', 'aprobada', 'rechazada'])],
         ];
     }
 }

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Ingenierias;
 
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
-use App\Actions\Ingenierias\Partidas\PartidasAction;
+use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Cotizaciones\ImportCotizacionRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\UpdateCotizacionRequest;
-use App\Imports\CotizacionExcelImport;
+use App\Imports\Cotizaciones\CotizacionExcelImport;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
 use App\Models\Planta;
@@ -79,5 +79,16 @@ class CotizacionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización eliminada.']);
 
         return back();
+    }
+
+    public function index(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, CotizacionesAction $action): Response
+    {
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Index', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
+            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
+            'resumen' => $action->resumen($levantamiento),
+            'cotizaciones' => $action->list($levantamiento),
+        ]);
     }
 }

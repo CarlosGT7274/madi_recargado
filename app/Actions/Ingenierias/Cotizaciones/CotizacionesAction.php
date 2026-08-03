@@ -2,13 +2,20 @@
 
 namespace App\Actions\Ingenierias\Cotizaciones;
 
+use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
+use App\Services\FolioService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
 class CotizacionesAction
 {
+    public function __construct(
+        private readonly FolioService $folios,
+        private readonly PartidasAction $partidasAction,
+    ) {}
+
     public function list(Levantamiento $levantamiento): Collection
     {
         return $levantamiento->cotizaciones()
@@ -55,6 +62,8 @@ class CotizacionesAction
 
     public function create(Levantamiento $levantamiento, array $data): Cotizacion
     {
+        $data['folio'] = $this->folios->siguiente('ingenierias', 'cotizacion', 'COT');
+
         return $levantamiento->cotizaciones()->create([
             ...$data,
             'usuario_id' => Auth::id(),
@@ -63,7 +72,23 @@ class CotizacionesAction
 
     public function update(Cotizacion $cotizacion, array $data): Cotizacion
     {
+        $aprobandoAhora = ($data['estado'] ?? null) === 'aprobada' && $cotizacion->estado !== 'aprobada';
+
+        if ($aprobandoAhora) {
+            $data['fecha_aprobacion'] = now()->toDateString();
+        }
+
         $cotizacion->update($data);
+
+        if ($aprobandoAhora) {
+            $cotizacion->levantamiento->update([
+                'fecha_cotizacion_enviada' => now()->toDateString(),
+            ]);
+        }
+
+        if (array_key_exists('iva', $data)) {
+            $this->partidasAction->recalcularTotales($cotizacion);
+        }
 
         return $cotizacion;
     }
@@ -73,18 +98,27 @@ class CotizacionesAction
         $cotizacion->delete();
     }
 
-    public function recalcularTotales(Cotizacion $cotizacion): void
+    public function resumen(Levantamiento $levantamiento): array
     {
-        $subtotal = (float) $cotizacion->partidas()->sum('importe');
-        $costoHoraTotal = (float) $cotizacion->partidas()
-            ->selectRaw('SUM(costo_hora * cantidad) as total')
-            ->value('total');
+        $cotizaciones = $levantamiento->cotizaciones()->get();
+        $aprobadas = $cotizaciones->where('estado', 'aprobada');
 
-        $cotizacion->update([
-            'subtotal' => $subtotal,
-            'total' => $subtotal + (float) $cotizacion->iva, // iva se queda como esté, se captura a mano
-            'costo_hora_total' => $costoHoraTotal ?? 0,
-            'tiene_partidas' => $cotizacion->partidas()->exists(),
-        ]);
+        $yaEnviada = $levantamiento->fecha_cotizacion_enviada !== null;
+        $programada = $levantamiento->fecha_envio_cotizacion_programada;
+
+        $tiempoRestanteHoras = null;
+
+        if (! $yaEnviada && $programada !== null) {
+            $horasAbs = (int) round(now()->diffInHours($programada));
+            $tiempoRestanteHoras = $programada->isFuture() ? $horasAbs : -$horasAbs;
+        }
+
+        return [
+            'totalCotizaciones' => $cotizaciones->count(),
+            'totalAprobadas' => $aprobadas->count(),
+            'montoTotalAprobado' => (float) $aprobadas->sum('total'),
+            'tiempoRestanteHoras' => $tiempoRestanteHoras,
+            'yaEnviada' => $yaEnviada,
+        ];
     }
 }

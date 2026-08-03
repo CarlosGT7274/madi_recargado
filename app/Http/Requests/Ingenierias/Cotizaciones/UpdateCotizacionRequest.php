@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Ingenierias\Cotizaciones;
 
-use App\Support\Ingenierias\CotizacionRules;
+use App\Support\Ingenierias\Cotizaciones\CotizacionRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCotizacionRequest extends FormRequest

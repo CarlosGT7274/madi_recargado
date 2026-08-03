@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\Ingenierias\CotizacionController;
-use App\Http\Controllers\Ingenierias\LevantamientoController;
-use App\Http\Controllers\Ingenierias\PartidaController;
+use App\Http\Controllers\Ingenierias\Cotizaciones\PartidaController;
+use App\Http\Controllers\Ingenierias\LevantamientoController; // ← este cambia
 use App\Http\Controllers\Ingenierias\PlantaController;
 use App\Http\Controllers\Ingenierias\ProyectoController;
 use App\Support\Accion;
@@ -66,6 +66,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/levantamientos/{levantamiento}/cotizaciones')
         ->scopeBindings()
         ->group(function () {
+            Route::get('/', [CotizacionController::class, 'index'])
+                ->middleware('permiso:'.Accion::READ)->name('index');
             Route::get('/plantilla-partidas', [PartidaController::class, 'plantillaGenerica'])
                 ->middleware('permiso:'.Accion::CREATE)->name('plantilla-partidas');
             Route::get('/{cotizacion}', [CotizacionController::class, 'show'])

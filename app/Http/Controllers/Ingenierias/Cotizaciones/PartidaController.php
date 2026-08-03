@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\Ingenierias;
+namespace App\Http\Controllers\Ingenierias\Cotizaciones;
 
-use App\Actions\Ingenierias\Partidas\PartidasAction;
-use App\Exports\PartidaPlantillaExport;
+use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
+use App\Exports\Cotizaciones\PartidaPlantillaExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Ingenierias\Partidas\ImportPartidasRequest;
-use App\Http\Requests\Ingenierias\Partidas\StorePartidaRequest;
-use App\Http\Requests\Ingenierias\Partidas\UpdatePartidaRequest;
-use App\Imports\PartidasImport;
+use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\ImportPartidasRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\StorePartidaRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\UpdatePartidaRequest;
+use App\Imports\Cotizaciones\PartidasImport;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
 use App\Models\Partida;

@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Imports;
+namespace App\Imports\Cotizaciones;
 
-use App\Actions\Ingenierias\Partidas\PartidasAction;
+use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Models\Cotizacion;
 use App\Models\Partida;
 use Illuminate\Support\Collection;

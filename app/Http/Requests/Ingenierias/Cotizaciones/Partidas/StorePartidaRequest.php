@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Ingenierias\Partidas;
+namespace App\Http\Requests\Ingenierias\Cotizaciones\Partidas;
 
 use Illuminate\Foundation\Http\FormRequest;
 

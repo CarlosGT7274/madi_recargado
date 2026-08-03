@@ -56,7 +56,7 @@ function seVisible(campo: CampoConfig): boolean {
 }
 
 function esEditableCampo(campo: CampoConfig): boolean {
-    return esEditable.value && !campo.soloLectura;
+    return esEditable.value && !campo.soloLectura && !campo.disabled;
 }
 
 function textoPlano(campo: CampoConfig): string {
@@ -76,64 +76,46 @@ const seccionesEstandar: SeccionConfig[] = seccionesLevantamiento;
 <template>
     <div class="space-y-6">
         <!-- Secciones estándar: Identificación + Datos Generales (1 columna, cards apiladas) -->
-        <div
-            v-for="seccion in seccionesEstandar"
-            :key="seccion.titulo"
-            class="rounded-2xl border bg-card p-5 shadow-sm"
-        >
+        <div v-for="seccion in seccionesEstandar" :key="seccion.titulo"
+            class="rounded-2xl border bg-card p-5 shadow-sm">
             <p class="mb-4 text-sm font-medium text-muted-foreground">{{ seccion.titulo }}</p>
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <template v-for="campo in seccion.campos" :key="campo.key">
-                    <div
-                        v-if="seVisible(campo)"
-                        class="grid gap-2"
-                        :class="campo.colSpan === 2 ? 'sm:col-span-2' : ''"
-                    >
+                    <div v-if="seVisible(campo)" class="grid gap-2" :class="campo.colSpan === 2 ? 'sm:col-span-2' : ''">
                         <Label :for="campo.key">
                             {{ campo.label }}
                             <span v-if="campo.required" class="text-destructive">*</span>
                         </Label>
 
-                        <p v-if="!esEditableCampo(campo)" class="text-sm font-medium">
+                        <p v-if="mode === 'view' || campo.soloLectura" class="text-sm font-medium">
                             {{ textoPlano(campo) }}
                         </p>
 
+                        <Input v-else-if="campo.disabled" :id="campo.key" :type="campo.type" disabled
+                            :model-value="(valorDe(campo.key) as string) ?? ''" />
+
                         <template v-else>
-                            <Select
-                                v-if="campo.type === 'select'"
-                                :model-value="(valorDe(campo.key) as string) ?? ''"
-                                @update:model-value="(v) => actualizar(campo.key, v)"
-                            >
+                            <Select v-if="campo.type === 'select'" :model-value="(valorDe(campo.key) as string) ?? ''"
+                                @update:model-value="(v) => actualizar(campo.key, v)">
                                 <SelectTrigger :id="campo.key">
                                     <SelectValue :placeholder="campo.placeholder ?? 'Seleccionar'" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem
-                                        v-for="opcion in campo.options"
-                                        :key="opcion.value"
-                                        :value="opcion.value"
-                                    >
+                                    <SelectItem v-for="opcion in campo.options" :key="opcion.value"
+                                        :value="opcion.value">
                                         {{ opcion.label }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
 
-                            <Textarea
-                                v-else-if="campo.type === 'textarea'"
-                                :id="campo.key"
+                            <Textarea v-else-if="campo.type === 'textarea'" :id="campo.key"
                                 :model-value="(valorDe(campo.key) as string) ?? ''"
-                                @update:model-value="(v) => actualizar(campo.key, v)"
-                            />
+                                @update:model-value="(v) => actualizar(campo.key, v)" />
 
-                            <Input
-                                v-else
-                                :id="campo.key"
-                                :type="campo.type"
-                                :placeholder="campo.placeholder"
+                            <Input v-else :id="campo.key" :type="campo.type" :placeholder="campo.placeholder"
                                 :model-value="(valorDe(campo.key) as string) ?? ''"
-                                @update:model-value="(v) => actualizar(campo.key, v)"
-                            />
+                                @update:model-value="(v) => actualizar(campo.key, v)" />
 
                             <InputError :message="errorDe(campo.key)" />
                         </template>
@@ -147,11 +129,7 @@ const seccionesEstandar: SeccionConfig[] = seccionesLevantamiento;
             <p class="mb-4 text-sm font-medium text-muted-foreground">Trabajos Especiales</p>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div
-                    v-for="seccion in seccionesTrabajosEspeciales"
-                    :key="seccion.titulo"
-                    class="rounded-xl border p-4"
-                >
+                <div v-for="seccion in seccionesTrabajosEspeciales" :key="seccion.titulo" class="rounded-xl border p-4">
                     <p class="mb-3 text-sm font-semibold">{{ seccion.titulo }}</p>
 
                     <div class="space-y-3">
@@ -162,11 +140,8 @@ const seccionesEstandar: SeccionConfig[] = seccionesLevantamiento;
                                         {{ campo.label }}
                                     </Label>
 
-                                    <ToggleSiNo
-                                        v-if="esEditableCampo(campo)"
-                                        :model-value="Boolean(valorDe(campo.key))"
-                                        @update:model-value="(v) => actualizar(campo.key, v)"
-                                    />
+                                    <ToggleSiNo v-if="esEditableCampo(campo)" :model-value="Boolean(valorDe(campo.key))"
+                                        @update:model-value="(v) => actualizar(campo.key, v)" />
                                     <span v-else class="text-sm font-medium">
                                         {{ valorDe(campo.key) ? 'Sí' : 'No' }}
                                     </span>
@@ -180,13 +155,9 @@ const seccionesEstandar: SeccionConfig[] = seccionesLevantamiento;
                                     <p v-if="!esEditableCampo(campo)" class="text-sm">
                                         {{ textoPlano(campo) }}
                                     </p>
-                                    <Textarea
-                                        v-else
-                                        :id="campo.key"
-                                        class="min-h-16 text-sm"
+                                    <Textarea v-else :id="campo.key" class="min-h-16 text-sm"
                                         :model-value="(valorDe(campo.key) as string) ?? ''"
-                                        @update:model-value="(v) => actualizar(campo.key, v)"
-                                    />
+                                        @update:model-value="(v) => actualizar(campo.key, v)" />
                                 </div>
                             </div>
                         </template>
@@ -207,12 +178,8 @@ const seccionesEstandar: SeccionConfig[] = seccionesLevantamiento;
                         <p v-if="!esEditableCampo(campo)" class="text-sm font-medium">
                             {{ textoPlano(campo) }}
                         </p>
-                        <Textarea
-                            v-else
-                            :id="campo.key"
-                            :model-value="(valorDe(campo.key) as string) ?? ''"
-                            @update:model-value="(v) => actualizar(campo.key, v)"
-                        />
+                        <Textarea v-else :id="campo.key" :model-value="(valorDe(campo.key) as string) ?? ''"
+                            @update:model-value="(v) => actualizar(campo.key, v)" />
                     </div>
                 </template>
             </div>
