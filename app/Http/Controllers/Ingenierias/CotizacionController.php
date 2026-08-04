@@ -4,43 +4,76 @@ namespace App\Http\Controllers\Ingenierias;
 
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
+use App\Exports\Cotizaciones\PartidaPlantillaExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Cotizaciones\ImportCotizacionRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\StorePartidaRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\UpdatePartidaRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\UpdateCotizacionRequest;
 use App\Imports\Cotizaciones\CotizacionExcelImport;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
+use App\Models\Partida;
 use App\Models\Planta;
 use App\Models\Proyecto;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CotizacionController extends Controller
 {
+    /**
+     * Vista intermedia: cotizaciones agrupadas por obra. Aquí es donde el
+     * usuario ve "Ampliación de línea 3 — 4 versiones" en vez de una lista
+     * plana de folios sueltos.
+     */
+    public function index(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, CotizacionesAction $action): Response
+    {
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Index', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
+            'levantamiento' => [
+                'id' => $levantamiento->id,
+                'folio' => $levantamiento->folio,
+                'nombre' => $levantamiento->nombre,
+                'cliente' => $levantamiento->cliente,
+                'estatus_admin' => $levantamiento->estatus_admin,
+                'creado' => $levantamiento->fecha_creacion?->format('d M Y'),
+            ],
+            'resumen' => $action->resumen($levantamiento),
+            'obras' => $action->listAgrupado($levantamiento),
+        ]);
+    }
+
+    /** Todas las versiones de una obra puntual (cuando el usuario abre un grupo). */
+    public function versiones(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, string $obra, CotizacionesAction $action)
+    {
+        return response()->json($action->versionesDeObra($levantamiento, $obra));
+    }
+
     public function show(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action, PartidasAction $partidasAction): Response
     {
         return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Show', [
-            'planta' => [
-                'id' => $planta->id,
-                'nombre' => $planta->nombre,
-            ],
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
             'proyecto' => [
                 'id' => $proyecto->id,
                 'nombre' => $proyecto->nombre,
                 'folio' => $proyecto->folio,
                 'completado' => $proyecto->estaCompletado(),
             ],
-            'levantamiento' => [
-                'id' => $levantamiento->id,
-                'folio' => $levantamiento->folio,
-            ],
+            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
             'cotizacion' => $action->detail($cotizacion),
-            'partidas' => $partidasAction->list($cotizacion),
+            'partidas' => $partidasAction->arbol($cotizacion),
         ]);
     }
 
+    /**
+     * El Excel es la fuente de verdad de la Cotización: crea SIEMPRE una
+     * nueva versión (nunca actualiza una fila existente), aunque ya exista
+     * una cotización previa con la misma obra en este levantamiento.
+     */
     public function store(
         ImportCotizacionRequest $request,
         Planta $planta,
@@ -82,21 +115,31 @@ class CotizacionController extends Controller
         return back();
     }
 
-    public function index(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, CotizacionesAction $action): Response
+    public function plantilla(): BinaryFileResponse
     {
-        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Index', [
-            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
-            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
-            'levantamiento' => [
-                'id' => $levantamiento->id,
-                'folio' => $levantamiento->folio,
-                'nombre' => $levantamiento->nombre,
-                'cliente' => $levantamiento->cliente,
-                'estatus_admin' => $levantamiento->estatus_admin,
-                'creado' => $levantamiento->fecha_creacion?->format('d M Y'),
-            ],
-            'resumen' => $action->resumen($levantamiento),
-            'cotizaciones' => $action->list($levantamiento),
-        ]);
+        return Excel::download(new PartidaPlantillaExport, 'plantilla-partidas.xlsx');
+    }
+
+    // ---- Partidas: sub-acciones de Cotización, no un módulo aparte ----
+
+    public function storePartida(StorePartidaRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, PartidasAction $action): RedirectResponse
+    {
+        $action->create($cotizacion, $request->validated());
+
+        return back();
+    }
+
+    public function updatePartida(UpdatePartidaRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, Partida $partida, PartidasAction $action): RedirectResponse
+    {
+        $action->update($partida, $request->validated());
+
+        return back();
+    }
+
+    public function destroyPartida(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, Partida $partida, PartidasAction $action): RedirectResponse
+    {
+        $action->delete($partida);
+
+        return back();
     }
 }

@@ -1,7 +1,6 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { breadcrumbsLevantamiento, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
-import GaleriaImagenes from '@/components/GaleriaImagenes.vue';
 
 interface Props {
     planta: PlantaRef;
@@ -17,13 +16,12 @@ export default pageLayout(() => {
 
 <script setup lang="ts">
 import { Deferred, Head, Link, router, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import { ArrowLeft, FileSpreadsheet, FileText, Plus, Download, Upload } from '@lucide/vue';
-import { ref } from 'vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
-import PartidaController from '@/actions/App/Http/Controllers/Ingenierias/Cotizaciones/PartidaController';
 import PageLayout from '@/components/PageLayout.vue';
 
 import { Button } from '@/components/ui/button';
@@ -68,12 +66,22 @@ const form = useForm<LevantamientoFormData>({ ...props.levantamiento });
 const createCotizacionDialogOpen = ref(false);
 const archivoCotizacionInput = ref<HTMLInputElement | null>(null);
 
+const rutaCotizaciones = computed(() => ({
+    planta: props.planta.id,
+    proyecto: props.proyecto.id,
+    levantamiento: props.levantamiento.id,
+}));
+
+const urlPlantillaCotizacion = computed(
+    () => CotizacionController.plantilla(rutaCotizaciones.value).url,
+);
+
 function subirCotizacionExcel(): void {
     const archivo = archivoCotizacionInput.value?.files?.[0];
     if (!archivo) return;
 
     router.post(
-        CotizacionController.store({ planta: props.planta.id, proyecto: props.proyecto.id, levantamiento: props.levantamiento.id }).url,
+        CotizacionController.store(rutaCotizaciones.value).url,
         { archivo },
         { forceFormData: true, onSuccess: () => (createCotizacionDialogOpen.value = false) },
     );
@@ -85,7 +93,7 @@ function actualizar(payload: LevantamientoFormData): void {
 
 function guardar(): void {
     form.put(
-        LevantamientoController.update({ planta: props.planta.id, proyecto: props.proyecto.id, levantamiento: props.levantamiento.id }).url,
+        LevantamientoController.update(rutaCotizaciones.value).url,
         { onSuccess: () => (modo.value = 'view') },
     );
 }
@@ -95,7 +103,7 @@ function eliminar(): void {
         return;
     }
     router.delete(
-        LevantamientoController.destroy({ planta: props.planta.id, proyecto: props.proyecto.id, levantamiento: props.levantamiento.id }).url,
+        LevantamientoController.destroy(rutaCotizaciones.value).url,
         { onSuccess: () => router.visit(ProyectoController.show([props.planta.id, props.proyecto.id]).url) },
     );
 }
@@ -185,8 +193,7 @@ function formatoMoneda(valor: number | null): string {
                     Cotizaciones
                 </div>
                 <div class="flex items-center gap-2">
-                    <a
-                        :href="PartidaController.plantillaGenerica({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }).url">
+                    <a :href="urlPlantillaCotizacion">
                         <Button variant="outline" size="sm">
                             <Download class="mr-2 size-4" />
                             Descargar Plantilla

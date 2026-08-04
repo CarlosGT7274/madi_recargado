@@ -21,6 +21,7 @@ import { ArrowLeft, Box, Building2, Clock, DollarSign, Download, FileText, Hash,
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
+import { computed } from 'vue';
 
 interface PlantaResumen { id: number; nombre: string }
 interface ProyectoResumen { id: number; nombre: string; folio: string; bloqueado: boolean; motivo_bloqueo: string | null }
@@ -77,6 +78,10 @@ const estadoLabel: Record<string, string> = {
     aprobada: 'Aprobada',
     rechazada: 'Rechazada',
 };
+
+const mensajeBloqueo = computed(() =>
+    props.proyecto.motivo_bloqueo ?? 'Este proyecto está bloqueado y no permite nuevas cotizaciones.',
+);
 
 function formatoMoneda(valor: number | null | undefined): string {
     if (valor === null || valor === undefined) return '—';
@@ -176,12 +181,12 @@ function formatoMoneda(valor: number | null | undefined): string {
                         <div class="flex items-center gap-2">
                             <Building2 class="size-4 text-muted-foreground" /><span class="font-medium">Cliente:</span>
                             {{
-                            cotizacion.cliente ?? '—' }}
+                                cotizacion.cliente ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <MapPin class="size-4 text-muted-foreground" /><span class="font-medium">Dirección:</span>
                             {{
-                            cotizacion.direccion ?? '—' }}
+                                cotizacion.direccion ?? '—' }}
                         </div>
                     </dl>
                 </div>
@@ -190,15 +195,15 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <dl class="space-y-2 text-sm">
                         <div class="flex items-center gap-2">
                             <FileText class="size-4 text-muted-foreground" /><span class="font-medium">Obra:</span> {{
-                            cotizacion.obra ?? '—' }}
+                                cotizacion.obra ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <User class="size-4 text-muted-foreground" /><span class="font-medium">Vendedor:</span> {{
-                            cotizacion.vendedor ?? '—' }}
+                                cotizacion.vendedor ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <Hash class="size-4 text-muted-foreground" /><span class="font-medium">Proveedor:</span> {{
-                            cotizacion.proveedor ?? '—' }}
+                                cotizacion.proveedor ?? '—' }}
                         </div>
                     </dl>
                 </div>
@@ -267,8 +272,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                 <Lock class="mt-0.5 size-4 shrink-0 text-red-600" />
                 <div>
                     <p class="text-sm font-semibold text-red-800 dark:text-red-300">Estado del Proyecto: BLOQUEADO</p>
-                    <p class="text-sm text-red-700 dark:text-red-400">{{ proyecto.motivo_bloqueo ?? 'Este proyecto está
-                        bloqueado y no permite nuevas cotizaciones.' }}</p>
+                    <p class="text-sm text-red-700 dark:text-red-400">{{ mensajeBloqueo }}</p>
                 </div>
             </div>
         </div>

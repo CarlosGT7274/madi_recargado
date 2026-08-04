@@ -1,8 +1,7 @@
 <?php
 
 use App\Http\Controllers\Ingenierias\CotizacionController;
-use App\Http\Controllers\Ingenierias\Cotizaciones\PartidaController;
-use App\Http\Controllers\Ingenierias\LevantamientoController; // ← este cambia
+use App\Http\Controllers\Ingenierias\LevantamientoController;
 use App\Http\Controllers\Ingenierias\PlantaController;
 use App\Http\Controllers\Ingenierias\ProyectoController;
 use App\Support\Accion;
@@ -68,8 +67,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->group(function () {
             Route::get('/', [CotizacionController::class, 'index'])
                 ->middleware('permiso:'.Accion::READ)->name('index');
-            Route::get('/plantilla-partidas', [PartidaController::class, 'plantillaGenerica'])
-                ->middleware('permiso:'.Accion::CREATE)->name('plantilla-partidas');
+            Route::get('/plantilla', [CotizacionController::class, 'plantilla'])
+                ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
+            Route::get('/obra/{obra}', [CotizacionController::class, 'versiones'])
+                ->middleware('permiso:'.Accion::READ)->name('versiones')
+                ->where('obra', '.*');
             Route::get('/{cotizacion}', [CotizacionController::class, 'show'])
                 ->middleware('permiso:'.Accion::READ)->name('show');
             Route::post('/', [CotizacionController::class, 'store'])
@@ -78,21 +80,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::UPDATE)->name('update');
             Route::delete('/{cotizacion}', [CotizacionController::class, 'destroy'])
                 ->middleware('permiso:'.Accion::DELETE)->name('destroy');
-        });
-
-    Route::name('ingenierias.plantas.proyectos.levantamientos.cotizaciones.partidas.')
-        ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/levantamientos/{levantamiento}/cotizaciones/{cotizacion}/partidas')
-        ->scopeBindings()
-        ->group(function () {
-            Route::get('/plantilla', [PartidaController::class, 'plantilla'])
-                ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
-            Route::post('/importar', [PartidaController::class, 'importar'])
-                ->middleware('permiso:'.Accion::CREATE)->name('importar');
-            Route::post('/', [PartidaController::class, 'store'])
-                ->middleware('permiso:'.Accion::CREATE)->name('store');
-            Route::put('/{partida}', [PartidaController::class, 'update'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('update');
-            Route::delete('/{partida}', [PartidaController::class, 'destroy'])
-                ->middleware('permiso:'.Accion::DELETE)->name('destroy');
+            Route::post('/{cotizacion}/partidas', [CotizacionController::class, 'storePartida'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('partidas.store');
+            Route::put('/{cotizacion}/partidas/{partida}', [CotizacionController::class, 'updatePartida'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('partidas.update');
+            Route::delete('/{cotizacion}/partidas/{partida}', [CotizacionController::class, 'destroyPartida'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('partidas.destroy');
         });
 });
