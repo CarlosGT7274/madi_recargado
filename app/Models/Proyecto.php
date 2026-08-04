@@ -20,25 +20,13 @@ class Proyecto extends Model
         'descripcion',
         'estado',
         'estado_revision',
-        'bloqueado',
-        'motivo_bloqueo',
-        'fecha_bloqueo',
         'usuario_id',
     ];
 
     protected $attributes = [
         'tipo' => 'grande',
         'estado' => 'activo',
-        'bloqueado' => false,
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'bloqueado' => 'boolean',
-            'fecha_bloqueo' => 'datetime',
-        ];
-    }
 
     public function planta()
     {

@@ -25,6 +25,7 @@ class Notificacion extends Model
     protected $casts = [
         'leida' => 'boolean',
         'es_general' => 'boolean',
+        'fecha' => 'datetime',
     ];
 
     public function usuario()

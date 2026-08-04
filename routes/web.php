@@ -6,6 +6,7 @@ require __DIR__.'/settings.php';
 require __DIR__.'/seguridad.php';
 require __DIR__.'/ingenierias.php';
 require __DIR__.'/archivos.php';
+require __DIR__.'/notificaciones.php';
 
 Route::inertia('/', 'Welcome')->name('home');
 
