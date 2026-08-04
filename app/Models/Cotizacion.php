@@ -92,7 +92,7 @@ class Cotizacion extends Model
 
     public function tieneOrdenAprobada(): bool
     {
-        return $this->ordenCompra?->estatus_compra === 'aprobado';
+        return $this->ordenCompra?->archivos()->where('tipo_archivo', 'pdf')->exists() ?? false;
     }
 
     public function estaCompletada(): bool

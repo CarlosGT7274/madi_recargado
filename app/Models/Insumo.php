@@ -34,6 +34,7 @@ class Insumo extends Model
         'importe' => 'decimal:2',
         'valor_total' => 'decimal:2',
         'activo' => 'boolean',
+        'fecha_carga' => 'datetime',
     ];
 
     public function cotizacion()

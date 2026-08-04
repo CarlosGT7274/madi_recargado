@@ -1,6 +1,7 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
+import ArchivoController from '@/actions/App/Http/Controllers/ArchivoController';
 
 interface Props {
     planta: PlantaRef;
@@ -16,16 +17,39 @@ export default pageLayout(() => {
 </script>
 
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Box, Building2, Clock, DollarSign, Download, FileText, Hash, Lock, MapPin, ShoppingCart, User } from '@lucide/vue';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoController';
+import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/CompraOrdenController';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 interface PlantaResumen { id: number; nombre: string }
-interface ProyectoResumen { id: number; nombre: string; folio: string; bloqueado: boolean; motivo_bloqueo: string | null }
 interface LevantamientoResumen { id: number; folio: string }
+
+interface OrdenCompraInfo {
+    id: number;
+    pdfUrl: string | null;
+    pdfNombre: string | null;
+}
+
+interface ProyectoResumen {
+    id: number;
+    nombre: string;
+    folio: string;
+    completado: boolean;
+}
 
 interface CotizacionDetalle {
     id: number;
@@ -44,6 +68,8 @@ interface CotizacionDetalle {
     creado: string | null;
     tiene_insumos: boolean;
     tiene_orden_compra: boolean;
+    completada: boolean;
+    ordenCompra: OrdenCompraInfo | null;
 }
 
 interface PartidaHija {
@@ -63,6 +89,29 @@ interface PartidaRaiz {
     hijas: PartidaHija[];
 }
 
+const ocDialogOpen = ref(false);
+const archivoOcInput = ref<HTMLInputElement | null>(null);
+
+function subirOrdenCompra(): void {
+    const archivo = archivoOcInput.value?.files?.[0];
+    if (!archivo) return;
+
+    router.post(
+        CompraOrdenController.store({
+            planta: props.planta.id,
+            proyecto: props.proyecto.id,
+            levantamiento: props.levantamiento.id,
+            cotizacion: props.cotizacion.id,
+        }).url,
+        { archivo },
+        { forceFormData: true, preserveScroll: true, onSuccess: () => (ocDialogOpen.value = false) },
+    );
+}
+
+function eliminarOrdenCompraPdf(archivoId: number): void {
+    router.delete(ArchivoController.destroy(archivoId).url, { preserveScroll: true });
+}
+
 const props = defineProps<{
     planta: PlantaResumen;
     proyecto: ProyectoResumen;
@@ -78,10 +127,6 @@ const estadoLabel: Record<string, string> = {
     aprobada: 'Aprobada',
     rechazada: 'Rechazada',
 };
-
-const mensajeBloqueo = computed(() =>
-    props.proyecto.motivo_bloqueo ?? 'Este proyecto está bloqueado y no permite nuevas cotizaciones.',
-);
 
 function formatoMoneda(valor: number | null | undefined): string {
     if (valor === null || valor === undefined) return '—';
@@ -235,7 +280,10 @@ function formatoMoneda(valor: number | null | undefined): string {
             <p class="mb-5 text-sm text-muted-foreground">Completa las fases en orden para procesar la cotización</p>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-xl border p-4"
+                <Link :href="InsumoController.index({
+                    planta: planta.id, proyecto: proyecto.id,
+                    levantamiento: levantamiento.id, cotizacion: cotizacion.id,
+                })" class="block rounded-xl border p-4 transition-colors hover:bg-accent/50"
                     :class="cotizacion.tiene_insumos ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20' : ''">
                     <div class="mb-3 flex items-center gap-2">
                         <Box class="size-5"
@@ -248,8 +296,8 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <p v-if="cotizacion.tiene_insumos" class="text-sm text-emerald-700 dark:text-emerald-400">Fase
                         completada
                     </p>
-                    <p v-else class="text-sm text-muted-foreground">Pendiente</p>
-                </div>
+                    <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / cargar insumos</p>
+                </Link>
 
                 <div class="rounded-xl border p-4"
                     :class="cotizacion.tiene_orden_compra ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20' : ''">
@@ -258,21 +306,70 @@ function formatoMoneda(valor: number | null | undefined): string {
                             :class="cotizacion.tiene_orden_compra ? 'text-emerald-600' : 'text-muted-foreground'" />
                         <div>
                             <p class="font-semibold">Orden de Compra</p>
-                            <p class="text-xs text-muted-foreground">Orden emitida y aprobada</p>
+                            <p class="text-xs text-muted-foreground">PDF de la orden emitida</p>
                         </div>
                     </div>
-                    <p v-if="cotizacion.tiene_orden_compra" class="text-sm text-emerald-700 dark:text-emerald-400">Orden
-                        aprobada</p>
-                    <p v-else class="text-sm text-muted-foreground">Pendiente</p>
+
+                    <div v-if="cotizacion.ordenCompra?.pdfUrl" class="flex items-center justify-between gap-2">
+                        <a :href="cotizacion.ordenCompra.pdfUrl" target="_blank"
+                            class="truncate text-sm text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
+                            {{ cotizacion.ordenCompra.pdfNombre ?? 'Ver PDF' }}
+                        </a>
+                        <button type="button" class="text-xs text-muted-foreground hover:text-destructive"
+                            @click="eliminarOrdenCompraPdf(cotizacion.ordenCompra.id)">
+                            Quitar
+                        </button>
+                    </div>
+                    <button v-else type="button"
+                        class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                        @click="ocDialogOpen = true">
+                        <Upload class="size-4" />
+                        Subir PDF
+                    </button>
                 </div>
+
+                <Dialog v-model:open="ocDialogOpen">
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Subir Orden de Compra</DialogTitle>
+                            <DialogDescription>Selecciona el PDF de la orden de compra.</DialogDescription>
+                        </DialogHeader>
+
+                        <label
+                            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">
+                            <Upload class="size-5" />
+                            <span class="text-primary">Seleccionar PDF</span>
+                            <input ref="archivoOcInput" type="file" accept="application/pdf" class="hidden"
+                                @change="subirOrdenCompra" />
+                        </label>
+
+                        <DialogFooter>
+                            <DialogClose as-child>
+                                <Button variant="secondary">Cancelar</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
-            <div v-if="proyecto.bloqueado"
-                class="mt-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900 dark:bg-red-950/30">
-                <Lock class="mt-0.5 size-4 shrink-0 text-red-600" />
+            <div v-if="cotizacion.completada"
+                class="mt-5 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+                <ShoppingCart class="mt-0.5 size-4 shrink-0 text-emerald-600" />
                 <div>
-                    <p class="text-sm font-semibold text-red-800 dark:text-red-300">Estado del Proyecto: BLOQUEADO</p>
-                    <p class="text-sm text-red-700 dark:text-red-400">{{ mensajeBloqueo }}</p>
+                    <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Flujo completado</p>
+                    <p class="text-sm text-emerald-700 dark:text-emerald-400">
+                        Ya se cumplieron los dos requisitos: Explosión de Insumos y Orden de Compra.
+                    </p>
+                </div>
+            </div>
+            <div v-else
+                class="mt-5 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30">
+                <Clock class="mt-0.5 size-4 shrink-0 text-amber-600" />
+                <div>
+                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Flujo en proceso</p>
+                    <p class="text-sm text-amber-700 dark:text-amber-400">
+                        Completa Insumos y Orden de Compra para cerrar el flujo de esta cotización.
+                    </p>
                 </div>
             </div>
         </div>

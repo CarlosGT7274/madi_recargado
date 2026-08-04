@@ -120,6 +120,11 @@ class CotizacionesAction
             'otrasVersiones' => $this->versionesDeObra($cotizacion->levantamiento, $cotizacion->obra ?? '')
                 ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
                 ->values(),
+            'ordenCompra' => $cotizacion->ordenCompra ? [
+                'id' => $cotizacion->ordenCompra->id,
+                'pdfUrl' => $cotizacion->ordenCompra->pdf()?->urlPublica(),
+                'pdfNombre' => $cotizacion->ordenCompra->pdf()?->nombre_archivo,
+            ] : null,
         ];
     }
 

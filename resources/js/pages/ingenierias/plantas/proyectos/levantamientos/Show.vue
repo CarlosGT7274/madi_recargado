@@ -1,6 +1,7 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { breadcrumbsLevantamiento, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
+import GaleriaImagenes from '@/components/GaleriaImagenes.vue';
 
 interface Props {
     planta: PlantaRef;

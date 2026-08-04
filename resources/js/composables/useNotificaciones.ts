@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useEcho } from '@laravel/echo-vue';
 import { toast } from 'vue-sonner';
 
@@ -31,7 +31,7 @@ export function useNotificaciones() {
         { immediate: true },
     );
 
-    if (!suscrito) {
+    if (!import.meta.env.SSR && !suscrito) {
         suscrito = true;
 
         useEcho<NotificacionItem>(
@@ -46,5 +46,39 @@ export function useNotificaciones() {
 
     const total = computed(() => notificaciones.value.length);
 
-    return { notificaciones, total };
+    function marcarLeida(id: number): void {
+        const anterior = notificaciones.value;
+        notificaciones.value = anterior.filter((item) => item.id !== id);
+
+        router.patch(
+            `/notificaciones/${id}/leida`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => {
+                    notificaciones.value = anterior;
+                },
+            },
+        );
+    }
+
+    function marcarTodasLeidas(): void {
+        const anterior = notificaciones.value;
+        notificaciones.value = [];
+
+        router.patch(
+            '/notificaciones/leidas',
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => {
+                    notificaciones.value = anterior;
+                },
+            },
+        );
+    }
+
+    return { notificaciones, total, marcarLeida, marcarTodasLeidas };
 }

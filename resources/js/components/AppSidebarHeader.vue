@@ -25,7 +25,7 @@ withDefaults(
     },
 );
 
-const { notificaciones, total } = useNotificaciones();
+const { notificaciones, total, marcarLeida, marcarTodasLeidas } = useNotificaciones();
 
 const now = ref(new Date());
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -37,14 +37,6 @@ function formatoFechaHora(date: Date): string {
     const hh = String(date.getHours()).padStart(2, '0');
     const min = String(date.getMinutes()).padStart(2, '0');
     return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-}
-
-function marcarLeida(id: number): void {
-    router.patch(`/notificaciones/${id}/leida`, {}, { preserveScroll: true, preserveState: true });
-}
-
-function marcarTodasLeidas(): void {
-    router.patch('/notificaciones/leidas', {}, { preserveScroll: true, preserveState: true });
 }
 
 onMounted(() => {

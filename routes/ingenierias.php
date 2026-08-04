@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Ingenierias\CompraOrdenController;
 use App\Http\Controllers\Ingenierias\CotizacionController;
+use App\Http\Controllers\Ingenierias\InsumoController;
 use App\Http\Controllers\Ingenierias\LevantamientoController;
 use App\Http\Controllers\Ingenierias\PlantaController;
 use App\Http\Controllers\Ingenierias\ProyectoController;
@@ -86,5 +88,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::UPDATE)->name('partidas.update');
             Route::delete('/{cotizacion}/partidas/{partida}', [CotizacionController::class, 'destroyPartida'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('partidas.destroy');
+        });
+
+    Route::name('ingenierias.plantas.proyectos.levantamientos.cotizaciones.insumos.')
+        ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/levantamientos/{levantamiento}/cotizaciones/{cotizacion}/insumos')
+        ->scopeBindings()
+        ->group(function () {
+            Route::get('/', [InsumoController::class, 'index'])
+                ->middleware('permiso:'.Accion::READ)->name('index');
+            Route::get('/plantilla', [InsumoController::class, 'plantilla'])
+                ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
+            Route::post('/importar', [InsumoController::class, 'importar'])
+                ->middleware('permiso:'.Accion::CREATE)->name('importar');
+            Route::delete('/{insumo}', [InsumoController::class, 'destroy'])
+                ->middleware('permiso:'.Accion::DELETE)->name('destroy');
+        });
+
+    Route::name('ingenierias.plantas.proyectos.levantamientos.cotizaciones.orden-compra.')
+        ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/levantamientos/{levantamiento}/cotizaciones/{cotizacion}/orden-compra')
+        ->scopeBindings()
+        ->group(function () {
+            Route::post('/', [CompraOrdenController::class, 'store'])
+                ->middleware('permiso:'.Accion::CREATE)->name('store');
         });
 });

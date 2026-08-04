@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchivos;
 use Illuminate\Database\Eloquent\Model;
 
 class CompraOrden extends Model
 {
+    use HasArchivos;
+
     protected $table = 'compras_ordenes';
 
     protected $fillable = [
@@ -39,5 +42,10 @@ class CompraOrden extends Model
     public function cotizacion()
     {
         return $this->belongsTo(Cotizacion::class, 'cotizacion_id');
+    }
+
+    public function pdf(): ?Archivo
+    {
+        return $this->archivos()->where('tipo_archivo', 'pdf')->latest('fecha_creacion')->first();
     }
 }
