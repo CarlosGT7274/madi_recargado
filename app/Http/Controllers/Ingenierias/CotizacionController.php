@@ -142,4 +142,14 @@ class CotizacionController extends Controller
 
         return back();
     }
+
+    public function obra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, string $obra, CotizacionesAction $action): Response
+    {
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Obra', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
+            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
+            'grupo' => $action->obra($levantamiento, $obra),
+        ]);
+    }
 }

@@ -43,16 +43,36 @@ class CotizacionesAction
             ->get()
             ->groupBy(fn (Cotizacion $c) => $c->obra ?: 'Sin nombre de obra')
             ->map(function (Collection $versiones, string $obra) {
-                $ultima = $versiones->first(); // ya viene ordenado desc por latest('id')
+                $ultima = $versiones->first();
 
                 return [
                     'obra' => $obra,
                     'totalVersiones' => $versiones->count(),
+                    'aprobada' => $versiones->contains(fn (Cotizacion $c) => $c->estaAprobada()),
                     'ultimaVersion' => $this->resumenVersion($ultima),
-                    'versiones' => $versiones->map(fn (Cotizacion $c) => $this->resumenVersion($c))->values(),
                 ];
             })
             ->values();
+    }
+
+    /** Detalle de una obra puntual: todas sus versiones, planas, sin agrupar más. */
+    public function obra(Levantamiento $levantamiento, string $obra): array
+    {
+        $versiones = $levantamiento->cotizaciones()
+            ->with('archivos')
+            ->where('obra', $obra)
+            ->latest('id')
+            ->get();
+
+        $aprobada = $versiones->first(fn (Cotizacion $c) => $c->estaAprobada());
+
+        return [
+            'obra' => $obra,
+            'aprobada' => $aprobada !== null,
+            'montoAprobado' => $aprobada?->total,
+            'totalVersiones' => $versiones->count(),
+            'versiones' => $versiones->map(fn (Cotizacion $c) => $this->resumenVersion($c))->values(),
+        ];
     }
 
     private function resumenVersion(Cotizacion $c): array

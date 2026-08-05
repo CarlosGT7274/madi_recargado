@@ -8,11 +8,18 @@ use App\Models\Cotizacion;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class CompraOrdenAction
 {
     public function subirPdf(Cotizacion $cotizacion, UploadedFile $archivo): CompraOrden
     {
+        if (! $cotizacion->tieneInsumos()) {
+            throw ValidationException::withMessages([
+                'archivo' => 'Debes completar la Explosión de Insumos antes de subir la Orden de Compra.',
+            ]);
+        }
+
         $ordenCompra = $cotizacion->ordenCompra
             ?? $cotizacion->ordenCompra()->create(['usuario_registro_id' => Auth::id()]);
 

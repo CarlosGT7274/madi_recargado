@@ -1,29 +1,12 @@
-<script lang="ts">
-import { usePage } from '@inertiajs/vue3';
-import { breadcrumbsLevantamiento, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
-import GaleriaImagenes from '@/components/GaleriaImagenes.vue';
-
-interface Props {
-    planta: PlantaRef;
-    proyecto: ProyectoRef;
-    levantamiento: LevantamientoRef;
-}
-
-export default pageLayout(() => {
-    const { planta, proyecto, levantamiento } = usePage<Props>().props;
-    return breadcrumbsLevantamiento(planta, proyecto, levantamiento);
-});
-</script>
-
 <script setup lang="ts">
 import { Deferred, Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
-import { ArrowLeft, FileSpreadsheet, FileText, Plus, Download, Upload } from '@lucide/vue';
-import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
+import { ArrowLeft, FileSpreadsheet, Layers, Plus, Download, ShieldCheck, Upload } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
+import GaleriaImagenes from '@/components/GaleriaImagenes.vue';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -39,27 +22,31 @@ import {
 import LevantamientoForm from './components/LevantamientoForm.vue';
 import type { LevantamientoFormData } from './types';
 
-
 interface PlantaResumen {
     id: number;
     nombre: string;
 }
 
-interface CotizacionResumen {
+interface VersionCotizacion {
     id: number;
     folio: string;
     fecha: string | null;
-    cliente: string | null;
-    vendedor: string | null;
     total: number | null;
     estado: string;
+}
+
+interface ObraAgrupada {
+    obra: string;
+    totalVersiones: number;
+    aprobada: boolean;
+    ultimaVersion: VersionCotizacion;
 }
 
 const props = defineProps<{
     planta: PlantaResumen;
     proyecto: { id: number; nombre: string; folio: string };
     levantamiento: LevantamientoFormData & { id: number; folio: string; nombre: string };
-    cotizaciones?: CotizacionResumen[];
+    obras?: ObraAgrupada[];
 }>();
 
 const modo = ref<'view' | 'edit'>('view');
@@ -156,6 +143,8 @@ function formatoMoneda(valor: number | null): string {
                     <DialogTitle>Nueva cotización</DialogTitle>
                     <DialogDescription>
                         Sube la plantilla de cotización llena (descárgala primero con el botón "Descargar Plantilla").
+                        Si el nombre de obra coincide con una cotización existente, se guarda como una nueva versión
+                        de esa misma obra.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -186,7 +175,7 @@ function formatoMoneda(valor: number | null): string {
             <Button :disabled="form.processing" @click="guardar">Guardar cambios</Button>
         </div>
 
-        <!-- Cotizaciones (recuperado del Show.vue original) -->
+        <!-- Cotizaciones agrupadas por obra: una card por obra, sin importar cuántas versiones tenga -->
         <div v-if="modo === 'view'" class="mt-6 rounded-2xl border bg-card p-5 shadow-sm">
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -207,34 +196,41 @@ function formatoMoneda(valor: number | null): string {
                 </div>
             </div>
 
-            <Deferred data="cotizaciones">
+            <Deferred data="obras">
                 <template #fallback>
                     <p class="py-6 text-center text-sm text-muted-foreground">Cargando cotizaciones…</p>
                 </template>
 
-                <div v-if="cotizaciones?.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <Link v-for="cot in cotizaciones" :key="cot.id" :href="CotizacionController.show({
+                <div v-if="obras?.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Link v-for="grupo in obras" :key="grupo.obra" :href="CotizacionController.obra({
                         planta: planta.id,
                         proyecto: proyecto.id,
                         levantamiento: levantamiento.id,
-                        cotizacion: cot.id,
-                    })
-                        "
+                        obra: grupo.obra,
+                    })"
                         class="flex items-start gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50">
-                        <div
-                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <FileText class="size-4" />
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                            :class="grupo.aprobada ? 'bg-emerald-500/10 text-emerald-600' : 'bg-primary/10 text-primary'">
+                            <ShieldCheck v-if="grupo.aprobada" class="size-4" />
+                            <Layers v-else class="size-4" />
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
-                                <p class="truncate font-semibold">{{ cot.folio }}</p>
+                                <p class="truncate font-semibold">{{ grupo.obra }}</p>
+                                <span v-if="grupo.totalVersiones > 1"
+                                    class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                    {{ grupo.totalVersiones }} versiones
+                                </span>
                                 <span class="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase"
-                                    :class="estadoCotizacionBadgeClass(cot.estado)">
-                                    {{ estadoCotizacionLabel[cot.estado] ?? cot.estado }}
+                                    :class="estadoCotizacionBadgeClass(grupo.ultimaVersion.estado)">
+                                    {{ estadoCotizacionLabel[grupo.ultimaVersion.estado] ?? grupo.ultimaVersion.estado
+                                    }}
                                 </span>
                             </div>
-                            <p class="mt-1 truncate text-sm text-muted-foreground">{{ cot.cliente ?? '—' }}</p>
-                            <p class="mt-1 text-sm font-medium">{{ formatoMoneda(cot.total) }}</p>
+                            <p class="mt-1 truncate text-sm text-muted-foreground">
+                                Última versión: {{ grupo.ultimaVersion.folio }}
+                            </p>
+                            <p class="mt-1 text-sm font-medium">{{ formatoMoneda(grupo.ultimaVersion.total) }}</p>
                         </div>
                     </Link>
                 </div>

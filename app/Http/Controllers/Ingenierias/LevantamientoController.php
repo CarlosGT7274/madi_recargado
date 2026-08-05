@@ -14,6 +14,7 @@ use App\Models\Levantamiento;
 use App\Models\Planta;
 use App\Models\Proyecto;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -58,6 +59,9 @@ class LevantamientoController extends Controller
             'levantamiento' => $action->detail($levantamiento),
             'cotizaciones' => Inertia::defer(
                 fn () => $cotizacionesAction->list($levantamiento)
+            ),
+            'obras' => Inertia::defer(
+                fn () => app(CotizacionesAction::class)->listAgrupado($levantamiento)
             ),
         ]);
     }
@@ -125,19 +129,28 @@ class LevantamientoController extends Controller
         Excel::import($import, $request->file('archivo'));
 
         if (! empty($import->errores())) {
-            Inertia::flash('toast', [
-                'type' => 'warning',
-                'message' => "{$import->creados()} creados. Algunas filas tuvieron errores.",
-            ]);
+            $mensajes = [];
+            foreach ($import->errores() as $fila => $erroresFila) {
+                $mensajes["fila_{$fila}"] = "Fila {$fila}: ".implode(' ', $erroresFila);
+            }
 
-            // Opcional: guardar $import->errores() en sesión para mostrarlos en la UI
-            return back()->with('erroresImportacion', $import->errores());
+            throw ValidationException::withMessages($mensajes);
         }
 
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => "{$import->creados()} levantamientos creados.",
         ]);
+
+        // Si solo se creó uno, hay un destino único y obvio: su detalle.
+        // Si se crearon varios, no hay "un" destino, así que nos quedamos aquí.
+        if ($import->creados() === 1) {
+            $levantamiento = $import->creadosModelos()[0];
+
+            return redirect()->route('ingenierias.plantas.proyectos.levantamientos.show', [
+                $planta->id, $proyecto->id, $levantamiento->id,
+            ]);
+        }
 
         return back();
     }

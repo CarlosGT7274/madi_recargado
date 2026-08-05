@@ -16,7 +16,7 @@ class LevantamientoRules
             'cliente' => ['nullable', 'string', 'max:255'],
             'obra' => ['nullable', 'string', 'max:255'],
             'solicitante' => ['nullable', 'string', 'max:255'],
-            'fecha_solicitud' => ['nullable', 'date'],
+            'fecha_solicitud' => ['required', 'date'],
             'usuario_requiriente' => ['nullable', 'string', 'max:255'],
             'correo_usuario' => ['nullable', 'email', 'max:255'],
             'area_trabajo' => ['nullable', 'string', 'max:255'],

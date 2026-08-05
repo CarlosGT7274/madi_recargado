@@ -15,12 +15,13 @@ export default pageLayout(() => {
 </script>
 
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, Download, Upload, Save } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
+import AlertError from '@/components/AlertError.vue';
 import { Button } from '@/components/ui/button';
 import LevantamientoForm from './components/LevantamientoForm.vue';
 import type { LevantamientoFormData } from './types';
@@ -83,15 +84,33 @@ function guardar() {
 }
 
 const archivoInput = ref<HTMLInputElement | null>(null);
+const subiendoPlantilla = ref(false);
+
+// Cada fila con error llega como `errors.fila_2`, `errors.fila_5`, etc.
+// Los juntamos en una sola lista para pintarlos con AlertError.
+const erroresImportacion = computed(() =>
+    Object.entries(page.props.errors ?? {})
+        .filter(([key]) => key.startsWith('fila_'))
+        .map(([, mensaje]) => mensaje as string),
+);
 
 function subirPlantilla(): void {
     const archivo = archivoInput.value?.files?.[0];
     if (!archivo) return;
 
+    subiendoPlantilla.value = true;
+
     router.post(
         LevantamientoController.importar({ planta: props.planta.id, proyecto: props.proyecto.id }).url,
         { archivo },
-        { forceFormData: true },
+        {
+            forceFormData: true,
+            preserveScroll: true,
+            onFinish: () => {
+                subiendoPlantilla.value = false;
+                if (archivoInput.value) archivoInput.value.value = '';
+            },
+        },
     );
 }
 </script>
@@ -128,9 +147,13 @@ function subirPlantilla(): void {
             <label
                 class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 py-6 text-sm font-medium text-emerald-700 hover:bg-emerald-100">
                 <Upload class="size-4" />
-                Subir Plantilla Llena
-                <input ref="archivoInput" type="file" accept=".xlsx,.xls" class="hidden" @change="subirPlantilla" />
+                {{ subiendoPlantilla ? 'Subiendo…' : 'Subir Plantilla Llena' }}
+                <input ref="archivoInput" type="file" accept=".xlsx,.xls" class="hidden" :disabled="subiendoPlantilla"
+                    @change="subirPlantilla" />
             </label>
+
+            <AlertError v-if="erroresImportacion.length" class="mt-4" title="Algunas filas no se pudieron importar"
+                :errors="erroresImportacion" />
         </div>
 
         <LevantamientoForm mode="create" :data="form" :errors="form.errors" @update="actualizar" />

@@ -18,13 +18,12 @@ export default pageLayout(() => {
 
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, Box, Building2, Clock, DollarSign, Download, FileText, Hash, Lock, MapPin, ShoppingCart, User } from '@lucide/vue';
+import { ArrowLeft, Box, Building2, CheckCircle2, Clock, DollarSign, Download, FileText, Hash, MapPin, ShoppingCart, Upload, User } from '@lucide/vue';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
 import { computed, ref } from 'vue';
 import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoController';
-import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/CompraOrdenController';
 import {
     Dialog,
     DialogClose,
@@ -34,6 +33,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/CompraOrdenController';
 
 interface PlantaResumen { id: number; nombre: string }
 interface LevantamientoResumen { id: number; folio: string }
@@ -89,8 +89,26 @@ interface PartidaRaiz {
     hijas: PartidaHija[];
 }
 
+const props = defineProps<{
+    planta: PlantaResumen;
+    proyecto: ProyectoResumen;
+    levantamiento: LevantamientoResumen;
+    cotizacion: CotizacionDetalle;
+    partidas: PartidaRaiz[];
+    numeroPartidas: number;
+}>();
+
 const ocDialogOpen = ref(false);
 const archivoOcInput = ref<HTMLInputElement | null>(null);
+
+// La OC solo se puede tocar una vez que Insumos está completo — regla de negocio,
+// reforzada también en el backend (CompraOrdenAction::subirPdf).
+const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
+
+function abrirDialogoOc(): void {
+    if (!ocHabilitada.value) return;
+    ocDialogOpen.value = true;
+}
 
 function subirOrdenCompra(): void {
     const archivo = archivoOcInput.value?.files?.[0];
@@ -111,15 +129,6 @@ function subirOrdenCompra(): void {
 function eliminarOrdenCompraPdf(archivoId: number): void {
     router.delete(ArchivoController.destroy(archivoId).url, { preserveScroll: true });
 }
-
-const props = defineProps<{
-    planta: PlantaResumen;
-    proyecto: ProyectoResumen;
-    levantamiento: LevantamientoResumen;
-    cotizacion: CotizacionDetalle;
-    partidas: PartidaRaiz[];
-    numeroPartidas: number;
-}>();
 
 const estadoLabel: Record<string, string> = {
     borrador: 'Borrador',
@@ -274,12 +283,13 @@ function formatoMoneda(valor: number | null | undefined): string {
             </div>
         </div>
 
-        <!-- Proceso de Cotización (display-only por ahora) -->
+        <!-- Proceso de Cotización -->
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <p class="text-lg font-semibold">Proceso de Cotización</p>
             <p class="mb-5 text-sm text-muted-foreground">Completa las fases en orden para procesar la cotización</p>
 
             <div class="grid gap-4 sm:grid-cols-2">
+                <!-- Fase 1: Insumos -->
                 <Link :href="InsumoController.index({
                     planta: planta.id, proyecto: proyecto.id,
                     levantamiento: levantamiento.id, cotizacion: cotizacion.id,
@@ -292,6 +302,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                             <p class="font-semibold">Explosión de Insumos</p>
                             <p class="text-xs text-muted-foreground">Materiales definidos y listos</p>
                         </div>
+                        <CheckCircle2 v-if="cotizacion.tiene_insumos" class="ml-auto size-5 text-emerald-600" />
                     </div>
                     <p v-if="cotizacion.tiene_insumos" class="text-sm text-emerald-700 dark:text-emerald-400">Fase
                         completada
@@ -299,7 +310,11 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / cargar insumos</p>
                 </Link>
 
-                <div class="rounded-xl border p-4"
+                <!-- Fase 2: Orden de Compra -->
+                <Link v-if="ocHabilitada" :href="CompraOrdenController.index({
+                    planta: planta.id, proyecto: proyecto.id,
+                    levantamiento: levantamiento.id, cotizacion: cotizacion.id,
+                })" class="block rounded-xl border p-4 transition-colors hover:bg-accent/50"
                     :class="cotizacion.tiene_orden_compra ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20' : ''">
                     <div class="mb-3 flex items-center gap-2">
                         <ShoppingCart class="size-5"
@@ -308,24 +323,25 @@ function formatoMoneda(valor: number | null | undefined): string {
                             <p class="font-semibold">Orden de Compra</p>
                             <p class="text-xs text-muted-foreground">PDF de la orden emitida</p>
                         </div>
+                        <CheckCircle2 v-if="cotizacion.tiene_orden_compra" class="ml-auto size-5 text-emerald-600" />
                     </div>
+                    <p v-if="cotizacion.tiene_orden_compra" class="text-sm text-emerald-700 dark:text-emerald-400">
+                        Fase completada
+                    </p>
+                    <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / subir orden de compra</p>
+                </Link>
 
-                    <div v-if="cotizacion.ordenCompra?.pdfUrl" class="flex items-center justify-between gap-2">
-                        <a :href="cotizacion.ordenCompra.pdfUrl" target="_blank"
-                            class="truncate text-sm text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
-                            {{ cotizacion.ordenCompra.pdfNombre ?? 'Ver PDF' }}
-                        </a>
-                        <button type="button" class="text-xs text-muted-foreground hover:text-destructive"
-                            @click="eliminarOrdenCompraPdf(cotizacion.ordenCompra.id)">
-                            Quitar
-                        </button>
+                <div v-else class="rounded-xl border p-4 opacity-60">
+                    <div class="mb-3 flex items-center gap-2">
+                        <ShoppingCart class="size-5 text-muted-foreground" />
+                        <div>
+                            <p class="font-semibold">Orden de Compra</p>
+                            <p class="text-xs text-muted-foreground">PDF de la orden emitida</p>
+                        </div>
                     </div>
-                    <button v-else type="button"
-                        class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-                        @click="ocDialogOpen = true">
-                        <Upload class="size-4" />
-                        Subir PDF
-                    </button>
+                    <p class="text-sm text-muted-foreground">
+                        Primero completa la Explosión de Insumos para habilitar este paso.
+                    </p>
                 </div>
 
                 <Dialog v-model:open="ocDialogOpen">
@@ -352,13 +368,14 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </Dialog>
             </div>
 
+            <!-- Estado global del flujo: derivado, sin ninguna columna "bloqueado" -->
             <div v-if="cotizacion.completada"
                 class="mt-5 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-                <ShoppingCart class="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-emerald-600" />
                 <div>
-                    <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Flujo completado</p>
+                    <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Flujo aprobado</p>
                     <p class="text-sm text-emerald-700 dark:text-emerald-400">
-                        Ya se cumplieron los dos requisitos: Explosión de Insumos y Orden de Compra.
+                        Se cumplieron los dos requisitos: Explosión de Insumos y Orden de Compra.
                     </p>
                 </div>
             </div>
@@ -368,7 +385,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                 <div>
                     <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Flujo en proceso</p>
                     <p class="text-sm text-amber-700 dark:text-amber-400">
-                        Completa Insumos y Orden de Compra para cerrar el flujo de esta cotización.
+                        Completa Insumos y Orden de Compra para aprobar el flujo de esta cotización.
                     </p>
                 </div>
             </div>

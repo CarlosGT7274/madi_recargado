@@ -99,4 +99,9 @@ class Cotizacion extends Model
     {
         return $this->tieneInsumos() && $this->tieneOrdenAprobada();
     }
+
+    public function estaAprobada(): bool
+    {
+        return $this->estado === 'aprobada';
+    }
 }

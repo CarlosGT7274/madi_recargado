@@ -10,13 +10,14 @@ class LevantamientoPlantillaColumnas
      * Fuente única de verdad para la plantilla vertical de Levantamientos:
      * export (llenar plantilla) e import (leerla) usan este mismo arreglo.
      *
-     * NOTA: no incluye 'solicitante' ni 'fecha_solicitud' porque el sistema
+     * NOTA: no incluye 'solicitante' porque el sistema
      * los fija automáticamente (usuario en sesión + hoy) al crear — el
      * importador los sobreescribe sin importar lo que traiga el Excel.
      *
      * @var array<int, array{campo: string, header: string, tipo: string, opciones?: array<int, string>}>
      */
     public const COLUMNAS = [
+        ['campo' => 'fecha_solicitud', 'header' => 'Fecha Solicitud (dd/mm/aaaa)', 'tipo' => 'fecha'],
         ['campo' => 'fecha_levantamiento_programada', 'header' => 'Fecha Lev. Prog. (dd/mm/aaaa)', 'tipo' => 'fecha'],
         ['campo' => 'usuario_requiriente', 'header' => 'Usuario Requiriente', 'tipo' => 'texto'],
         ['campo' => 'fecha_envio_cotizacion_programada', 'header' => 'Fecha Envío Prog. (dd/mm/aaaa)', 'tipo' => 'fecha'],

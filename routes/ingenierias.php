@@ -71,8 +71,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('index');
             Route::get('/plantilla', [CotizacionController::class, 'plantilla'])
                 ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
-            Route::get('/obra/{obra}', [CotizacionController::class, 'versiones'])
-                ->middleware('permiso:'.Accion::READ)->name('versiones')
+            Route::get('/obra/{obra}', [CotizacionController::class, 'obra'])
+                ->middleware('permiso:'.Accion::READ)->name('obra')
                 ->where('obra', '.*');
             Route::get('/{cotizacion}', [CotizacionController::class, 'show'])
                 ->middleware('permiso:'.Accion::READ)->name('show');
@@ -108,6 +108,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/levantamientos/{levantamiento}/cotizaciones/{cotizacion}/orden-compra')
         ->scopeBindings()
         ->group(function () {
+            Route::get('/', [CompraOrdenController::class, 'index'])
+                ->middleware('permiso:'.Accion::READ)->name('index');
             Route::post('/', [CompraOrdenController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
         });

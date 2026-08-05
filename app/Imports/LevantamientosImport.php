@@ -3,19 +3,23 @@
 namespace App\Imports;
 
 use App\Actions\Ingenierias\Levantamientos\LevantamientosAction;
+use App\Models\Levantamiento;
 use App\Models\Proyecto;
 use App\Support\Ingenierias\LevantamientoPlantillaColumnas;
 use App\Support\Ingenierias\LevantamientoRules;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class LevantamientosImport implements ToCollection
 {
     /** @var array<int, array<int, string>> */
     private array $errores = [];
 
-    private int $creados = 0;
+    /** @var array<int, Levantamiento> */
+    private array $creadosModelos = [];
 
     public function __construct(
         private readonly Proyecto $proyecto,
@@ -26,7 +30,6 @@ class LevantamientosImport implements ToCollection
     {
         $columnas = LevantamientoPlantillaColumnas::COLUMNAS;
 
-        // Cuántos registros (columnas B..?) trae realmente el archivo subido
         $totalRegistros = $filas->reduce(fn (int $max, Collection $fila) => max($max, $fila->count() - 1), 0);
 
         for ($reg = 1; $reg <= $totalRegistros; $reg++) {
@@ -43,15 +46,16 @@ class LevantamientosImport implements ToCollection
 
                 $data[$columna['campo']] = match ($columna['tipo']) {
                     'booleano' => $this->aBooleano($valor),
+                    'fecha' => $this->aFecha($valor),
                     default => $vacio ? null : trim((string) $valor),
                 };
             }
 
             if (! $tieneDatos) {
-                continue; // "columna" (registro) vacía, se ignora
+                continue;
             }
 
-            $validador = Validator::make($data, LevantamientoRules::rules());
+            $validador = Validator::make($data, LevantamientoRules::rules(incluirFolio: false));
 
             if ($validador->fails()) {
                 $this->errores[$reg] = $validador->errors()->all();
@@ -59,8 +63,7 @@ class LevantamientosImport implements ToCollection
                 continue;
             }
 
-            $this->action->create($this->proyecto, $validador->validated());
-            $this->creados++;
+            $this->creadosModelos[] = $this->action->create($this->proyecto, $validador->validated());
         }
     }
 
@@ -71,6 +74,37 @@ class LevantamientosImport implements ToCollection
         return in_array($texto, ['si', 'sí', '1', 'true', 'x'], true);
     }
 
+    private function aFecha(mixed $valor): ?string
+    {
+        if ($valor === null || trim((string) $valor) === '') {
+            return null;
+        }
+
+        if ($valor instanceof \DateTimeInterface) {
+            return $valor->format('Y-m-d');
+        }
+
+        if (is_numeric($valor)) {
+            try {
+                return ExcelDate::excelToDateTimeObject((float) $valor)->format('Y-m-d');
+            } catch (\Throwable) {
+                //
+            }
+        }
+
+        $texto = trim((string) $valor);
+
+        foreach (['d/m/Y', 'Y-m-d', 'd-m-Y'] as $formato) {
+            try {
+                return Carbon::createFromFormat($formato, $texto)->format('Y-m-d');
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return $texto;
+    }
+
     /** @return array<int, array<int, string>> */
     public function errores(): array
     {
@@ -79,6 +113,12 @@ class LevantamientosImport implements ToCollection
 
     public function creados(): int
     {
-        return $this->creados;
+        return count($this->creadosModelos);
+    }
+
+    /** @return array<int, Levantamiento> */
+    public function creadosModelos(): array
+    {
+        return $this->creadosModelos;
     }
 }

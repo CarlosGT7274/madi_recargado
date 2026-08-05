@@ -17,6 +17,8 @@ const props = defineProps<{
     soloLectura?: boolean;
 }>();
 
+const montado = ref(false);
+
 const pendientes = defineModel<File[]>('pendientes', { default: () => [] });
 
 const modoLocal = props.archivableId === null || props.archivableId === undefined;
@@ -175,6 +177,7 @@ function alTeclado(e: KeyboardEvent): void {
 }
 
 onMounted(() => window.addEventListener('keydown', alTeclado));
+onMounted(() => (montado.value = true));
 onUnmounted(() => window.removeEventListener('keydown', alTeclado));
 
 // Si borran la imagen activa desde el lightbox, cierra o reajusta el índice.
@@ -227,7 +230,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Lightbox -->
-        <Teleport to="body">
+        <Teleport v-if="montado" to="body">
             <div v-if="abierto && itemActivo" class="fixed inset-0 z-50 flex flex-col bg-black/95" @click.self="cerrar">
                 <!-- Barra superior -->
                 <div class="flex items-center justify-between px-4 py-3 text-white">

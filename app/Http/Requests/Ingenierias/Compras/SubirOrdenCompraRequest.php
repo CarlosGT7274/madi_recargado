@@ -17,7 +17,7 @@ class SubirOrdenCompraRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'archivo' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'archivo' => ['required', 'file', 'mimes:pdf'],
         ];
     }
 }

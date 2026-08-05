@@ -140,11 +140,9 @@ const seccionesEstandar: SeccionConfig[] = seccionesLevantamiento;
                                         {{ campo.label }}
                                     </Label>
 
-                                    <ToggleSiNo v-if="esEditableCampo(campo)" :model-value="Boolean(valorDe(campo.key))"
+                                    <ToggleSiNo :model-value="Boolean(valorDe(campo.key))"
+                                        :readonly="!esEditableCampo(campo)"
                                         @update:model-value="(v) => actualizar(campo.key, v)" />
-                                    <span v-else class="text-sm font-medium">
-                                        {{ valorDe(campo.key) ? 'Sí' : 'No' }}
-                                    </span>
                                 </div>
 
                                 <div v-else class="grid gap-1">

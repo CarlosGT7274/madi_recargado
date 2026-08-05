@@ -53,7 +53,6 @@ function seccionRiesgo(prefijo: string, titulo: string): SeccionConfig {
                 key: `${prefijo}_certificado`,
                 label: '¿Personal certificado?',
                 type: 'boolean',
-                dependsOn: { key: `${prefijo}_aplica`, equals: true },
             },
             {
                 key: `${prefijo}_notas`,
@@ -78,7 +77,7 @@ export const seccionesLevantamiento: SeccionConfig[] = [
         titulo: 'Datos Generales',
         campos: [
             { key: 'solicitante', label: 'Solicitante', type: 'text', required: true, disabled: true },
-            { key: 'fecha_solicitud', label: 'Fecha Solicitud', type: 'date', disabled: true },
+            { key: 'fecha_solicitud', label: 'Fecha Solicitud', type: 'date', required: true },
             { key: 'usuario_requiriente', label: 'Usuario Requiriente', type: 'text' },
             { key: 'fecha_levantamiento_programada', label: 'Fecha Lev. Prog.', type: 'date' },
             { key: 'correo_usuario', label: 'Correo', type: 'email' },

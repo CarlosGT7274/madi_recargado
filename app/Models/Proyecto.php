@@ -46,9 +46,9 @@ class Proyecto extends Model
     public function estaCompletado(): bool
     {
         return $this->levantamientos()
-            ->with('cotizaciones.ordenCompra', 'cotizaciones.insumos')
+            ->with('cotizaciones')
             ->get()
             ->flatMap->cotizaciones
-            ->contains(fn (Cotizacion $c) => $c->estaCompletada());
+            ->contains(fn (Cotizacion $c) => $c->estaAprobada());
     }
 }

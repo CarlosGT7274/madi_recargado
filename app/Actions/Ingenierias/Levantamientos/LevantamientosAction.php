@@ -95,8 +95,7 @@ class LevantamientosAction
     {
         $data['folio'] = $this->folios->siguiente('ingenierias', 'levantamiento', 'LEV');
         $data['solicitante'] = Auth::user()?->name;
-        $data['fecha_solicitud'] = now()->toDateString();
-        unset($data['fecha_cotizacion_enviada']); // solo se llena al aprobar cotización
+        unset($data['fecha_cotizacion_enviada']);
 
         return $proyecto->levantamientos()->create([
             ...$data,
@@ -107,8 +106,7 @@ class LevantamientosAction
 
     public function update(Levantamiento $levantamiento, array $data): Levantamiento
     {
-        // Nunca editables desde el formulario, sin importar lo que llegue del cliente
-        unset($data['solicitante'], $data['fecha_solicitud'], $data['fecha_cotizacion_enviada']);
+        unset($data['solicitante'], $data['fecha_cotizacion_enviada']);
 
         $levantamiento->update($data);
 
