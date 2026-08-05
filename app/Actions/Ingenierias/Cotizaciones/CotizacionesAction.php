@@ -110,8 +110,8 @@ class CotizacionesAction
             'vigencia_cotizacion' => $cotizacion->vigencia_cotizacion,
             'notas' => $cotizacion->notas,
             'estado' => $cotizacion->estado,
-            'creado' => $cotizacion->created_at?->format('d/m/Y H:i'),
-            'modificado' => $cotizacion->updated_at?->format('d/m/Y H:i'),
+            'creado' => $cotizacion->fecha_creacion?->format('d/m/Y H:i'),
+            'modificado' => $cotizacion->fecha_modificacion?->format('d/m/Y H:i'),
             'tiene_insumos' => $cotizacion->tieneInsumos(),
             'tiene_orden_compra' => $cotizacion->tieneOrdenAprobada(),
             'completada' => $cotizacion->estaCompletada(),
@@ -120,6 +120,7 @@ class CotizacionesAction
                 ->values(),
             'ordenCompra' => $cotizacion->ordenCompra ? [
                 'id' => $cotizacion->ordenCompra->id,
+                'estatusCompra' => $cotizacion->ordenCompra->estatus_compra,
                 'pdfUrl' => $cotizacion->ordenCompra->pdf()?->urlPublica(),
                 'pdfNombre' => $cotizacion->ordenCompra->pdf()?->nombre_archivo,
             ] : null,

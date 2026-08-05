@@ -16,6 +16,7 @@ use App\Models\Levantamiento;
 use App\Models\Partida;
 use App\Models\Planta;
 use App\Models\Proyecto;
+use App\Support\Accion;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -40,6 +41,8 @@ class CotizacionController extends Controller
 
     public function show(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action, PartidasAction $partidasAction): Response
     {
+        $partidas = $partidasAction->arbol($cotizacion);
+
         return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Show', [
             'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
             'proyecto' => [
@@ -50,7 +53,9 @@ class CotizacionController extends Controller
             ],
             'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
             'cotizacion' => $action->detail($cotizacion),
-            'partidas' => $partidasAction->arbol($cotizacion),
+            'partidas' => $partidas,
+            'numeroPartidas' => collect($partidas)->sum(fn (array $raiz) => count($raiz['hijas'])),
+            'puedeAprobarOc' => request()->user()?->puedePorEndpoint('ingenierias', Accion::ALL) ?? false,
         ]);
     }
 

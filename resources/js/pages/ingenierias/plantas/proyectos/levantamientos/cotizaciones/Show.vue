@@ -1,7 +1,6 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
-import ArchivoController from '@/actions/App/Http/Controllers/ArchivoController';
 
 interface Props {
     planta: PlantaRef;
@@ -18,7 +17,25 @@ export default pageLayout(() => {
 
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, Box, Building2, CheckCircle2, Clock, DollarSign, Download, FileText, Hash, MapPin, ShoppingCart, Upload, User } from '@lucide/vue';
+import {
+    ArrowRight,
+    Box,
+    Building2,
+    CheckCircle2,
+    Clock,
+    DollarSign,
+    Download,
+    FileText,
+    FileWarning,
+    Hash,
+    MapPin,
+    Send,
+    ShieldCheck,
+    ShoppingCart,
+    Upload,
+    User,
+    XCircle,
+} from '@lucide/vue';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -38,8 +55,13 @@ import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/Co
 interface PlantaResumen { id: number; nombre: string }
 interface LevantamientoResumen { id: number; folio: string }
 
+type EstatusCompra =
+    | 'pendiente' | 'en_cotizacion' | 'aprobado' | 'rechazado'
+    | 'orden_generada' | 'en_transito' | 'entregado' | null;
+
 interface OrdenCompraInfo {
     id: number;
+    estatusCompra: EstatusCompra;
     pdfUrl: string | null;
     pdfNombre: string | null;
 }
@@ -96,27 +118,52 @@ const props = defineProps<{
     cotizacion: CotizacionDetalle;
     partidas: PartidaRaiz[];
     numeroPartidas: number;
+    puedeAprobarOc: boolean;
 }>();
+
+const rutaOc = computed(() => ({
+    planta: props.planta.id,
+    proyecto: props.proyecto.id,
+    levantamiento: props.levantamiento.id,
+    cotizacion: props.cotizacion.id,
+}));
 
 const ocDialogOpen = ref(false);
 const archivoOcInput = ref<HTMLInputElement | null>(null);
 
 const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
 
+const solicitudPendiente = computed(
+    () => props.cotizacion.ordenCompra?.estatusCompra === 'en_cotizacion' && !props.cotizacion.completada,
+);
+
+const estadoDescripcion = computed(() =>
+    props.cotizacion.completada
+        ? 'Insumos y Orden de Compra están completos.'
+        : 'Faltan pasos por completar en esta cotización.'
+);
+
 function subirOrdenCompra(): void {
     const archivo = archivoOcInput.value?.files?.[0];
     if (!archivo) return;
 
     router.post(
-        CompraOrdenController.store({
-            planta: props.planta.id,
-            proyecto: props.proyecto.id,
-            levantamiento: props.levantamiento.id,
-            cotizacion: props.cotizacion.id,
-        }).url,
+        CompraOrdenController.store(rutaOc.value).url,
         { archivo },
         { forceFormData: true, preserveScroll: true, onSuccess: () => (ocDialogOpen.value = false) },
     );
+}
+
+function solicitarRevision(): void {
+    router.post(CompraOrdenController.solicitarRevision(rutaOc.value).url, {}, { preserveScroll: true });
+}
+
+function aprobarRevision(): void {
+    router.post(CompraOrdenController.aprobar(rutaOc.value).url, {}, { preserveScroll: true });
+}
+
+function rechazarRevision(): void {
+    router.post(CompraOrdenController.rechazar(rutaOc.value).url, {}, { preserveScroll: true });
 }
 
 const estadoLabel: Record<string, string> = {
@@ -140,7 +187,7 @@ function formatoMoneda(valor: number | null | undefined): string {
             <Link
                 :href="LevantamientoController.show({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id })"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                <ArrowLeft class="size-4" />
+                <ArrowRight class="size-4 rotate-180" />
             </Link>
         </template>
 
@@ -157,10 +204,55 @@ function formatoMoneda(valor: number | null | undefined): string {
                         Exportar
                     </Button>
                     <span class="rounded-md px-3 py-1 text-xs font-bold uppercase"
-                        :class="cotizacion.completada ? 'bg-emerald-500' : 'bg-amber-500'">
+                        :class="cotizacion.completada ? 'bg-emerald-500' : 'bg-white/20'">
                         {{ cotizacion.completada ? 'Completada' : (estadoLabel[cotizacion.estado] ?? cotizacion.estado)
                         }}
                     </span>
+                </div>
+            </div>
+
+            <!-- Banner de revisión administrativa pendiente -->
+            <div v-if="solicitudPendiente"
+                class="border-b border-amber-200 bg-amber-50 px-6 py-5 dark:border-amber-900 dark:bg-amber-950/30">
+                <div class="flex items-start gap-3">
+                    <Clock class="mt-0.5 size-5 shrink-0 text-amber-600" />
+                    <div>
+                        <p class="font-semibold text-amber-800 dark:text-amber-300">Pendiente de revisión administrativa
+                        </p>
+                        <p class="text-sm text-amber-700 dark:text-amber-400">
+                            Esta cotización fue enviada para revisión sin orden de compra.
+                        </p>
+                    </div>
+                </div>
+
+                <div v-if="puedeAprobarOc" class="mt-4 border-t border-amber-200 pt-4 dark:border-amber-900">
+                    <p class="mb-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400">
+                        Acciones de administrador
+                    </p>
+                    <div class="flex gap-2">
+                        <Button class="bg-emerald-600 text-white hover:bg-emerald-700" @click="aprobarRevision">
+                            <CheckCircle2 class="mr-2 size-4" />
+                            Aprobar
+                        </Button>
+                        <Button variant="outline"
+                            class="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                            @click="rechazarRevision">
+                            <XCircle class="mr-2 size-4" />
+                            Rechazar
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Banner de rechazo -->
+            <div v-else-if="cotizacion.ordenCompra?.estatusCompra === 'rechazado'"
+                class="flex items-start gap-3 border-b border-red-200 bg-red-50 px-6 py-5 dark:border-red-900 dark:bg-red-950/30">
+                <FileWarning class="mt-0.5 size-5 shrink-0 text-red-600" />
+                <div>
+                    <p class="font-semibold text-red-800 dark:text-red-300">Solicitud rechazada</p>
+                    <p class="text-sm text-red-700 dark:text-red-400">
+                        La revisión sin orden de compra fue rechazada. Sube el PDF de la orden para continuar.
+                    </p>
                 </div>
             </div>
 
@@ -255,16 +347,37 @@ function formatoMoneda(valor: number | null | undefined): string {
             </div>
         </div>
 
+        <!-- Proceso de Cotización -->
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <p class="text-lg font-semibold">Proceso de Cotización</p>
             <p class="mb-5 text-sm text-muted-foreground">Completa las fases en orden para procesar la cotización</p>
 
+            <div class="mb-5 flex items-center justify-between text-sm font-medium">
+                <span class="flex items-center gap-1.5"
+                    :class="cotizacion.tiene_insumos ? 'text-emerald-600' : 'text-muted-foreground'">
+                    <span class="flex size-6 items-center justify-center rounded-full"
+                        :class="cotizacion.tiene_insumos ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'">
+                        <CheckCircle2 v-if="cotizacion.tiene_insumos" class="size-4" />
+                        <span v-else class="text-xs">1</span>
+                    </span>
+                    Explosión de Insumos
+                </span>
+                <ArrowRight class="size-4 text-muted-foreground" />
+                <span class="flex items-center gap-1.5"
+                    :class="cotizacion.tiene_orden_compra ? 'text-emerald-600' : 'text-muted-foreground'">
+                    <span class="flex size-6 items-center justify-center rounded-full"
+                        :class="cotizacion.tiene_orden_compra ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'">
+                        <CheckCircle2 v-if="cotizacion.tiene_orden_compra" class="size-4" />
+                        <span v-else class="text-xs">2</span>
+                    </span>
+                    Orden de Compra
+                </span>
+            </div>
+
             <div class="grid gap-4 sm:grid-cols-2">
-                <Link :href="InsumoController.index({
-                    planta: planta.id, proyecto: proyecto.id,
-                    levantamiento: levantamiento.id, cotizacion: cotizacion.id,
-                })" class="block rounded-xl border p-4 transition-colors hover:bg-accent/50"
-                    :class="cotizacion.tiene_insumos ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20' : ''">
+                <!-- Card 1: Insumos -->
+                <div class="rounded-xl border p-4"
+                    :class="cotizacion.tiene_insumos ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : ''">
                     <div class="mb-3 flex items-center gap-2">
                         <Box class="size-5"
                             :class="cotizacion.tiene_insumos ? 'text-emerald-600' : 'text-muted-foreground'" />
@@ -272,44 +385,84 @@ function formatoMoneda(valor: number | null | undefined): string {
                             <p class="font-semibold">Explosión de Insumos</p>
                             <p class="text-xs text-muted-foreground">Materiales definidos y listos</p>
                         </div>
-                        <CheckCircle2 v-if="cotizacion.tiene_insumos" class="ml-auto size-5 text-emerald-600" />
                     </div>
-                    <p v-if="cotizacion.tiene_insumos" class="text-sm text-emerald-700 dark:text-emerald-400">Fase
-                        completada</p>
-                    <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / cargar insumos</p>
-                </Link>
 
-                <Link v-if="ocHabilitada" :href="CompraOrdenController.index({
-                    planta: planta.id, proyecto: proyecto.id,
-                    levantamiento: levantamiento.id, cotizacion: cotizacion.id,
-                })" class="block rounded-xl border p-4 transition-colors hover:bg-accent/50"
-                    :class="cotizacion.tiene_orden_compra ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20' : ''">
+                    <div v-if="cotizacion.tiene_insumos"
+                        class="mb-3 rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20">
+                        <p class="font-medium text-emerald-700 dark:text-emerald-400">✓ Fase completada</p>
+                        <p class="text-xs text-muted-foreground">Los materiales han sido registrados correctamente</p>
+                    </div>
+
+                    <Link
+                        :href="InsumoController.index({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id })">
+                        <Button class="w-full"
+                            :class="cotizacion.tiene_insumos ? 'bg-emerald-600 text-white hover:bg-emerald-700' : ''"
+                            :variant="cotizacion.tiene_insumos ? 'default' : 'outline'">
+                            Ver Insumos
+                        </Button>
+                    </Link>
+                </div>
+
+                <!-- Card 2: Orden de Compra -->
+                <div class="rounded-xl border p-4"
+                    :class="[!ocHabilitada && 'opacity-60', cotizacion.tiene_orden_compra ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : '']">
                     <div class="mb-3 flex items-center gap-2">
                         <ShoppingCart class="size-5"
                             :class="cotizacion.tiene_orden_compra ? 'text-emerald-600' : 'text-muted-foreground'" />
                         <div>
                             <p class="font-semibold">Orden de Compra</p>
-                            <p class="text-xs text-muted-foreground">PDF de la orden emitida</p>
+                            <p class="text-xs text-muted-foreground">Sube el PDF de la orden o solicita revisión</p>
                         </div>
-                        <CheckCircle2 v-if="cotizacion.tiene_orden_compra" class="ml-auto size-5 text-emerald-600" />
                     </div>
-                    <p v-if="cotizacion.tiene_orden_compra" class="text-sm text-emerald-700 dark:text-emerald-400">Fase
-                        completada
-                    </p>
-                    <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / subir orden de compra</p>
-                </Link>
 
-                <div v-else class="rounded-xl border p-4 opacity-60">
-                    <div class="mb-3 flex items-center gap-2">
-                        <ShoppingCart class="size-5 text-muted-foreground" />
-                        <div>
-                            <p class="font-semibold">Orden de Compra</p>
-                            <p class="text-xs text-muted-foreground">PDF de la orden emitida</p>
+                    <template v-if="!ocHabilitada">
+                        <p class="text-sm text-muted-foreground">Primero completa la Explosión de Insumos para habilitar
+                            este paso.</p>
+                    </template>
+
+                    <template v-else-if="cotizacion.tiene_orden_compra">
+                        <div class="rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20">
+                            <p class="font-medium text-emerald-700 dark:text-emerald-400">✓ Fase completada</p>
                         </div>
-                    </div>
-                    <p class="text-sm text-muted-foreground">Primero completa la Explosión de Insumos para habilitar
-                        este paso.
-                    </p>
+                        <Link class="mt-3 block" :href="CompraOrdenController.index(rutaOc)">
+                            <Button class="w-full bg-emerald-600 text-white hover:bg-emerald-700">Ver Orden de
+                                Compra</Button>
+                        </Link>
+                    </template>
+
+                    <template v-else-if="solicitudPendiente">
+                        <div
+                            class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/20">
+                            <p class="font-medium text-amber-700 dark:text-amber-400">Solicitud enviada</p>
+                            <p class="text-xs text-muted-foreground">En espera de aprobación de un administrador.</p>
+                        </div>
+                    </template>
+
+                    <template v-else>
+                        <div
+                            class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
+                            <p class="text-sm font-medium text-blue-700 dark:text-blue-400">Opción 1: Subir orden de
+                                compra</p>
+                            <p class="mb-2 text-xs text-muted-foreground">Sube el PDF de la orden de compra</p>
+                            <Button class="w-full" @click="ocDialogOpen = true">
+                                <ShoppingCart class="mr-2 size-4" />
+                                Subir PDF
+                            </Button>
+                        </div>
+
+                        <div
+                            class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/20">
+                            <p class="text-sm font-medium text-amber-700 dark:text-amber-400">Opción 2: Solicitar
+                                revisión sin orden</p>
+                            <p class="mb-2 text-xs text-muted-foreground">Envía esta cotización para revisión
+                                administrativa</p>
+                            <Button class="w-full bg-amber-600 text-white hover:bg-amber-700"
+                                @click="solicitarRevision">
+                                <Send class="mr-2 size-4" />
+                                Solicitar Revisión
+                            </Button>
+                        </div>
+                    </template>
                 </div>
 
                 <Dialog v-model:open="ocDialogOpen">
@@ -336,23 +489,19 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </Dialog>
             </div>
 
-            <div v-if="cotizacion.completada"
-                class="mt-5 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-                <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-emerald-600" />
+            <div class="mt-5 flex items-start gap-3 rounded-lg border px-4 py-3" :class="cotizacion.completada
+                ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30'
+                : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30'">
+                <component :is="cotizacion.completada ? CheckCircle2 : Clock" class="mt-0.5 size-4 shrink-0"
+                    :class="cotizacion.completada ? 'text-emerald-600' : 'text-amber-600'" />
                 <div>
-                    <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Flujo aprobado</p>
-                    <p class="text-sm text-emerald-700 dark:text-emerald-400">
-                        Se cumplieron los dos requisitos: Explosión de Insumos y Orden de Compra.
+                    <p class="text-sm font-semibold"
+                        :class="cotizacion.completada ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'">
+                        {{ cotizacion.completada ? 'Flujo aprobado' : 'Flujo en proceso' }}
                     </p>
-                </div>
-            </div>
-            <div v-else
-                class="mt-5 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30">
-                <Clock class="mt-0.5 size-4 shrink-0 text-amber-600" />
-                <div>
-                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Flujo en proceso</p>
-                    <p class="text-sm text-amber-700 dark:text-amber-400">
-                        Completa Insumos y Orden de Compra para aprobar el flujo de esta cotización.
+                    <p class="text-sm"
+                        :class="cotizacion.completada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'">
+                        {{ estadoDescripcion }}
                     </p>
                 </div>
             </div>

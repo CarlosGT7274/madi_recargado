@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\CompraOrden;
+use App\Models\Cotizacion;
 use App\Models\Levantamiento;
 use App\Models\User;
 use App\Support\Accion;
@@ -35,7 +36,7 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'levantamiento' => Levantamiento::class,
             'compra_orden' => CompraOrden::class,
-            // agrega aquí el alias de cada módulo nuevo que use imágenes
+            'cotizacion' => Cotizacion::class,
         ]);
     }
 

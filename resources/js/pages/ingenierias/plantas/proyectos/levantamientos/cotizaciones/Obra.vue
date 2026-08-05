@@ -18,7 +18,8 @@ export default pageLayout(() => {
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
-import { CheckCircle2, Download, FileText, Upload } from '@lucide/vue';
+import { CheckCircle2, Download, FileText, Lock, Package, Upload } from '@lucide/vue';
+import ArchivoController from '@/actions/App/Http/Controllers/ArchivoController';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,10 @@ const rutaCotizaciones = computed(() => ({
     levantamiento: props.levantamiento.id,
 }));
 
+const versionesAprobadas = computed(
+    () => props.grupo.versiones.filter((v) => v.completada).length,
+);
+
 const archivoInput = ref<HTMLInputElement | null>(null);
 
 function subirNuevaVersion(): void {
@@ -75,7 +80,23 @@ function subirNuevaVersion(): void {
     router.post(
         CotizacionController.store(rutaCotizaciones.value).url,
         { archivo },
-        { forceFormData: true, preserveScroll: true },
+        { forceFormData: true, preserveScroll: true, onFinish: () => { if (archivoInput.value) archivoInput.value.value = ''; } },
+    );
+}
+
+function subirExcelVersion(version: VersionCotizacion, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+
+    router.post(
+        ArchivoController.storeDocumento().url,
+        {
+            archivable_type: 'cotizacion',
+            archivable_id: version.id,
+            archivo,
+        },
+        { forceFormData: true, preserveScroll: true, onFinish: () => (input.value = '') },
     );
 }
 
@@ -106,40 +127,111 @@ function formatoMoneda(valor: number | null): string {
 
     <Head :title="`${grupo.obra} — Cotizaciones`" />
 
-    <PageLayout :title="grupo.obra"
-        :description="`${grupo.totalVersiones} ${grupo.totalVersiones === 1 ? 'versión' : 'versiones'}`">
+    <PageLayout title="" description="">
+        <!-- Banner: obra completada -->
         <div v-if="grupo.completada"
-            class="mb-6 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30">
+            class="mb-6 overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
             <div class="flex items-start gap-3 p-5">
-                <CheckCircle2 class="mt-0.5 size-5 shrink-0 text-emerald-600" />
+                <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                    <CheckCircle2 class="size-5" />
+                </div>
                 <div class="flex-1">
-                    <p class="font-semibold text-emerald-800 dark:text-emerald-300">Obra completada</p>
-                    <p class="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+                    <p class="font-semibold text-blue-800 dark:text-blue-300">Obra completada</p>
+                    <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
                         Al menos una versión tiene insumos y orden de compra completos.
                     </p>
                     <div class="mt-3 rounded-lg bg-white/60 px-4 py-2 text-sm dark:bg-black/20">
-                        Monto: <span class="font-semibold">{{ formatoMoneda(grupo.montoCompletado) }}</span>
+                        Monto total aprobado: <span class="font-semibold">{{ formatoMoneda(grupo.montoCompletado)
+                        }}</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="rounded-2xl border bg-card p-5 shadow-sm">
+        <!-- Header azul -->
+        <div class="overflow-hidden rounded-2xl border shadow-sm">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-6 text-white">
+                <div class="flex flex-wrap items-center gap-3">
+                    <p class="text-2xl font-bold">{{ grupo.obra }}</p>
+                    <span class="rounded-full px-3 py-1 text-xs font-bold uppercase"
+                        :class="grupo.completada ? 'bg-emerald-500' : 'bg-white/20'">
+                        {{ grupo.completada ? 'Completado' : 'En proceso' }}
+                    </span>
+                </div>
+                <p class="mt-1 text-sm text-blue-100">
+                    {{ grupo.totalVersiones }} {{ grupo.totalVersiones === 1 ? 'versión' : 'versiones' }}
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 divide-y border-b bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                <div class="flex items-center gap-3 p-5">
+                    <div
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
+                        <FileText class="size-4" />
+                    </div>
+                    <div>
+                        <p class="text-xs text-muted-foreground">Cotizaciones Totales</p>
+                        <p class="text-xl font-bold">{{ grupo.totalVersiones }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 p-5">
+                    <div
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                        <CheckCircle2 class="size-4" />
+                    </div>
+                    <div>
+                        <p class="text-xs text-muted-foreground">Cotizaciones Aprobadas</p>
+                        <p class="text-xl font-bold">{{ versionesAprobadas }}</p>
+                        <p class="text-xs text-muted-foreground">
+                            {{ grupo.totalVersiones ? Math.round((versionesAprobadas / grupo.totalVersiones) * 100) : 0
+                            }}% del total
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 p-5">
+                    <div
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
+                        <Package class="size-4" />
+                    </div>
+                    <div>
+                        <p class="text-xs text-muted-foreground">Monto Total Aprobado</p>
+                        <p class="text-xl font-bold">{{ formatoMoneda(grupo.montoCompletado) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Versiones -->
+        <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p class="font-semibold">Versiones</p>
-                <label v-if="puedeCrear" class="cursor-pointer">
-                    <Button size="sm" as="span">
-                        <Upload class="mr-2 size-4" />
-                        Nueva versión
-                    </Button>
-                    <input ref="archivoInput" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="subirNuevaVersion" />
-                </label>
+                <div>
+                    <p class="text-lg font-semibold">Versiones de esta Obra</p>
+                    <p class="text-sm text-muted-foreground">Gestiona y revisa todas las cotizaciones</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <a :href="CotizacionController.plantilla(rutaCotizaciones).url">
+                        <Button variant="outline" size="sm">
+                            <Download class="mr-2 size-4" />
+                            Descargar Plantilla
+                        </Button>
+                    </a>
+
+                    <label v-if="puedeCrear">
+                        <Button size="sm" as="span" class="cursor-pointer">
+                            <Upload class="mr-2 size-4" />
+                            Nueva versión
+                        </Button>
+                        <input ref="archivoInput" type="file" accept=".xlsx,.xls" class="hidden"
+                            @change="subirNuevaVersion" />
+                    </label>
+                </div>
             </div>
 
             <div class="space-y-3">
                 <div v-for="version in grupo.versiones" :key="version.id"
-                    class="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                    class="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"
+                    :class="version.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'bg-card'">
                     <div class="flex items-start gap-3">
                         <div class="flex size-9 shrink-0 items-center justify-center rounded-lg"
                             :class="version.completada ? 'bg-emerald-500/10 text-emerald-600' : 'bg-primary/10 text-primary'">
@@ -162,21 +254,36 @@ function formatoMoneda(valor: number | null): string {
                         </div>
                     </div>
 
-                    <div class="flex shrink-0 items-center gap-2">
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <label v-if="puedeCrear" class="cursor-pointer">
+                            <Button variant="outline" size="sm" as="span">
+                                <Upload class="mr-1.5 size-3.5" />
+                                Subir Excel
+                            </Button>
+                            <input type="file" accept=".xlsx,.xls" class="hidden"
+                                @change="(e) => subirExcelVersion(version, e)" />
+                        </label>
+
                         <a v-if="version.archivoExcelUrl" :href="version.archivoExcelUrl" target="_blank">
                             <Button variant="outline" size="sm">
                                 <Download class="mr-1.5 size-3.5" />
-                                Excel
+                                Descargar Excel
                             </Button>
                         </a>
+
                         <Link :href="CotizacionController.show({
                             planta: planta.id, proyecto: proyecto.id,
                             levantamiento: levantamiento.id, cotizacion: version.id,
                         })">
-                            <Button size="sm">Ver Detalle</Button>
+                            <Button size="sm" class="bg-violet-600 text-white hover:bg-violet-700">Ver Detalle</Button>
                         </Link>
                     </div>
                 </div>
+
+                <p v-if="!grupo.versiones.length"
+                    class="rounded-xl border py-8 text-center text-sm text-muted-foreground">
+                    Aún no hay versiones para esta obra.
+                </p>
             </div>
         </div>
     </PageLayout>

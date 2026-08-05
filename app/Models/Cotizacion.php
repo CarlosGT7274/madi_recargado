@@ -90,11 +90,6 @@ class Cotizacion extends Model
         return $this->insumos()->exists();
     }
 
-    public function tieneOrdenAprobada(): bool
-    {
-        return $this->ordenCompra?->archivos()->where('tipo_archivo', 'pdf')->exists() ?? false;
-    }
-
     /**
      * ÚNICA fuente de verdad de "completada/aprobada" en todo el sistema.
      * El campo `estado` (borrador/enviada/rechazada) ya NO participa en esto;
@@ -105,5 +100,15 @@ class Cotizacion extends Model
     public function estaCompletada(): bool
     {
         return $this->tieneInsumos() && $this->tieneOrdenAprobada();
+    }
+
+    public function tieneOrdenAprobada(): bool
+    {
+        if (! $this->ordenCompra) {
+            return false;
+        }
+
+        return $this->ordenCompra->archivos()->where('tipo_archivo', 'pdf')->exists()
+            || $this->ordenCompra->estatus_compra === 'aprobado';
     }
 }

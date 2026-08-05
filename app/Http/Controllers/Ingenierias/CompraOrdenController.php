@@ -58,4 +58,46 @@ class CompraOrdenController extends Controller
 
         return back();
     }
+
+    public function solicitarRevision(
+        Planta $planta,
+        Proyecto $proyecto,
+        Levantamiento $levantamiento,
+        Cotizacion $cotizacion,
+        CompraOrdenAction $action,
+    ): RedirectResponse {
+        $action->solicitarRevision($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Revisión solicitada.']);
+
+        return back();
+    }
+
+    public function aprobar(
+        Planta $planta,
+        Proyecto $proyecto,
+        Levantamiento $levantamiento,
+        Cotizacion $cotizacion,
+        CompraOrdenAction $action,
+    ): RedirectResponse {
+        $action->aprobar($cotizacion->ordenCompra);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización aprobada.']);
+
+        return back();
+    }
+
+    public function rechazar(
+        Planta $planta,
+        Proyecto $proyecto,
+        Levantamiento $levantamiento,
+        Cotizacion $cotizacion,
+        CompraOrdenAction $action,
+    ): RedirectResponse {
+        $action->rechazar($cotizacion->ordenCompra);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización rechazada.']);
+
+        return back();
+    }
 }

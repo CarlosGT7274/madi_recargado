@@ -110,5 +110,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('index');
             Route::post('/', [CompraOrdenController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
+            Route::post('/aprobar', [CompraOrdenController::class, 'aprobar'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('aprobar');
+            Route::post('/rechazar', [CompraOrdenController::class, 'rechazar'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('rechazar');
+            Route::post('/solicitar-revision', [CompraOrdenController::class, 'solicitarRevision'])
+                ->middleware('permiso:'.Accion::CREATE)->name('solicitar-revision');
         });
 });
