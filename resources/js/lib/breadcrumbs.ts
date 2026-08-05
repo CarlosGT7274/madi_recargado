@@ -87,6 +87,31 @@ export function breadcrumbsCotizacion(
     ];
 }
 
+/**
+ * Equivalentes de breadcrumbsObra/breadcrumbsCotizacion para el flujo de
+ * Proyecto directo (sin Levantamiento).
+ */
+export function breadcrumbsObraDirecto(planta: PlantaRef, proyecto: ProyectoRef, obra: string): BreadcrumbItem[] {
+    return [
+        ...breadcrumbsProyecto(planta, proyecto),
+        {
+            title: obra,
+            href: CotizacionController.obraProyecto({ planta: planta.id, proyecto: proyecto.id, obra }),
+        },
+    ];
+}
+
+export function breadcrumbsCotizacionDirecto(
+    planta: PlantaRef,
+    proyecto: ProyectoRef,
+    cotizacion: CotizacionRef,
+): BreadcrumbItem[] {
+    return [
+        ...breadcrumbsObraDirecto(planta, proyecto, cotizacion.obra ?? 'Sin nombre de obra'),
+        { title: cotizacion.folio, href: '' },
+    ];
+}
+
 export function pageLayout(build: () => BreadcrumbItem[]) {
     return {
         layout: () => ({ breadcrumbs: build() }),

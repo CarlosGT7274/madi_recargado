@@ -19,6 +19,7 @@ class Cotizacion extends Model
 
     protected $fillable = [
         'levantamiento_id',
+        'proyecto_id',
         'folio',
         'fecha',
         'para',
@@ -65,6 +66,11 @@ class Cotizacion extends Model
         return $this->belongsTo(Levantamiento::class, 'levantamiento_id');
     }
 
+    public function proyecto()
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
@@ -91,6 +97,16 @@ class Cotizacion extends Model
     }
 
     /**
+     * Cotizaciones sin Levantamiento pertenecen al flujo de Proyecto directo
+     * (proyecto_id set en su lugar). Ahí no hay paso de Explosión de
+     * Insumos, así que "completada" solo depende de la Orden de Compra.
+     */
+    public function esDeProyectoDirecto(): bool
+    {
+        return $this->levantamiento_id === null;
+    }
+
+    /**
      * ÚNICA fuente de verdad de "completada/aprobada" en todo el sistema.
      * El campo `estado` (borrador/enviada/rechazada) ya NO participa en esto;
      * solo describe el paso comercial previo a que exista Insumos + OC.
@@ -99,6 +115,10 @@ class Cotizacion extends Model
      */
     public function estaCompletada(): bool
     {
+        if ($this->esDeProyectoDirecto()) {
+            return $this->tieneOrdenAprobada();
+        }
+
         return $this->tieneInsumos() && $this->tieneOrdenAprobada();
     }
 

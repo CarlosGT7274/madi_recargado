@@ -23,7 +23,7 @@ class CompraOrdenAction
 
     public function subirPdf(Cotizacion $cotizacion, UploadedFile $archivo): CompraOrden
     {
-        if (! $cotizacion->tieneInsumos()) {
+        if (! $cotizacion->esDeProyectoDirecto() && ! $cotizacion->tieneInsumos()) {
             throw ValidationException::withMessages([
                 'archivo' => 'Debes completar la Explosión de Insumos antes de subir la Orden de Compra.',
             ]);
@@ -113,12 +113,6 @@ class CompraOrdenAction
         return $ordenCompra->fresh();
     }
 
-    /**
-     * Todo usuario cuyo rol tenga control total (ALL) sobre el permiso raíz
-     * `ingenierias`. Aprovecha Role::tienePermiso(), que ya sube por padre_id
-     * cuando el rol no tiene override en un endpoint hijo — así cualquier rol
-     * con ALL en la raíz cubre automáticamente plantas, proyectos, compras, etc.
-     */
     private function administradores(): Collection
     {
         $raiz = Permiso::whereNull('padre_id')

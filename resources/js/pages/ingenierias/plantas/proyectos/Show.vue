@@ -20,16 +20,21 @@ import {
     ChevronLeft,
     ChevronRight,
     CircleCheck,
+    ClipboardList,
     Clock,
+    FileSpreadsheet,
     FileText,
-    FolderOpen,
     Plus,
+    ShoppingCart,
+    Upload,
 } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
+import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import InputError from '@/components/InputError.vue';
+import ActividadesArbol, { type ActividadNodo } from '@/components/ActividadesArbol.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,6 +49,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+type PlantaRef = { id: number; nombre: string };
+
 type ProyectoDetalle = {
     id: number;
     planta_id: number;
@@ -52,8 +59,7 @@ type ProyectoDetalle = {
     nombre: string;
     descripcion: string | null;
     estado: string;
-    bloqueado: boolean;
-    motivo_bloqueo: string | null;
+    completado: boolean;
     creado: string | null;
 };
 
@@ -68,10 +74,25 @@ type LevantamientoResumen = {
     creado_iso: string | null;
 };
 
+type ObraAgrupada = {
+    obra: string;
+    totalVersiones: number;
+    completada: boolean;
+    ultimaVersion: {
+        id: number;
+        folio: string;
+        total: number | null;
+        completada: boolean;
+        tieneOrdenAprobada: boolean;
+    };
+};
+
 const props = defineProps<{
     planta: PlantaRef;
     proyecto: ProyectoDetalle;
     levantamientos?: LevantamientoResumen[];
+    obras?: ObraAgrupada[];
+    actividades?: ActividadNodo[];
 }>();
 
 const editDialogOpen = ref(false);
@@ -130,7 +151,13 @@ function prioridadVariant(prioridad: string) {
     return 'secondary';
 }
 
-// --- Calendario ---
+function tipoLabel(tipo: string) {
+    if (tipo === 'grande') return 'Proyecto estándar';
+    if (tipo === 'chico') return 'Proyecto directo';
+    return tipo;
+}
+
+// --- Calendario (solo Proyecto estándar) ---
 const hoy = new Date();
 const mesActual = ref(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
 const fechaSeleccionada = ref<string | null>(null);
@@ -191,30 +218,39 @@ const nombreMes = computed(() =>
 );
 
 const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+
+// --- Proyecto directo: subir cotización ---
+const archivoCotizacionInput = ref<HTMLInputElement | null>(null);
+
+function subirCotizacionExcel(): void {
+    const archivo = archivoCotizacionInput.value?.files?.[0];
+    if (!archivo) return;
+
+    router.post(
+        CotizacionController.storeProyecto({ planta: props.planta.id, proyecto: props.proyecto.id }).url,
+        { archivo },
+        { forceFormData: true, preserveScroll: true, onFinish: () => { if (archivoCotizacionInput.value) archivoCotizacionInput.value.value = ''; } },
+    );
+}
+
+function formatoMoneda(valor: number | null): string {
+    if (valor === null) return '—';
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
+}
 </script>
 
 <template>
+
     <Head :title="`Proyecto: ${proyecto.nombre}`" />
 
-    <PageLayout
-        :title="proyecto.nombre"
-        :description="`Folio ${proyecto.folio}`"
-        endpoint="ingenierias.plantas.proyectos"
-        with-edit
-        with-delete
-        @edit="editDialogOpen = true"
-        @delete="eliminarProyecto"
-    >
-        <!-- Dialog: editar proyecto -->
+    <PageLayout :title="proyecto.nombre" :description="`Folio ${proyecto.folio}`"
+        endpoint="ingenierias.plantas.proyectos" with-edit with-delete @edit="editDialogOpen = true"
+        @delete="eliminarProyecto">
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form
-                    v-bind="ProyectoController.update.form([planta.id, proyecto.id])"
-                    :options="{ preserveScroll: true }"
-                    @success="editDialogOpen = false"
-                    v-slot="{ errors, processing }"
-                    class="space-y-4"
-                >
+                <Form v-bind="ProyectoController.update.form([planta.id, proyecto.id])"
+                    :options="{ preserveScroll: true }" @success="editDialogOpen = false"
+                    v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Editar proyecto</DialogTitle>
                         <DialogDescription>Actualiza los datos de este proyecto.</DialogDescription>
@@ -228,7 +264,7 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
                     <div class="grid gap-2">
                         <Label for="edit-tipo">Tipo</Label>
-                        <Input id="edit-tipo" name="tipo" :default-value="proyecto.tipo" readonly />
+                        <Input id="edit-tipo" name="tipo" :default-value="tipoLabel(proyecto.tipo)" readonly />
                         <InputError :message="errors.tipo" />
                         <p class="text-xs text-muted-foreground">El tipo no puede cambiar una vez creado.</p>
                     </div>
@@ -250,34 +286,41 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
         </Dialog>
 
         <div class="space-y-6">
-            <!-- Header: proyecto + acción nuevo levantamiento -->
+            <!-- Header: proyecto + acción principal según tipo -->
             <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b bg-muted/30 px-6 py-5">
                     <div class="flex items-center gap-4">
-                        <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <FolderOpen class="size-6" />
+                        <div
+                            class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <FileText class="size-6" />
                         </div>
                         <div>
                             <p class="text-lg font-semibold leading-tight">{{ proyecto.nombre }}</p>
                             <p class="text-sm text-muted-foreground">
-                                {{ proyecto.folio }} · Creado: {{ proyecto.creado ?? '—' }}
+                                {{ proyecto.folio }} · {{ tipoLabel(proyecto.tipo) }} · Creado: {{ proyecto.creado ??
+                                '—' }}
                             </p>
                         </div>
                     </div>
 
-                    <!-- Botón de nuevo levantamiento solo si es tipo 'grande' -->
-                    <Link v-if="proyecto.tipo === 'grande'" :href="LevantamientoController.create({ planta: planta.id, proyecto: proyecto.id })">
+                    <Link v-if="proyecto.tipo === 'grande'"
+                        :href="LevantamientoController.create({ planta: planta.id, proyecto: proyecto.id })">
                         <Button>
                             <Plus class="size-4" />
                             Nuevo Levantamiento
                         </Button>
                     </Link>
-                    <div v-else class="text-sm text-muted-foreground italic">
-                        Los proyectos "Directo a Actividades" no usan levantamientos.
-                    </div>
+
+                    <label v-else>
+                        <Button as="span" class="cursor-pointer">
+                            <Upload class="size-4" />
+                            Subir cotización
+                        </Button>
+                        <input ref="archivoCotizacionInput" type="file" accept=".xlsx,.xls" class="hidden"
+                            @change="subirCotizacionExcel" />
+                    </label>
                 </div>
 
-                <!-- Totales: solo tienen sentido una vez que llegó la data diferida -->
                 <Deferred data="levantamientos" v-if="proyecto.tipo === 'grande'">
                     <template #fallback>
                         <div class="grid grid-cols-3 divide-x border-b py-6 text-center text-sm text-muted-foreground">
@@ -310,8 +353,8 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                 </Deferred>
             </div>
 
+            <!-- Proyecto estándar: calendario + lista de levantamientos -->
             <div v-if="proyecto.tipo === 'grande'" class="grid gap-6 lg:grid-cols-[320px_1fr]">
-                <!-- Calendario -->
                 <div class="h-fit rounded-2xl border bg-card p-4 shadow-sm">
                     <div class="mb-3 flex items-center justify-between">
                         <button type="button" class="rounded-md p-1 hover:bg-accent" @click="cambiarMes(-1)">
@@ -328,67 +371,54 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                     </div>
 
                     <div class="mt-1 grid grid-cols-7 gap-1">
-                        <button
-                            v-for="(celda, idx) in diasDelMes"
-                            :key="idx"
-                            type="button"
-                            :disabled="!celda.fecha"
+                        <button v-for="(celda, idx) in diasDelMes" :key="idx" type="button" :disabled="!celda.fecha"
                             class="relative flex aspect-square items-center justify-center rounded-md text-sm transition-colors disabled:cursor-default"
                             :class="[
                                 !celda.fecha ? 'invisible' : 'hover:bg-accent',
                                 fechaSeleccionada === celda.iso ? 'bg-primary text-primary-foreground hover:bg-primary' : '',
-                            ]"
-                            @click="seleccionarDia(celda.iso)"
-                        >
+                            ]" @click="seleccionarDia(celda.iso)">
                             {{ celda.fecha?.getDate() }}
                             <span
                                 v-if="celda.iso && diasConLevantamientos.has(celda.iso) && fechaSeleccionada !== celda.iso"
-                                class="absolute bottom-1 size-1 rounded-full bg-primary"
-                            />
+                                class="absolute bottom-1 size-1 rounded-full bg-primary" />
                         </button>
                     </div>
 
-                    <button
-                        v-if="fechaSeleccionada"
-                        type="button"
+                    <button v-if="fechaSeleccionada" type="button"
                         class="mt-3 w-full rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
-                        @click="fechaSeleccionada = null"
-                    >
+                        @click="fechaSeleccionada = null">
                         Ver todos los levantamientos
                     </button>
                 </div>
 
-                <!-- Lista filtrada -->
                 <Deferred data="levantamientos">
                     <template #fallback>
-                        <div class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm">
+                        <div
+                            class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm">
                             <FileText class="size-8 text-muted-foreground" />
                             <p class="text-sm font-medium text-muted-foreground">Cargando levantamientos…</p>
                         </div>
                     </template>
 
                     <div class="space-y-3">
-                        <Link
-                            v-for="lev in levantamientosFiltrados"
-                            :key="lev.id"
+                        <Link v-for="lev in levantamientosFiltrados" :key="lev.id"
                             :href="LevantamientoController.show({ planta: planta.id, proyecto: proyecto.id, levantamiento: lev.id })"
-                            class="flex items-start gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent/50"
-                        >
-                            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                            class="flex items-start gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent/50">
+                            <div
+                                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
                                 <FileText class="size-5" />
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="font-semibold">{{ lev.folio }}</p>
-                                    <span
-                                        class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
-                                        :class="estatusBadgeClass(lev.estatus_admin)"
-                                    >
+                                    <span class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
+                                        :class="estatusBadgeClass(lev.estatus_admin)">
                                         {{ estatusLabel[lev.estatus_admin] ?? lev.estatus_admin }}
                                     </span>
                                 </div>
                                 <p class="mt-1 truncate text-sm">{{ lev.nombre ?? '—' }}</p>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                <div
+                                    class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                     <span>Cliente: {{ lev.cliente ?? '—' }}</span>
                                     <span class="flex items-center gap-1">
                                         <Badge :variant="prioridadVariant(lev.prioridad)" class="text-[10px]">
@@ -400,23 +430,83 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                             </div>
                         </Link>
 
-                        <div
-                            v-if="!levantamientosFiltrados.length"
-                            class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm"
-                        >
+                        <div v-if="!levantamientosFiltrados.length"
+                            class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm">
                             <FileText class="size-8 text-muted-foreground" />
                             <p class="text-sm font-medium">No hay levantamientos para esta fecha</p>
-                            <button
-                                v-if="fechaSeleccionada"
-                                type="button"
+                            <button v-if="fechaSeleccionada" type="button"
                                 class="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                                @click="fechaSeleccionada = null"
-                            >
+                                @click="fechaSeleccionada = null">
                                 Ver todos
                             </button>
                         </div>
                     </div>
                 </Deferred>
+            </div>
+
+            <!-- Proyecto directo: cotización + OC (obras) + actividades -->
+            <div v-else class="space-y-6">
+                <div class="rounded-2xl border bg-card p-5 shadow-sm">
+                    <div class="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <FileSpreadsheet class="size-4" />
+                        Cotizaciones
+                    </div>
+
+                    <Deferred data="obras">
+                        <template #fallback>
+                            <p class="py-6 text-center text-sm text-muted-foreground">Cargando cotizaciones…</p>
+                        </template>
+
+                        <div v-if="obras?.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <Link v-for="grupo in obras" :key="grupo.obra" :href="CotizacionController.obraProyecto({
+                                planta: planta.id,
+                                proyecto: proyecto.id,
+                                obra: grupo.obra,
+                            })" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
+                                :class="grupo.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'bg-card'">
+                                <div class="flex items-start justify-between gap-2">
+                                    <p class="truncate font-semibold">{{ grupo.obra }}</p>
+                                    <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase"
+                                        :class="grupo.completada ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted text-muted-foreground'">
+                                        {{ grupo.completada ? 'Completado' : 'En proceso' }}
+                                    </span>
+                                </div>
+
+                                <div v-if="grupo.ultimaVersion.tieneOrdenAprobada"
+                                    class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <ShoppingCart class="size-3.5" />
+                                    Con orden de compra
+                                </div>
+
+                                <div class="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>{{ formatoMoneda(grupo.ultimaVersion.total) }}</span>
+                                    <span>{{ grupo.totalVersiones }} {{ grupo.totalVersiones === 1 ? 'versión' :
+                                        'versiones' }}</span>
+                                </div>
+                            </Link>
+                        </div>
+
+                        <p v-else class="py-6 text-center text-sm text-muted-foreground">
+                            Aún no hay cotizaciones. Sube el Excel para crear la primera.
+                        </p>
+                    </Deferred>
+                </div>
+
+                <div class="rounded-2xl border bg-card p-5 shadow-sm">
+                    <div class="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <ClipboardList class="size-4" />
+                        Actividades
+                    </div>
+
+                    <Deferred data="actividades">
+                        <template #fallback>
+                            <p class="py-6 text-center text-sm text-muted-foreground">Cargando actividades…</p>
+                        </template>
+
+                        <ActividadesArbol :planta="planta.id" :proyecto="proyecto.id"
+                            :actividades="actividades ?? []" />
+                    </Deferred>
+                </div>
             </div>
         </div>
     </PageLayout>

@@ -25,13 +25,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 
 const props = defineProps<{
     planta: PlantaRef;
@@ -43,24 +36,33 @@ const form = useForm({
     descripcion: '',
 });
 
+const tiposProyecto = [
+    {
+        value: 'grande',
+        titulo: 'Proyecto estándar',
+        descripcion: 'Flujo completo con levantamiento, planeación y demás procesos.',
+    },
+    {
+        value: 'chico',
+        titulo: 'Proyecto directo',
+        descripcion: 'Flujo simplificado para capturar actividades, cotización y orden de compra.',
+    },
+] as const;
+
 function submit() {
     form.post(ProyectoController.store(props.planta.id).url);
 }
 </script>
 
 <template>
+
     <Head title="Nuevo Proyecto" />
 
-    <PageLayout
-        title="Nuevo Proyecto"
-        :description="`Para la planta ${planta.nombre}`"
-        endpoint="ingenierias.plantas.proyectos"
-    >
+    <PageLayout title="Nuevo Proyecto" :description="`Para la planta ${planta.nombre}`"
+        endpoint="ingenierias.plantas.proyectos">
         <template #breadcrumbs>
-            <Link
-                :href="PlantaController.show(planta.id)"
-                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
+            <Link :href="PlantaController.show(planta.id)"
+                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft class="size-4" />
             </Link>
         </template>
@@ -69,55 +71,48 @@ function submit() {
             <div class="rounded-2xl border bg-card text-card-foreground shadow-sm">
                 <div class="flex flex-col space-y-1.5 p-6 border-b">
                     <h3 class="text-2xl font-semibold leading-none tracking-tight">Datos del proyecto</h3>
-                    <p class="text-sm text-muted-foreground">Ingresa la información básica para registrar el proyecto.</p>
+                    <p class="text-sm text-muted-foreground">Ingresa la información básica para registrar el proyecto.
+                    </p>
                 </div>
-                
+
                 <div class="p-6">
-                    <Form
-                        v-bind="ProyectoController.store.form(planta.id)"
-                        @success="() => {}"
-                        v-slot="{ errors, processing }"
-                        class="space-y-6"
-                    >
+                    <Form v-bind="ProyectoController.store.form(planta.id)" @success="() => { }"
+                        v-slot="{ errors, processing }" class="space-y-6">
                         <div class="space-y-2">
                             <Label for="nombre">Nombre del proyecto <span class="text-red-500">*</span></Label>
-                            <Input
-                                id="nombre"
-                                name="nombre"
-                                v-model="form.nombre"
-                                placeholder="Ej. Instalación de tableros de control"
-                                required
-                            />
+                            <Input id="nombre" name="nombre" v-model="form.nombre"
+                                placeholder="Ej. Instalación de tableros de control" required />
                             <InputError :message="errors.nombre" />
                         </div>
 
                         <div class="space-y-2">
-                            <Label for="tipo">Tipo de flujo <span class="text-red-500">*</span></Label>
-                            <Select name="tipo" v-model="form.tipo">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecciona un tipo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="grande">Proyecto con Levantamiento (Grande)</SelectItem>
-                                    <SelectItem value="chico">Directo a Actividades (Chico)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p class="text-xs text-muted-foreground">
-                                "Con Levantamiento" requerirá crear un levantamiento antes de cotizar. "Directo" pasa directo a actividades.
-                            </p>
+                            <Label>Tipo de proyecto <span class="text-red-500">*</span></Label>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label v-for="opcion in tiposProyecto" :key="opcion.value"
+                                    class="relative flex cursor-pointer flex-col gap-2 rounded-2xl border p-4 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 hover:bg-accent/50">
+                                    <input type="radio" name="tipo" :value="opcion.value" v-model="form.tipo"
+                                        class="peer sr-only" required />
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-semibold">{{ opcion.titulo }}</span>
+                                        <span
+                                            class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/40 peer-checked:border-primary">
+                                            <span v-if="form.tipo === opcion.value"
+                                                class="size-2 rounded-full bg-primary" />
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-muted-foreground">{{ opcion.descripcion }}</p>
+                                </label>
+                            </div>
+
                             <InputError :message="errors.tipo" />
                         </div>
 
                         <div class="space-y-2">
                             <Label for="descripcion">Descripción (opcional)</Label>
-                            <Textarea
-                                id="descripcion"
-                                name="descripcion"
-                                v-model="form.descripcion"
-                                placeholder="Agrega detalles adicionales del proyecto..."
-                                class="resize-none"
-                                rows="3"
-                            />
+                            <Textarea id="descripcion" name="descripcion" v-model="form.descripcion"
+                                placeholder="Agrega detalles adicionales del proyecto..." class="resize-none"
+                                rows="3" />
                             <InputError :message="errors.descripcion" />
                         </div>
 

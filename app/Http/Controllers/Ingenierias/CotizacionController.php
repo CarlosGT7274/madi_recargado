@@ -110,6 +110,70 @@ class CotizacionController extends Controller
         return Excel::download(new PartidaPlantillaExport, 'plantilla-partidas.xlsx');
     }
 
+    // ---- Flujo de Proyecto directo: cotizaciones colgando del proyecto ----
+
+    public function obraProyecto(Planta $planta, Proyecto $proyecto, string $obra, CotizacionesAction $action): Response
+    {
+        return Inertia::render('ingenierias/plantas/proyectos/cotizaciones/Obra', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
+            'grupo' => $action->obraProyecto($proyecto, $obra),
+        ]);
+    }
+
+    public function showProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action, PartidasAction $partidasAction): Response
+    {
+        $partidas = $partidasAction->arbol($cotizacion);
+
+        return Inertia::render('ingenierias/plantas/proyectos/cotizaciones/Show', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
+            'cotizacion' => $action->detail($cotizacion),
+            'partidas' => $partidas,
+            'numeroPartidas' => collect($partidas)->sum(fn (array $raiz) => count($raiz['hijas'])),
+        ]);
+    }
+
+    public function storeProyecto(
+        ImportCotizacionRequest $request,
+        Planta $planta,
+        Proyecto $proyecto,
+        CotizacionesAction $action,
+        PartidasAction $partidasAction,
+    ): RedirectResponse {
+        $import = new CotizacionExcelImport($proyecto, $action, $partidasAction);
+        Excel::import($import, $request->file('archivo'));
+
+        $cotizacion = $import->cotizacion();
+
+        Inertia::flash('toast', [
+            'type' => empty($import->errores()) ? 'success' : 'warning',
+            'message' => "Cotización creada con {$import->partidasCreadas()} partidas.",
+        ]);
+
+        return redirect()->route('ingenierias.plantas.proyectos.cotizaciones.show', [
+            $planta->id, $proyecto->id, $cotizacion->id,
+        ]);
+    }
+
+    public function updateProyecto(UpdateCotizacionRequest $request, Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->update($cotizacion, $request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización actualizada.']);
+
+        return back();
+    }
+
+    public function destroyProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->delete($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización eliminada.']);
+
+        return back();
+    }
+
     // ---- Partidas: sub-acciones de Cotización, no un módulo aparte ----
 
     public function storePartida(StorePartidaRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, PartidasAction $action): RedirectResponse

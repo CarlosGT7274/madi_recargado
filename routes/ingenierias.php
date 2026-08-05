@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Ingenierias\ActividadController;
 use App\Http\Controllers\Ingenierias\CompraOrdenController;
 use App\Http\Controllers\Ingenierias\CotizacionController;
 use App\Http\Controllers\Ingenierias\InsumoController;
@@ -116,5 +117,46 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::UPDATE)->name('rechazar');
             Route::post('/solicitar-revision', [CompraOrdenController::class, 'solicitarRevision'])
                 ->middleware('permiso:'.Accion::CREATE)->name('solicitar-revision');
+        });
+
+    // ---- Proyecto directo: cotización + OC + actividades, sin Levantamiento ----
+
+    Route::name('ingenierias.plantas.proyectos.cotizaciones.')
+        ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/cotizaciones')
+        ->scopeBindings()
+        ->group(function () {
+            Route::get('/plantilla', [CotizacionController::class, 'plantilla'])
+                ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
+            Route::get('/obra/{obra}', [CotizacionController::class, 'obraProyecto'])
+                ->middleware('permiso:'.Accion::READ)->name('obra')
+                ->where('obra', '.*');
+            Route::get('/{cotizacion}', [CotizacionController::class, 'showProyecto'])
+                ->middleware('permiso:'.Accion::READ)->name('show');
+            Route::post('/', [CotizacionController::class, 'storeProyecto'])
+                ->middleware('permiso:'.Accion::CREATE)->name('store');
+            Route::put('/{cotizacion}', [CotizacionController::class, 'updateProyecto'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('update');
+            Route::delete('/{cotizacion}', [CotizacionController::class, 'destroyProyecto'])
+                ->middleware('permiso:'.Accion::DELETE)->name('destroy');
+        });
+
+    Route::name('ingenierias.plantas.proyectos.cotizaciones.orden-compra.')
+        ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/cotizaciones/{cotizacion}/orden-compra')
+        ->scopeBindings()
+        ->group(function () {
+            Route::post('/', [CompraOrdenController::class, 'storeProyecto'])
+                ->middleware('permiso:'.Accion::CREATE)->name('store');
+        });
+
+    Route::name('ingenierias.plantas.proyectos.actividades.')
+        ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/actividades')
+        ->scopeBindings()
+        ->group(function () {
+            Route::post('/', [ActividadController::class, 'store'])
+                ->middleware('permiso:'.Accion::CREATE)->name('store');
+            Route::put('/{actividad}', [ActividadController::class, 'update'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('update');
+            Route::delete('/{actividad}', [ActividadController::class, 'destroy'])
+                ->middleware('permiso:'.Accion::DELETE)->name('destroy');
         });
 });

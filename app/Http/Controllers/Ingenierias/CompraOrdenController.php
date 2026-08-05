@@ -100,4 +100,19 @@ class CompraOrdenController extends Controller
 
         return back();
     }
+
+    /** Flujo de Proyecto directo: subir OC directamente sobre la cotización. */
+    public function storeProyecto(
+        SubirOrdenCompraRequest $request,
+        Planta $planta,
+        Proyecto $proyecto,
+        Cotizacion $cotizacion,
+        CompraOrdenAction $action,
+    ): RedirectResponse {
+        $action->subirPdf($cotizacion, $request->file('archivo'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Orden de compra subida.']);
+
+        return back();
+    }
 }

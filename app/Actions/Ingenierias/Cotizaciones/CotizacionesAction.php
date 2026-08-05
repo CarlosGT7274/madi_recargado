@@ -5,6 +5,7 @@ namespace App\Actions\Ingenierias\Cotizaciones;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
+use App\Models\Proyecto;
 use App\Services\FolioService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -24,10 +25,27 @@ class CotizacionesAction
      */
     public function listAgrupado(Levantamiento $levantamiento): Collection
     {
-        return $levantamiento->cotizaciones()
+        $cotizaciones = $levantamiento->cotizaciones()
             ->with('archivos', 'ordenCompra.archivos', 'insumos')
             ->latest('id')
-            ->get()
+            ->get();
+
+        return $this->agruparPorObra($cotizaciones);
+    }
+
+    public function listAgrupadoProyecto(Proyecto $proyecto): Collection
+    {
+        $cotizaciones = $proyecto->cotizaciones()
+            ->with('archivos', 'ordenCompra.archivos')
+            ->latest('id')
+            ->get();
+
+        return $this->agruparPorObra($cotizaciones);
+    }
+
+    private function agruparPorObra(Collection $cotizaciones): Collection
+    {
+        return $cotizaciones
             ->groupBy(fn (Cotizacion $c) => $c->obra ?: 'Sin nombre de obra')
             ->map(function (Collection $versiones, string $obra) {
                 $ultima = $versiones->first();
@@ -42,10 +60,6 @@ class CotizacionesAction
             ->values();
     }
 
-    /**
-     * Única pantalla intermedia del flujo: todas las versiones de una obra
-     * puntual, planas, sin agrupar más.
-     */
     public function obra(Levantamiento $levantamiento, string $obra): array
     {
         $versiones = $levantamiento->cotizaciones()
@@ -54,6 +68,23 @@ class CotizacionesAction
             ->latest('id')
             ->get();
 
+        return $this->resumenObra($obra, $versiones);
+    }
+
+    /** Equivalente a obra(), para el flujo de Proyecto directo. */
+    public function obraProyecto(Proyecto $proyecto, string $obra): array
+    {
+        $versiones = $proyecto->cotizaciones()
+            ->with('archivos', 'ordenCompra.archivos')
+            ->where('obra', $obra)
+            ->latest('id')
+            ->get();
+
+        return $this->resumenObra($obra, $versiones);
+    }
+
+    private function resumenObra(string $obra, Collection $versiones): array
+    {
         $completada = $versiones->first(fn (Cotizacion $c) => $c->estaCompletada());
 
         return [
@@ -92,6 +123,7 @@ class CotizacionesAction
         return [
             'id' => $cotizacion->id,
             'levantamiento_id' => $cotizacion->levantamiento_id,
+            'proyecto_id' => $cotizacion->proyecto_id,
             'folio' => $cotizacion->folio,
             'fecha' => $cotizacion->fecha?->format('d/m/Y'),
             'para' => $cotizacion->para,
@@ -112,12 +144,17 @@ class CotizacionesAction
             'estado' => $cotizacion->estado,
             'creado' => $cotizacion->fecha_creacion?->format('d/m/Y H:i'),
             'modificado' => $cotizacion->fecha_modificacion?->format('d/m/Y H:i'),
+            'esDeProyectoDirecto' => $cotizacion->esDeProyectoDirecto(),
             'tiene_insumos' => $cotizacion->tieneInsumos(),
             'tiene_orden_compra' => $cotizacion->tieneOrdenAprobada(),
             'completada' => $cotizacion->estaCompletada(),
-            'otrasVersiones' => $this->versionesDeObra($cotizacion->levantamiento, $cotizacion->obra ?? '')
-                ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
-                ->values(),
+            'otrasVersiones' => $cotizacion->esDeProyectoDirecto()
+                ? $this->versionesDeObraProyecto($cotizacion->proyecto, $cotizacion->obra ?? '')
+                    ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
+                    ->values()
+                : $this->versionesDeObra($cotizacion->levantamiento, $cotizacion->obra ?? '')
+                    ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
+                    ->values(),
             'ordenCompra' => $cotizacion->ordenCompra ? [
                 'id' => $cotizacion->ordenCompra->id,
                 'estatusCompra' => $cotizacion->ordenCompra->estatus_compra,
@@ -137,16 +174,32 @@ class CotizacionesAction
             ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
     }
 
-    /**
-     * Crea SIEMPRE una nueva versión. El Excel es la fuente de verdad:
-     * si ya existe una cotización con la misma obra en este levantamiento,
-     * esta se agrega como versión nueva, nunca reemplaza a la anterior.
-     */
+    public function versionesDeObraProyecto(Proyecto $proyecto, string $obra): Collection
+    {
+        return $proyecto->cotizaciones()
+            ->with('archivos', 'ordenCompra.archivos')
+            ->where('obra', $obra)
+            ->latest('id')
+            ->get()
+            ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
+    }
+
     public function create(Levantamiento $levantamiento, array $data): Cotizacion
     {
         $data['folio'] = $this->folios->siguiente('ingenierias', 'cotizacion', 'COT');
 
         return $levantamiento->cotizaciones()->create([
+            ...$data,
+            'usuario_id' => Auth::id(),
+        ]);
+    }
+
+    /** Equivalente a create(), para el flujo de Proyecto directo. */
+    public function createParaProyecto(Proyecto $proyecto, array $data): Cotizacion
+    {
+        $data['folio'] = $this->folios->siguiente('ingenierias', 'cotizacion', 'COT');
+
+        return $proyecto->cotizaciones()->create([
             ...$data,
             'usuario_id' => Auth::id(),
         ]);

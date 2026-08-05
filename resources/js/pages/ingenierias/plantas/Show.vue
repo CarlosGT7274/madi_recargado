@@ -14,11 +14,11 @@ import { Deferred, Form, Head, Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import {
     Building2,
-    ChevronLeft,
-    ChevronRight,
     CircleCheck,
     Clock,
     FolderOpen,
+    FolderPlus,
+    Layers,
     Plus,
 } from '@lucide/vue';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
@@ -100,96 +100,30 @@ function tipoVariant(tipo: string) {
 }
 
 function tipoLabel(tipo: string) {
-    if (tipo === 'grande') return 'Con Levantamiento';
-    if (tipo === 'chico') return 'Directo a Actividades';
+    if (tipo === 'grande') return 'Proyecto estándar';
+    if (tipo === 'chico') return 'Proyecto directo';
     return tipo;
 }
 
-// --- Calendario ---
-const hoy = new Date();
-const mesActual = ref(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-const fechaSeleccionada = ref<string | null>(null);
-
-function toIso(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-const diasConProyectos = computed(() => {
-    const set = new Set<string>();
-    for (const pry of props.proyectos ?? []) {
-        if (pry.creado_iso) set.add(pry.creado_iso);
-    }
-    return set;
-});
-
-const diasDelMes = computed(() => {
-    const year = mesActual.value.getFullYear();
-    const month = mesActual.value.getMonth();
-    const primerDia = new Date(year, month, 1);
-    const inicioOffset = (primerDia.getDay() + 6) % 7;
-    const totalDias = new Date(year, month + 1, 0).getDate();
-
-    const celdas: { fecha: Date | null; iso: string | null }[] = [];
-    for (let i = 0; i < inicioOffset; i++) {
-        celdas.push({ fecha: null, iso: null });
-    }
-    for (let d = 1; d <= totalDias; d++) {
-        const fecha = new Date(year, month, d);
-        celdas.push({ fecha, iso: toIso(fecha) });
-    }
-    return celdas;
-});
-
-function cambiarMes(delta: number) {
-    mesActual.value = new Date(mesActual.value.getFullYear(), mesActual.value.getMonth() + delta, 1);
-}
-
-function seleccionarDia(iso: string | null) {
-    fechaSeleccionada.value = fechaSeleccionada.value === iso ? null : iso;
-}
-
-const proyectosFiltrados = computed(() => {
-    const lista = props.proyectos ?? [];
-    if (!fechaSeleccionada.value) return lista;
-    return lista.filter((l) => l.creado_iso === fechaSeleccionada.value);
-});
-
 const totales = computed(() => {
-    const lista = proyectosFiltrados.value;
-    const terminados = lista.filter((l) => estatusGrupo[l.estado] === 'aprobado').length;
-    const activos = lista.filter((l) => (estatusGrupo[l.estado] ?? 'pendiente') === 'pendiente').length;
+    const lista = props.proyectos ?? [];
+    const terminados = lista.filter((p) => estatusGrupo[p.estado] === 'aprobado').length;
+    const activos = lista.filter((p) => (estatusGrupo[p.estado] ?? 'pendiente') === 'pendiente').length;
     return { terminados, activos, total: lista.length };
 });
-
-const nombreMes = computed(() =>
-    mesActual.value.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }),
-);
-
-const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 </script>
 
 <template>
+
     <Head :title="`Planta: ${planta.nombre}`" />
 
-    <PageLayout
-        :title="planta.nombre"
-        :description="`Folio ${planta.folio}`"
-        endpoint="ingenierias.plantas"
-        with-edit
-        with-delete
-        @edit="editDialogOpen = true"
-        @delete="eliminarPlanta"
-    >
+    <PageLayout :title="planta.nombre" :description="`Folio ${planta.folio}`" endpoint="ingenierias.plantas" with-edit
+        with-delete @edit="editDialogOpen = true" @delete="eliminarPlanta">
         <!-- Dialog: editar planta -->
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form
-                    v-bind="PlantaController.update.form(planta.id)"
-                    :options="{ preserveScroll: true }"
-                    @success="editDialogOpen = false"
-                    v-slot="{ errors, processing }"
-                    class="space-y-4"
-                >
+                <Form v-bind="PlantaController.update.form(planta.id)" :options="{ preserveScroll: true }"
+                    @success="editDialogOpen = false" v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Editar planta</DialogTitle>
                         <DialogDescription>Actualiza los datos de esta planta.</DialogDescription>
@@ -224,39 +158,42 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
         </Dialog>
 
         <div class="space-y-6">
-            <!-- Header: planta + acción nuevo proyecto -->
+            <!-- Hero: identidad de la planta + entrada al módulo de proyectos -->
             <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-4 border-b bg-muted/30 px-6 py-5">
+                <div class="flex flex-col gap-6 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex items-center gap-4">
-                        <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Building2 class="size-6" />
+                        <div
+                            class="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <Building2 class="size-7" />
                         </div>
                         <div>
-                            <p class="text-lg font-semibold leading-tight">{{ planta.nombre }}</p>
-                            <p class="text-sm text-muted-foreground">
-                                {{ planta.folio }} · Creada: {{ planta.creada ?? '—' }}
+                            <p class="text-xl font-semibold leading-tight">{{ planta.nombre }}</p>
+                            <p class="text-sm text-muted-foreground">{{ planta.folio }}</p>
+                            <p v-if="planta.direccion" class="mt-0.5 text-sm text-muted-foreground">
+                                {{ planta.direccion }}
                             </p>
                         </div>
                     </div>
 
                     <Link :href="ProyectoController.create(planta.id)">
-                        <Button>
-                            <Plus class="size-4" />
+                        <Button size="lg">
+                            <FolderPlus class="size-4" />
                             Nuevo Proyecto
                         </Button>
                     </Link>
                 </div>
 
+                <!-- Totales: resumen simple, sin calendario -->
                 <Deferred data="proyectos">
                     <template #fallback>
-                        <div class="grid grid-cols-3 divide-x border-b py-6 text-center text-sm text-muted-foreground">
+                        <div class="grid grid-cols-3 divide-x border-t py-5 text-center text-sm text-muted-foreground">
                             <div>Cargando…</div>
                             <div>Cargando…</div>
                             <div>Cargando…</div>
                         </div>
                     </template>
 
-                    <div class="grid grid-cols-3 divide-x border-b">
+                    <div class="grid grid-cols-3 divide-x border-t">
                         <div class="flex flex-col items-center gap-1 py-4">
                             <span class="flex items-center gap-1 text-2xl font-bold text-emerald-600">
                                 <CircleCheck class="size-5" />
@@ -279,113 +216,60 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
                 </Deferred>
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-[320px_1fr]">
-                <!-- Calendario -->
-                <div class="h-fit rounded-2xl border bg-card p-4 shadow-sm">
-                    <div class="mb-3 flex items-center justify-between">
-                        <button type="button" class="rounded-md p-1 hover:bg-accent" @click="cambiarMes(-1)">
-                            <ChevronLeft class="size-4" />
-                        </button>
-                        <p class="text-sm font-medium capitalize">{{ nombreMes }}</p>
-                        <button type="button" class="rounded-md p-1 hover:bg-accent" @click="cambiarMes(1)">
-                            <ChevronRight class="size-4" />
-                        </button>
+            <!-- Proyectos: grid de tarjetas, pantalla de inicio del módulo -->
+            <Deferred data="proyectos">
+                <template #fallback>
+                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div v-for="n in 3" :key="n"
+                            class="h-32 animate-pulse rounded-2xl border bg-card/50 shadow-sm" />
                     </div>
+                </template>
 
-                    <div class="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-                        <span v-for="d in diasSemana" :key="d">{{ d }}</span>
-                    </div>
+                <div v-if="proyectos?.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <Link v-for="pry in proyectos" :key="pry.id" :href="ProyectoController.show([planta.id, pry.id])"
+                        class="group flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-sm transition-colors hover:bg-accent/50">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                                    <FolderOpen class="size-5" />
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="truncate font-semibold">{{ pry.folio }}</p>
+                                    <p class="truncate text-sm text-muted-foreground">{{ pry.nombre ?? '—' }}</p>
+                                </div>
+                            </div>
+                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
+                                :class="estatusBadgeClass(pry.estado)">
+                                {{ estatusLabel[pry.estado] ?? pry.estado }}
+                            </span>
+                        </div>
 
-                    <div class="mt-1 grid grid-cols-7 gap-1">
-                        <button
-                            v-for="(celda, idx) in diasDelMes"
-                            :key="idx"
-                            type="button"
-                            :disabled="!celda.fecha"
-                            class="relative flex aspect-square items-center justify-center rounded-md text-sm transition-colors disabled:cursor-default"
-                            :class="[
-                                !celda.fecha ? 'invisible' : 'hover:bg-accent',
-                                fechaSeleccionada === celda.iso ? 'bg-primary text-primary-foreground hover:bg-primary' : '',
-                            ]"
-                            @click="seleccionarDia(celda.iso)"
-                        >
-                            {{ celda.fecha?.getDate() }}
-                            <span
-                                v-if="celda.iso && diasConProyectos.has(celda.iso) && fechaSeleccionada !== celda.iso"
-                                class="absolute bottom-1 size-1 rounded-full bg-primary"
-                            />
-                        </button>
-                    </div>
-
-                    <button
-                        v-if="fechaSeleccionada"
-                        type="button"
-                        class="mt-3 w-full rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
-                        @click="fechaSeleccionada = null"
-                    >
-                        Ver todos los proyectos
-                    </button>
+                        <div class="flex items-center justify-between text-xs text-muted-foreground">
+                            <Badge :variant="tipoVariant(pry.tipo)" class="gap-1 text-[10px]">
+                                <Layers class="size-3" />
+                                {{ tipoLabel(pry.tipo) }}
+                            </Badge>
+                            <span>Creado: {{ pry.creado ?? '—' }}</span>
+                        </div>
+                    </Link>
                 </div>
 
-                <!-- Lista filtrada -->
-                <Deferred data="proyectos">
-                    <template #fallback>
-                        <div class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm">
-                            <FolderOpen class="size-8 text-muted-foreground" />
-                            <p class="text-sm font-medium text-muted-foreground">Cargando proyectos…</p>
-                        </div>
-                    </template>
-
-                    <div class="space-y-3">
-                        <Link
-                            v-for="pry in proyectosFiltrados"
-                            :key="pry.id"
-                            :href="ProyectoController.show([planta.id, pry.id])"
-                            class="flex items-start gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent/50"
-                        >
-                            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                                <FolderOpen class="size-5" />
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <p class="font-semibold">{{ pry.folio }}</p>
-                                    <span
-                                        class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase"
-                                        :class="estatusBadgeClass(pry.estado)"
-                                    >
-                                        {{ estatusLabel[pry.estado] ?? pry.estado }}
-                                    </span>
-                                </div>
-                                <p class="mt-1 truncate text-sm">{{ pry.nombre ?? '—' }}</p>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                    <span class="flex items-center gap-1">
-                                        <Badge :variant="tipoVariant(pry.tipo)" class="text-[10px]">
-                                            {{ tipoLabel(pry.tipo) }}
-                                        </Badge>
-                                    </span>
-                                </div>
-                                <p class="mt-1 text-xs text-muted-foreground">Creado: {{ pry.creado ?? '—' }}</p>
-                            </div>
-                        </Link>
-
-                        <div
-                            v-if="!proyectosFiltrados.length"
-                            class="flex flex-col items-center gap-3 rounded-2xl border bg-card py-12 text-center shadow-sm"
-                        >
-                            <FolderOpen class="size-8 text-muted-foreground" />
-                            <p class="text-sm font-medium">No hay proyectos para esta fecha</p>
-                            <button
-                                v-if="fechaSeleccionada"
-                                type="button"
-                                class="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                                @click="fechaSeleccionada = null"
-                            >
-                                Ver todos
-                            </button>
-                        </div>
-                    </div>
-                </Deferred>
-            </div>
+                <div v-else
+                    class="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card/50 py-16 text-center shadow-sm">
+                    <FolderOpen class="size-8 text-muted-foreground" />
+                    <p class="text-sm font-medium">Aún no hay proyectos en esta planta</p>
+                    <p class="max-w-sm text-sm text-muted-foreground">
+                        Crea el primer proyecto para empezar a trabajar sobre esta planta.
+                    </p>
+                    <Link :href="ProyectoController.create(planta.id)">
+                        <Button class="mt-2">
+                            <Plus class="mr-2 size-4" />
+                            Nuevo Proyecto
+                        </Button>
+                    </Link>
+                </div>
+            </Deferred>
         </div>
     </PageLayout>
 </template>

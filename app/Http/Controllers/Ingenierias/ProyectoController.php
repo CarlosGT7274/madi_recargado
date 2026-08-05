@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Ingenierias;
 
+use App\Actions\Ingenierias\Actividades\ActividadesAction;
+use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Levantamientos\LevantamientosAction;
 use App\Actions\Ingenierias\Proyectos\ProyectosAction;
 use App\Http\Controllers\Controller;
@@ -22,14 +24,25 @@ class ProyectoController extends Controller
         ]);
     }
 
-    public function show(Planta $planta, Proyecto $proyecto, ProyectosAction $action): Response
-    {
+    public function show(
+        Planta $planta,
+        Proyecto $proyecto,
+        ProyectosAction $action,
+        CotizacionesAction $cotizacionesAction,
+        ActividadesAction $actividadesAction,
+    ): Response {
         return Inertia::render('ingenierias/plantas/proyectos/Show', [
             'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
             'proyecto' => $action->detail($proyecto),
-            'levantamientos' => Inertia::defer(
-                fn () => app(LevantamientosAction::class)->list($proyecto)
-            ),
+            'levantamientos' => $proyecto->tipo === 'grande'
+                ? Inertia::defer(fn () => app(LevantamientosAction::class)->list($proyecto))
+                : null,
+            'obras' => $proyecto->tipo === 'chico'
+                ? Inertia::defer(fn () => $cotizacionesAction->listAgrupadoProyecto($proyecto))
+                : null,
+            'actividades' => $proyecto->tipo === 'chico'
+                ? Inertia::defer(fn () => $actividadesAction->arbol($proyecto))
+                : null,
         ]);
     }
 
