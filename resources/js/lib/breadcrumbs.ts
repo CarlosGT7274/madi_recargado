@@ -56,10 +56,21 @@ export function breadcrumbsLevantamientoNuevo(planta: PlantaRef, proyecto: Proye
     return [...breadcrumbsProyecto(planta, proyecto), { title: 'Nuevo Levantamiento', href: '' }];
 }
 
+/**
+ * "Cotizaciones" ya no tiene una pantalla propia con todas las obras: esa
+ * lista vive en el Show del Levantamiento. El breadcrumb regresa ahí.
+ */
 export function breadcrumbsCotizaciones(planta: PlantaRef, proyecto: ProyectoRef, levantamiento: LevantamientoRef): BreadcrumbItem[] {
+    return breadcrumbsLevantamiento(planta, proyecto, levantamiento);
+}
+
+export function breadcrumbsObra(planta: PlantaRef, proyecto: ProyectoRef, levantamiento: LevantamientoRef, obra: string): BreadcrumbItem[] {
     return [
         ...breadcrumbsLevantamiento(planta, proyecto, levantamiento),
-        { title: 'Cotizaciones', href: CotizacionController.index({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }) },
+        {
+            title: obra,
+            href: CotizacionController.obra({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, obra }),
+        },
     ];
 }
 
@@ -68,17 +79,14 @@ export function breadcrumbsCotizacion(
     proyecto: ProyectoRef,
     levantamiento: LevantamientoRef,
     cotizacion: CotizacionRef,
+    obra: string,
 ): BreadcrumbItem[] {
     return [
-        ...breadcrumbsCotizaciones(planta, proyecto, levantamiento),
+        ...breadcrumbsObra(planta, proyecto, levantamiento, obra),
         { title: cotizacion.folio, href: '' },
     ];
 }
 
-/**
- * Envuelve un builder de breadcrumbs en el objeto que Inertia espera
- * como `layout` export de una página.
- */
 export function pageLayout(build: () => BreadcrumbItem[]) {
     return {
         layout: () => ({ breadcrumbs: build() }),

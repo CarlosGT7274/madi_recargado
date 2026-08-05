@@ -1,8 +1,23 @@
+<script lang="ts">
+import { usePage } from '@inertiajs/vue3';
+import { breadcrumbsLevantamiento, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
+
+interface Props {
+    planta: PlantaRef;
+    proyecto: ProyectoRef;
+}
+
+export default pageLayout(() => {
+    const { planta, proyecto } = usePage<Props>().props;
+    return breadcrumbsLevantamiento(planta, proyecto, { id: usePage<{ levantamiento: { id: number; folio: string } }>().props.levantamiento.id, folio: usePage<{ levantamiento: { id: number; folio: string } }>().props.levantamiento.folio });
+});
+</script>
+
 <script setup lang="ts">
-import { Deferred, Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Deferred, Form, Head, Link, router, useForm } from '@inertiajs/vue3';
+import { ArrowLeft, FileSpreadsheet, Layers, Plus, ShieldCheck, ShoppingCart, Upload } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
-import { ArrowLeft, FileSpreadsheet, Layers, Plus, Download, ShieldCheck, Upload } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
@@ -27,19 +42,21 @@ interface PlantaResumen {
     nombre: string;
 }
 
-interface VersionCotizacion {
+interface UltimaVersion {
     id: number;
     folio: string;
     fecha: string | null;
     total: number | null;
-    estado: string;
+    completada: boolean;
+    tieneInsumos: boolean;
+    tieneOrdenAprobada: boolean;
 }
 
 interface ObraAgrupada {
     obra: string;
     totalVersiones: number;
-    aprobada: boolean;
-    ultimaVersion: VersionCotizacion;
+    completada: boolean;
+    ultimaVersion: UltimaVersion;
 }
 
 const props = defineProps<{
@@ -59,10 +76,6 @@ const rutaCotizaciones = computed(() => ({
     proyecto: props.proyecto.id,
     levantamiento: props.levantamiento.id,
 }));
-
-const urlPlantillaCotizacion = computed(
-    () => CotizacionController.plantilla(rutaCotizaciones.value).url,
-);
 
 function subirCotizacionExcel(): void {
     const archivo = archivoCotizacionInput.value?.files?.[0];
@@ -96,27 +109,6 @@ function eliminar(): void {
     );
 }
 
-const estadoCotizacionLabel: Record<string, string> = {
-    borrador: 'Borrador',
-    enviada: 'Enviada',
-    aprobada: 'Aprobada',
-    rechazada: 'Rechazada',
-};
-
-const estadoCotizacionGrupo: Record<string, 'aprobado' | 'pendiente' | 'negativo'> = {
-    borrador: 'pendiente',
-    enviada: 'pendiente',
-    aprobada: 'aprobado',
-    rechazada: 'negativo',
-};
-
-function estadoCotizacionBadgeClass(estado: string): string {
-    const grupo = estadoCotizacionGrupo[estado] ?? 'pendiente';
-    if (grupo === 'aprobado') return 'bg-emerald-500/10 text-emerald-600';
-    if (grupo === 'negativo') return 'bg-red-500/10 text-red-600';
-    return 'bg-amber-500/10 text-amber-600';
-}
-
 function formatoMoneda(valor: number | null): string {
     if (valor === null) return '—';
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
@@ -142,9 +134,7 @@ function formatoMoneda(valor: number | null): string {
                 <DialogHeader>
                     <DialogTitle>Nueva cotización</DialogTitle>
                     <DialogDescription>
-                        Sube la plantilla de cotización llena (descárgala primero con el botón "Descargar Plantilla").
-                        Si el nombre de obra coincide con una cotización existente, se guarda como una nueva versión
-                        de esa misma obra.
+                        Sube el Excel. Si el nombre de obra coincide con una existente, se agrega como nueva versión.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -175,25 +165,17 @@ function formatoMoneda(valor: number | null): string {
             <Button :disabled="form.processing" @click="guardar">Guardar cambios</Button>
         </div>
 
-        <!-- Cotizaciones agrupadas por obra: una card por obra, sin importar cuántas versiones tenga -->
+        <!-- Obras: única lista de agrupación de todo el flujo -->
         <div v-if="modo === 'view'" class="mt-6 rounded-2xl border bg-card p-5 shadow-sm">
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <FileSpreadsheet class="size-4" />
                     Cotizaciones
                 </div>
-                <div class="flex items-center gap-2">
-                    <a :href="urlPlantillaCotizacion">
-                        <Button variant="outline" size="sm">
-                            <Download class="mr-2 size-4" />
-                            Descargar Plantilla
-                        </Button>
-                    </a>
-                    <Button size="sm" @click="createCotizacionDialogOpen = true">
-                        <Plus class="mr-2 size-4" />
-                        Crear cotización
-                    </Button>
-                </div>
+                <Button size="sm" @click="createCotizacionDialogOpen = true">
+                    <Plus class="mr-2 size-4" />
+                    Subir cotización
+                </Button>
             </div>
 
             <Deferred data="obras">
@@ -207,30 +189,26 @@ function formatoMoneda(valor: number | null): string {
                         proyecto: proyecto.id,
                         levantamiento: levantamiento.id,
                         obra: grupo.obra,
-                    })"
-                        class="flex items-start gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50">
-                        <div class="flex size-9 shrink-0 items-center justify-center rounded-lg"
-                            :class="grupo.aprobada ? 'bg-emerald-500/10 text-emerald-600' : 'bg-primary/10 text-primary'">
-                            <ShieldCheck v-if="grupo.aprobada" class="size-4" />
-                            <Layers v-else class="size-4" />
+                    })" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
+                        :class="grupo.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'bg-card'">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="truncate font-semibold">{{ grupo.obra }}</p>
+                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase"
+                                :class="grupo.completada ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted text-muted-foreground'">
+                                {{ grupo.completada ? 'Completado' : 'En proceso' }}
+                            </span>
                         </div>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <p class="truncate font-semibold">{{ grupo.obra }}</p>
-                                <span v-if="grupo.totalVersiones > 1"
-                                    class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                    {{ grupo.totalVersiones }} versiones
-                                </span>
-                                <span class="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase"
-                                    :class="estadoCotizacionBadgeClass(grupo.ultimaVersion.estado)">
-                                    {{ estadoCotizacionLabel[grupo.ultimaVersion.estado] ?? grupo.ultimaVersion.estado
-                                    }}
-                                </span>
-                            </div>
-                            <p class="mt-1 truncate text-sm text-muted-foreground">
-                                Última versión: {{ grupo.ultimaVersion.folio }}
-                            </p>
-                            <p class="mt-1 text-sm font-medium">{{ formatoMoneda(grupo.ultimaVersion.total) }}</p>
+
+                        <div v-if="grupo.ultimaVersion.tieneOrdenAprobada"
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <ShoppingCart class="size-3.5" />
+                            Con orden de compra
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{{ formatoMoneda(grupo.ultimaVersion.total) }}</span>
+                            <span>{{ grupo.totalVersiones }} {{ grupo.totalVersiones === 1 ? 'versión' : 'versiones'
+                                }}</span>
                         </div>
                     </Link>
                 </div>

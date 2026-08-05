@@ -25,32 +25,17 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class CotizacionController extends Controller
 {
     /**
-     * Vista intermedia: cotizaciones agrupadas por obra. Aquí es donde el
-     * usuario ve "Ampliación de línea 3 — 4 versiones" en vez de una lista
-     * plana de folios sueltos.
+     * Única pantalla intermedia del flujo: versiones (Excel) de UNA obra.
+     * El listado de obras agrupadas vive en Levantamiento/Show.vue.
      */
-    public function index(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, CotizacionesAction $action): Response
+    public function obra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, string $obra, CotizacionesAction $action): Response
     {
-        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Index', [
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Obra', [
             'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
             'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
-            'levantamiento' => [
-                'id' => $levantamiento->id,
-                'folio' => $levantamiento->folio,
-                'nombre' => $levantamiento->nombre,
-                'cliente' => $levantamiento->cliente,
-                'estatus_admin' => $levantamiento->estatus_admin,
-                'creado' => $levantamiento->fecha_creacion?->format('d M Y'),
-            ],
-            'resumen' => $action->resumen($levantamiento),
-            'obras' => $action->listAgrupado($levantamiento),
+            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
+            'grupo' => $action->obra($levantamiento, $obra),
         ]);
-    }
-
-    /** Todas las versiones de una obra puntual (cuando el usuario abre un grupo). */
-    public function versiones(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, string $obra, CotizacionesAction $action)
-    {
-        return response()->json($action->versionesDeObra($levantamiento, $obra));
     }
 
     public function show(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action, PartidasAction $partidasAction): Response
@@ -71,8 +56,8 @@ class CotizacionController extends Controller
 
     /**
      * El Excel es la fuente de verdad de la Cotización: crea SIEMPRE una
-     * nueva versión (nunca actualiza una fila existente), aunque ya exista
-     * una cotización previa con la misma obra en este levantamiento.
+     * nueva versión, aunque ya exista una cotización previa con la misma
+     * obra en este levantamiento.
      */
     public function store(
         ImportCotizacionRequest $request,
@@ -141,15 +126,5 @@ class CotizacionController extends Controller
         $action->delete($partida);
 
         return back();
-    }
-
-    public function obra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, string $obra, CotizacionesAction $action): Response
-    {
-        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/Obra', [
-            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
-            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre, 'folio' => $proyecto->folio],
-            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
-            'grupo' => $action->obra($levantamiento, $obra),
-        ]);
     }
 }

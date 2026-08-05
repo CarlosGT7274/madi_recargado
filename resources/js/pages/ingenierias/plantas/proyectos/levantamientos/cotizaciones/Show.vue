@@ -7,12 +7,12 @@ interface Props {
     planta: PlantaRef;
     proyecto: ProyectoRef;
     levantamiento: LevantamientoRef;
-    cotizacion: CotizacionRef;
+    cotizacion: CotizacionRef & { obra?: string | number | null };
 }
 
 export default pageLayout(() => {
     const { planta, proyecto, levantamiento, cotizacion } = usePage<Props>().props;
-    return breadcrumbsCotizacion(planta, proyecto, levantamiento, cotizacion);
+    return breadcrumbsCotizacion(planta, proyecto, levantamiento, cotizacion, cotizacion.obra);
 });
 </script>
 
@@ -101,14 +101,7 @@ const props = defineProps<{
 const ocDialogOpen = ref(false);
 const archivoOcInput = ref<HTMLInputElement | null>(null);
 
-// La OC solo se puede tocar una vez que Insumos está completo — regla de negocio,
-// reforzada también en el backend (CompraOrdenAction::subirPdf).
 const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
-
-function abrirDialogoOc(): void {
-    if (!ocHabilitada.value) return;
-    ocDialogOpen.value = true;
-}
 
 function subirOrdenCompra(): void {
     const archivo = archivoOcInput.value?.files?.[0];
@@ -126,14 +119,9 @@ function subirOrdenCompra(): void {
     );
 }
 
-function eliminarOrdenCompraPdf(archivoId: number): void {
-    router.delete(ArchivoController.destroy(archivoId).url, { preserveScroll: true });
-}
-
 const estadoLabel: Record<string, string> = {
     borrador: 'Borrador',
     enviada: 'Enviada',
-    aprobada: 'Aprobada',
     rechazada: 'Rechazada',
 };
 
@@ -156,7 +144,6 @@ function formatoMoneda(valor: number | null | undefined): string {
             </Link>
         </template>
 
-        <!-- Header morado -->
         <div class="overflow-hidden rounded-2xl border shadow-sm">
             <div
                 class="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-6 text-white">
@@ -169,25 +156,14 @@ function formatoMoneda(valor: number | null | undefined): string {
                         <Download class="mr-2 size-4" />
                         Exportar
                     </Button>
-                    <span class="rounded-md bg-emerald-500 px-3 py-1 text-xs font-bold uppercase">
-                        {{ estadoLabel[cotizacion.estado] ?? cotizacion.estado }}
+                    <span class="rounded-md px-3 py-1 text-xs font-bold uppercase"
+                        :class="cotizacion.completada ? 'bg-emerald-500' : 'bg-amber-500'">
+                        {{ cotizacion.completada ? 'Completada' : (estadoLabel[cotizacion.estado] ?? cotizacion.estado)
+                        }}
                     </span>
                 </div>
             </div>
 
-            <!-- Banner aprobado sin OC -->
-            <div v-if="cotizacion.estado === 'aprobada' && !cotizacion.tiene_orden_compra"
-                class="flex items-start gap-3 bg-emerald-50 px-6 py-4 dark:bg-emerald-950/30">
-                <ShoppingCart class="mt-0.5 size-5 shrink-0 text-emerald-600" />
-                <div>
-                    <p class="font-semibold text-emerald-800 dark:text-emerald-300">Aprobado sin orden de compra</p>
-                    <p class="text-sm text-emerald-700 dark:text-emerald-400">Esta cotización fue aprobada por un
-                        administrador
-                        sin orden de compra.</p>
-                </div>
-            </div>
-
-            <!-- Stats -->
             <div class="grid grid-cols-2 gap-6 border-b bg-card px-6 py-5 sm:grid-cols-4">
                 <div class="flex items-start gap-3">
                     <div class="flex size-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
@@ -227,20 +203,17 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </div>
             </div>
 
-            <!-- Info cliente / proyecto -->
             <div class="grid gap-4 border-b bg-card px-6 py-5 sm:grid-cols-2">
                 <div class="rounded-lg bg-muted/40 p-4">
                     <p class="mb-3 text-xs font-semibold uppercase text-muted-foreground">Información del Cliente</p>
                     <dl class="space-y-2 text-sm">
                         <div class="flex items-center gap-2">
                             <Building2 class="size-4 text-muted-foreground" /><span class="font-medium">Cliente:</span>
-                            {{
-                                cotizacion.cliente ?? '—' }}
+                            {{ cotizacion.cliente ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <MapPin class="size-4 text-muted-foreground" /><span class="font-medium">Dirección:</span>
-                            {{
-                                cotizacion.direccion ?? '—' }}
+                            {{ cotizacion.direccion ?? '—' }}
                         </div>
                     </dl>
                 </div>
@@ -248,22 +221,21 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <p class="mb-3 text-xs font-semibold uppercase text-muted-foreground">Información del Proyecto</p>
                     <dl class="space-y-2 text-sm">
                         <div class="flex items-center gap-2">
-                            <FileText class="size-4 text-muted-foreground" /><span class="font-medium">Obra:</span> {{
-                                cotizacion.obra ?? '—' }}
+                            <FileText class="size-4 text-muted-foreground" /><span class="font-medium">Obra:</span>
+                            {{ cotizacion.obra ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
-                            <User class="size-4 text-muted-foreground" /><span class="font-medium">Vendedor:</span> {{
-                                cotizacion.vendedor ?? '—' }}
+                            <User class="size-4 text-muted-foreground" /><span class="font-medium">Vendedor:</span>
+                            {{ cotizacion.vendedor ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
-                            <Hash class="size-4 text-muted-foreground" /><span class="font-medium">Proveedor:</span> {{
-                                cotizacion.proveedor ?? '—' }}
+                            <Hash class="size-4 text-muted-foreground" /><span class="font-medium">Proveedor:</span>
+                            {{ cotizacion.proveedor ?? '—' }}
                         </div>
                     </dl>
                 </div>
             </div>
 
-            <!-- Info adicional -->
             <div class="bg-card px-6 py-5">
                 <p class="mb-3 text-xs font-semibold uppercase text-muted-foreground">Información Adicional</p>
                 <div class="grid gap-4 sm:grid-cols-3">
@@ -283,13 +255,11 @@ function formatoMoneda(valor: number | null | undefined): string {
             </div>
         </div>
 
-        <!-- Proceso de Cotización -->
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <p class="text-lg font-semibold">Proceso de Cotización</p>
             <p class="mb-5 text-sm text-muted-foreground">Completa las fases en orden para procesar la cotización</p>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <!-- Fase 1: Insumos -->
                 <Link :href="InsumoController.index({
                     planta: planta.id, proyecto: proyecto.id,
                     levantamiento: levantamiento.id, cotizacion: cotizacion.id,
@@ -305,12 +275,10 @@ function formatoMoneda(valor: number | null | undefined): string {
                         <CheckCircle2 v-if="cotizacion.tiene_insumos" class="ml-auto size-5 text-emerald-600" />
                     </div>
                     <p v-if="cotizacion.tiene_insumos" class="text-sm text-emerald-700 dark:text-emerald-400">Fase
-                        completada
-                    </p>
+                        completada</p>
                     <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / cargar insumos</p>
                 </Link>
 
-                <!-- Fase 2: Orden de Compra -->
                 <Link v-if="ocHabilitada" :href="CompraOrdenController.index({
                     planta: planta.id, proyecto: proyecto.id,
                     levantamiento: levantamiento.id, cotizacion: cotizacion.id,
@@ -325,8 +293,8 @@ function formatoMoneda(valor: number | null | undefined): string {
                         </div>
                         <CheckCircle2 v-if="cotizacion.tiene_orden_compra" class="ml-auto size-5 text-emerald-600" />
                     </div>
-                    <p v-if="cotizacion.tiene_orden_compra" class="text-sm text-emerald-700 dark:text-emerald-400">
-                        Fase completada
+                    <p v-if="cotizacion.tiene_orden_compra" class="text-sm text-emerald-700 dark:text-emerald-400">Fase
+                        completada
                     </p>
                     <p v-else class="text-sm text-muted-foreground">Pendiente — Ver / subir orden de compra</p>
                 </Link>
@@ -339,8 +307,8 @@ function formatoMoneda(valor: number | null | undefined): string {
                             <p class="text-xs text-muted-foreground">PDF de la orden emitida</p>
                         </div>
                     </div>
-                    <p class="text-sm text-muted-foreground">
-                        Primero completa la Explosión de Insumos para habilitar este paso.
+                    <p class="text-sm text-muted-foreground">Primero completa la Explosión de Insumos para habilitar
+                        este paso.
                     </p>
                 </div>
 
@@ -368,7 +336,6 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </Dialog>
             </div>
 
-            <!-- Estado global del flujo: derivado, sin ninguna columna "bloqueado" -->
             <div v-if="cotizacion.completada"
                 class="mt-5 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
                 <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-emerald-600" />
@@ -391,7 +358,6 @@ function formatoMoneda(valor: number | null | undefined): string {
             </div>
         </div>
 
-        <!-- Partidas -->
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <div class="mb-4 flex items-center gap-2">
                 <FileText class="size-5" />

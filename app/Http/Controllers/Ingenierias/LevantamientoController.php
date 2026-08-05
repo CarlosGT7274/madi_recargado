@@ -57,11 +57,8 @@ class LevantamientoController extends Controller
                 'folio' => $proyecto->folio,
             ],
             'levantamiento' => $action->detail($levantamiento),
-            'cotizaciones' => Inertia::defer(
-                fn () => $cotizacionesAction->list($levantamiento)
-            ),
             'obras' => Inertia::defer(
-                fn () => app(CotizacionesAction::class)->listAgrupado($levantamiento)
+                fn () => $cotizacionesAction->listAgrupado($levantamiento)
             ),
         ]);
     }
@@ -142,8 +139,6 @@ class LevantamientoController extends Controller
             'message' => "{$import->creados()} levantamientos creados.",
         ]);
 
-        // Si solo se creó uno, hay un destino único y obvio: su detalle.
-        // Si se crearon varios, no hay "un" destino, así que nos quedamos aquí.
         if ($import->creados() === 1) {
             $levantamiento = $import->creadosModelos()[0];
 

@@ -95,13 +95,15 @@ class Cotizacion extends Model
         return $this->ordenCompra?->archivos()->where('tipo_archivo', 'pdf')->exists() ?? false;
     }
 
+    /**
+     * ÚNICA fuente de verdad de "completada/aprobada" en todo el sistema.
+     * El campo `estado` (borrador/enviada/rechazada) ya NO participa en esto;
+     * solo describe el paso comercial previo a que exista Insumos + OC.
+     * Cualquier vista, Action o modelo que necesite saber si algo está
+     * aprobado debe llamar (directa o transitivamente) a este método.
+     */
     public function estaCompletada(): bool
     {
         return $this->tieneInsumos() && $this->tieneOrdenAprobada();
-    }
-
-    public function estaAprobada(): bool
-    {
-        return $this->estado === 'aprobada';
     }
 }

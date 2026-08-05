@@ -17,28 +17,15 @@ class CotizacionesAction
     ) {}
 
     /**
-     * Lista plana de cotizaciones de un levantamiento (sin agrupar por obra).
-     * Usada por el preview de Levantamiento::show, donde solo se muestran
-     * tarjetas sueltas y no hace falta la jerarquía de versiones.
-     */
-    public function list(Levantamiento $levantamiento): Collection
-    {
-        return $levantamiento->cotizaciones()
-            ->with('archivos')
-            ->latest('id')
-            ->get()
-            ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
-    }
-
-    /**
-     * Vista intermedia: agrupa las cotizaciones del levantamiento por
-     * nombre de obra. Cada grupo es "un mismo trabajo cotizado varias
-     * veces"; cada fila dentro del grupo es una versión (un Excel subido).
+     * Agrupa las cotizaciones del levantamiento por nombre de obra. Cada
+     * grupo es "un mismo trabajo cotizado varias veces"; cada fila dentro
+     * del grupo es una versión (un Excel subido). Única fuente de la lista
+     * de obras — la consume Levantamiento/Show.vue.
      */
     public function listAgrupado(Levantamiento $levantamiento): Collection
     {
         return $levantamiento->cotizaciones()
-            ->with('archivos')
+            ->with('archivos', 'ordenCompra.archivos', 'insumos')
             ->latest('id')
             ->get()
             ->groupBy(fn (Cotizacion $c) => $c->obra ?: 'Sin nombre de obra')
@@ -48,28 +35,31 @@ class CotizacionesAction
                 return [
                     'obra' => $obra,
                     'totalVersiones' => $versiones->count(),
-                    'aprobada' => $versiones->contains(fn (Cotizacion $c) => $c->estaAprobada()),
+                    'completada' => $versiones->contains(fn (Cotizacion $c) => $c->estaCompletada()),
                     'ultimaVersion' => $this->resumenVersion($ultima),
                 ];
             })
             ->values();
     }
 
-    /** Detalle de una obra puntual: todas sus versiones, planas, sin agrupar más. */
+    /**
+     * Única pantalla intermedia del flujo: todas las versiones de una obra
+     * puntual, planas, sin agrupar más.
+     */
     public function obra(Levantamiento $levantamiento, string $obra): array
     {
         $versiones = $levantamiento->cotizaciones()
-            ->with('archivos')
+            ->with('archivos', 'ordenCompra.archivos', 'insumos')
             ->where('obra', $obra)
             ->latest('id')
             ->get();
 
-        $aprobada = $versiones->first(fn (Cotizacion $c) => $c->estaAprobada());
+        $completada = $versiones->first(fn (Cotizacion $c) => $c->estaCompletada());
 
         return [
             'obra' => $obra,
-            'aprobada' => $aprobada !== null,
-            'montoAprobado' => $aprobada?->total,
+            'completada' => $completada !== null,
+            'montoCompletado' => $completada?->total,
             'totalVersiones' => $versiones->count(),
             'versiones' => $versiones->map(fn (Cotizacion $c) => $this->resumenVersion($c))->values(),
         ];
@@ -85,28 +75,16 @@ class CotizacionesAction
             'vendedor' => $c->vendedor,
             'total' => $c->total,
             'estado' => $c->estado,
+            'completada' => $c->estaCompletada(),
             'tienePartidas' => $c->tiene_partidas,
             'tieneInsumos' => $c->tieneInsumos(),
+            'tieneOrdenAprobada' => $c->tieneOrdenAprobada(),
             'archivoExcelUrl' => $c->archivos
                 ->where('tipo_archivo', 'excel')
                 ->sortByDesc('fecha_creacion')
                 ->first()
                 ?->urlPublica(),
         ];
-    }
-
-    /**
-     * Todas las versiones de una obra específica dentro de un levantamiento.
-     * Usado por la ruta `.../cotizaciones/{obra}` (versiones).
-     */
-    public function versionesDeObra(Levantamiento $levantamiento, string $obra): Collection
-    {
-        return $levantamiento->cotizaciones()
-            ->with('archivos')
-            ->where('obra', $obra)
-            ->latest('id')
-            ->get()
-            ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
     }
 
     public function detail(Cotizacion $cotizacion): array
@@ -148,6 +126,16 @@ class CotizacionesAction
         ];
     }
 
+    public function versionesDeObra(Levantamiento $levantamiento, string $obra): Collection
+    {
+        return $levantamiento->cotizaciones()
+            ->with('archivos', 'ordenCompra.archivos', 'insumos')
+            ->where('obra', $obra)
+            ->latest('id')
+            ->get()
+            ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
+    }
+
     /**
      * Crea SIEMPRE una nueva versión. El Excel es la fuente de verdad:
      * si ya existe una cotización con la misma obra en este levantamiento,
@@ -165,19 +153,7 @@ class CotizacionesAction
 
     public function update(Cotizacion $cotizacion, array $data): Cotizacion
     {
-        $aprobandoAhora = ($data['estado'] ?? null) === 'aprobada' && $cotizacion->estado !== 'aprobada';
-
-        if ($aprobandoAhora) {
-            $data['fecha_aprobacion'] = now()->toDateString();
-        }
-
         $cotizacion->update($data);
-
-        if ($aprobandoAhora) {
-            $cotizacion->levantamiento->update([
-                'fecha_cotizacion_enviada' => now()->toDateString(),
-            ]);
-        }
 
         if (array_key_exists('iva', $data)) {
             $this->partidasAction->recalcularTotales($cotizacion);
@@ -189,30 +165,5 @@ class CotizacionesAction
     public function delete(Cotizacion $cotizacion): void
     {
         $cotizacion->delete();
-    }
-
-    public function resumen(Levantamiento $levantamiento): array
-    {
-        $cotizaciones = $levantamiento->cotizaciones()->get();
-        $aprobadas = $cotizaciones->where('estado', 'aprobada');
-
-        $yaEnviada = $levantamiento->fecha_cotizacion_enviada !== null;
-        $programada = $levantamiento->fecha_envio_cotizacion_programada;
-
-        $tiempoRestanteHoras = null;
-
-        if (! $yaEnviada && $programada !== null) {
-            $horasAbs = (int) round(now()->diffInHours($programada));
-            $tiempoRestanteHoras = $programada->isFuture() ? $horasAbs : -$horasAbs;
-        }
-
-        return [
-            'totalCotizaciones' => $cotizaciones->count(),
-            'totalObras' => $cotizaciones->pluck('obra')->unique()->count(),
-            'totalAprobadas' => $aprobadas->count(),
-            'montoTotalAprobado' => (float) $aprobadas->sum('total'),
-            'tiempoRestanteHoras' => $tiempoRestanteHoras,
-            'yaEnviada' => $yaEnviada,
-        ];
     }
 }
