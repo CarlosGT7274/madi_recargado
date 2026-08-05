@@ -35,6 +35,7 @@ class InsumoController extends Controller
             'cotizacion' => [
                 'id' => $cotizacion->id,
                 'folio' => $cotizacion->folio,
+                'obra' => $cotizacion->obra,
                 'total' => (float) $cotizacion->total,
             ],
             'insumos' => $action->list($cotizacion),

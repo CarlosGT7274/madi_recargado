@@ -22,6 +22,7 @@ export interface LevantamientoRef {
 export interface CotizacionRef {
     id: number;
     folio: string;
+    obra: string | null;
 }
 
 export function breadcrumbsPlantas(): BreadcrumbItem[] {
@@ -79,10 +80,9 @@ export function breadcrumbsCotizacion(
     proyecto: ProyectoRef,
     levantamiento: LevantamientoRef,
     cotizacion: CotizacionRef,
-    obra: string,
 ): BreadcrumbItem[] {
     return [
-        ...breadcrumbsObra(planta, proyecto, levantamiento, obra),
+        ...breadcrumbsObra(planta, proyecto, levantamiento, cotizacion.obra ?? 'Sin nombre de obra'),
         { title: cotizacion.folio, href: '' },
     ];
 }

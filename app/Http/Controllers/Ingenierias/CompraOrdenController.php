@@ -30,6 +30,7 @@ class CompraOrdenController extends Controller
             'cotizacion' => [
                 'id' => $cotizacion->id,
                 'folio' => $cotizacion->folio,
+                'obra' => $cotizacion->obra,
                 'total' => (float) $cotizacion->total,
                 'tieneInsumos' => $cotizacion->tieneInsumos(),
             ],

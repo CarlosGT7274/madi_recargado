@@ -29,7 +29,7 @@ import { Button } from '@/components/ui/button';
 interface PlantaRef { id: number; nombre: string }
 interface ProyectoRef { id: number; nombre: string }
 interface LevantamientoRef { id: number; folio: string }
-interface CotizacionRef { id: number; folio: string; total: number }
+interface CotizacionRef { id: number; folio: string; obra: string | null; total: number }
 
 type Categoria = 'materiales' | 'mano_obra' | 'maquinaria';
 

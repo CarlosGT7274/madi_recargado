@@ -34,6 +34,7 @@ interface LevantamientoRef { id: number; folio: string }
 interface CotizacionInfo {
     id: number;
     folio: string;
+    obra: string | null;
     total: number;
     tieneInsumos: boolean;
 }
