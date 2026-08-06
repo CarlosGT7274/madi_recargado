@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from '@lucide/vue';
+import { ChevronDown, ChevronRight, FileSpreadsheet, Pencil, Plus, Trash2 } from '@lucide/vue';
 import { reactive, ref } from 'vue';
 import ActividadController from '@/actions/App/Http/Controllers/Ingenierias/ActividadController';
 import { Button } from '@/components/ui/button';
@@ -17,11 +17,14 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
+export type ActividadOrigen = 'manual' | 'cotizacion';
+
 export interface ActividadNodo {
     id: number;
     codigo: string | null;
     nombre: string;
     notas: string | null;
+    origen: ActividadOrigen;
     hijas: ActividadNodo[];
 }
 
@@ -43,6 +46,10 @@ const parentId = ref<number | null>(null);
 
 const form = reactive({ codigo: '', nombre: '', notas: '' });
 
+function esManual(nodo: ActividadNodo): boolean {
+    return nodo.origen === 'manual';
+}
+
 function abrirNueva(parent: number | null = null): void {
     editando.value = null;
     parentId.value = parent;
@@ -53,6 +60,8 @@ function abrirNueva(parent: number | null = null): void {
 }
 
 function abrirEditar(nodo: ActividadNodo): void {
+    if (!esManual(nodo)) return;
+
     editando.value = nodo;
     parentId.value = null;
     form.codigo = nodo.codigo ?? '';
@@ -84,6 +93,7 @@ function guardar(): void {
 }
 
 function eliminar(nodo: ActividadNodo): void {
+    if (!esManual(nodo)) return;
     if (!confirm(`¿Eliminar "${nodo.nombre}" y sus sub-actividades?`)) return;
 
     router.delete(
@@ -104,23 +114,31 @@ function eliminar(nodo: ActividadNodo): void {
                 <span v-else class="inline-block w-4" />
 
                 <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium">
+                    <p class="flex items-center gap-1.5 truncate text-sm font-medium">
                         <span v-if="nodo.codigo" class="text-muted-foreground">{{ nodo.codigo }} · </span>
                         {{ nodo.nombre }}
+                        <span v-if="!esManual(nodo)"
+                            class="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-600"
+                            title="Proviene de una cotización aprobada">
+                            <FileSpreadsheet class="size-3" />
+                            Cotización
+                        </span>
                     </p>
                     <p v-if="nodo.notas" class="truncate text-xs text-muted-foreground">{{ nodo.notas }}</p>
                 </div>
 
-                <Button variant="ghost" size="icon-sm" title="Agregar sub-actividad" @click="abrirNueva(nodo.id)">
-                    <Plus class="size-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon-sm" title="Editar" @click="abrirEditar(nodo)">
-                    <Pencil class="size-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon-sm" title="Eliminar" class="text-destructive"
-                    @click="eliminar(nodo)">
-                    <Trash2 class="size-3.5" />
-                </Button>
+                <template v-if="esManual(nodo)">
+                    <Button variant="ghost" size="icon-sm" title="Agregar sub-actividad" @click="abrirNueva(nodo.id)">
+                        <Plus class="size-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" title="Editar" @click="abrirEditar(nodo)">
+                        <Pencil class="size-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" title="Eliminar" class="text-destructive"
+                        @click="eliminar(nodo)">
+                        <Trash2 class="size-3.5" />
+                    </Button>
+                </template>
             </div>
 
             <div v-if="abiertos[nodo.id] && nodo.hijas.length" class="space-y-2 border-t bg-muted/20 p-2 pl-6">

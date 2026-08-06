@@ -48,6 +48,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ChevronDown } from '@lucide/vue';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import CotizacionManualForm from './components/CotizacionManualForm.vue';
 
 type PlantaRef = { id: number; nombre: string };
 
@@ -222,6 +225,8 @@ const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 // --- Proyecto directo: subir cotización ---
 const archivoCotizacionInput = ref<HTMLInputElement | null>(null);
 
+const captureManualOpen = ref(false);
+
 function subirCotizacionExcel(): void {
     const archivo = archivoCotizacionInput.value?.files?.[0];
     if (!archivo) return;
@@ -298,7 +303,7 @@ function formatoMoneda(valor: number | null): string {
                             <p class="text-lg font-semibold leading-tight">{{ proyecto.nombre }}</p>
                             <p class="text-sm text-muted-foreground">
                                 {{ proyecto.folio }} · {{ tipoLabel(proyecto.tipo) }} · Creado: {{ proyecto.creado ??
-                                '—' }}
+                                    '—' }}
                             </p>
                         </div>
                     </div>
@@ -311,14 +316,28 @@ function formatoMoneda(valor: number | null): string {
                         </Button>
                     </Link>
 
-                    <label v-else>
-                        <Button as="span" class="cursor-pointer">
-                            <Upload class="size-4" />
-                            Subir cotización
-                        </Button>
-                        <input ref="archivoCotizacionInput" type="file" accept=".xlsx,.xls" class="hidden"
-                            @change="subirCotizacionExcel" />
-                    </label>
+                    <div v-else class="flex flex-col items-end gap-2">
+                        <div class="flex items-center gap-2">
+                            <label>
+                                <Button as="span" class="cursor-pointer">
+                                    <Upload class="size-4" />
+                                    Subir cotización
+                                </Button>
+                                <input ref="archivoCotizacionInput" type="file" accept=".xlsx,.xls" class="hidden"
+                                    @change="subirCotizacionExcel" />
+                            </label>
+
+                            <Collapsible v-model:open="captureManualOpen">
+                                <CollapsibleTrigger as-child>
+                                    <Button variant="outline">
+                                        <ChevronDown class="size-4 transition-transform"
+                                            :class="captureManualOpen ? 'rotate-180' : ''" />
+                                        Crear manual
+                                    </Button>
+                                </CollapsibleTrigger>
+                            </Collapsible>
+                        </div>
+                    </div>
                 </div>
 
                 <Deferred data="levantamientos" v-if="proyecto.tipo === 'grande'">
@@ -352,7 +371,14 @@ function formatoMoneda(valor: number | null): string {
                     </div>
                 </Deferred>
             </div>
-
+            <Collapsible v-if="proyecto.tipo === 'chico'" v-model:open="captureManualOpen">
+                <CollapsibleContent>
+                    <div class="border-t px-6 py-5">
+                        <CotizacionManualForm :planta="planta" :proyecto="proyecto"
+                            @success="captureManualOpen = false" />
+                    </div>
+                </CollapsibleContent>
+            </Collapsible>
             <!-- Proyecto estándar: calendario + lista de levantamientos -->
             <div v-if="proyecto.tipo === 'grande'" class="grid gap-6 lg:grid-cols-[320px_1fr]">
                 <div class="h-fit rounded-2xl border bg-card p-4 shadow-sm">

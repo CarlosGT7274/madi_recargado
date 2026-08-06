@@ -205,6 +205,47 @@ class CotizacionesAction
         ]);
     }
 
+    /**
+     * Captura manual (sin Excel) para el flujo de Proyecto directo. La
+     * estructura es la misma que Partidas: categorías (raíz) con
+     * numeración 1,2,3... y sub-partidas (hijas) 1.1, 1.2... Cada
+     * categoría se crea como Partida raíz sin cantidad/precio (es solo
+     * agrupador); cada hija sí pasa por PartidasAction::create() para que
+     * el importe y los totales de la cotización se recalculen igual que
+     * en el flujo de Excel.
+     *
+     * @param  array<string, mixed>  $data  incluye 'categorias', validado
+     *                                      por StoreCotizacionManualRequest
+     */
+    public function createManualParaProyecto(Proyecto $proyecto, array $data): Cotizacion
+    {
+        $categorias = $data['categorias'];
+        unset($data['categorias']);
+
+        $cotizacion = $this->createParaProyecto($proyecto, $data);
+
+        foreach ($categorias as $indiceCategoria => $categoria) {
+            $padre = $cotizacion->partidas()->create([
+                'partida_id' => null,
+                'numero_partida' => $indiceCategoria + 1,
+                'descripcion' => $categoria['descripcion'],
+                'cantidad' => 0,
+                'precio_unitario' => 0,
+                'importe' => 0,
+            ]);
+
+            foreach ($categoria['partidas'] as $indiceHija => $hija) {
+                $this->partidasAction->create($cotizacion, [
+                    ...$hija,
+                    'partida_id' => $padre->id,
+                    'numero_partida' => $indiceHija + 1,
+                ]);
+            }
+        }
+
+        return $cotizacion->fresh();
+    }
+
     public function update(Cotizacion $cotizacion, array $data): Cotizacion
     {
         $cotizacion->update($data);

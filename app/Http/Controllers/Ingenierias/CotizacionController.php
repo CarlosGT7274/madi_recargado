@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Cotizaciones\ImportCotizacionRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\StorePartidaRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\UpdatePartidaRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\StoreCotizacionManualRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\UpdateCotizacionRequest;
 use App\Imports\Cotizaciones\CotizacionExcelImport;
 use App\Models\Cotizacion;
@@ -150,6 +151,26 @@ class CotizacionController extends Controller
             'type' => empty($import->errores()) ? 'success' : 'warning',
             'message' => "Cotización creada con {$import->partidasCreadas()} partidas.",
         ]);
+
+        return redirect()->route('ingenierias.plantas.proyectos.cotizaciones.show', [
+            $planta->id, $proyecto->id, $cotizacion->id,
+        ]);
+    }
+
+    /**
+     * Captura manual (sin Excel) de una cotización para Proyecto directo.
+     * Coexiste con storeProyecto() (Excel): ambas vías crean una versión
+     * nueva bajo la misma obra, ninguna reemplaza a la otra.
+     */
+    public function storeManualProyecto(
+        StoreCotizacionManualRequest $request,
+        Planta $planta,
+        Proyecto $proyecto,
+        CotizacionesAction $action,
+    ): RedirectResponse {
+        $cotizacion = $action->createManualParaProyecto($proyecto, $request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización creada.']);
 
         return redirect()->route('ingenierias.plantas.proyectos.cotizaciones.show', [
             $planta->id, $proyecto->id, $cotizacion->id,

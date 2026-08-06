@@ -134,6 +134,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('show');
             Route::post('/', [CotizacionController::class, 'storeProyecto'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
+            Route::post('/manual', [CotizacionController::class, 'storeManualProyecto'])
+                ->middleware('permiso:'.Accion::CREATE)->name('store-manual');
             Route::put('/{cotizacion}', [CotizacionController::class, 'updateProyecto'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('update');
             Route::delete('/{cotizacion}', [CotizacionController::class, 'destroyProyecto'])
