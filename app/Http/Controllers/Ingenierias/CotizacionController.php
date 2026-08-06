@@ -106,7 +106,8 @@ class CotizacionController extends Controller
         return back();
     }
 
-    public function plantilla(): BinaryFileResponse
+    /** Plantilla de partidas — flujo con Levantamiento. */
+    public function plantilla(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento): BinaryFileResponse
     {
         return Excel::download(new PartidaPlantillaExport, 'plantilla-partidas.xlsx');
     }
@@ -193,6 +194,12 @@ class CotizacionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización eliminada.']);
 
         return back();
+    }
+
+    /** Plantilla de partidas — flujo Proyecto directo (sin Levantamiento). */
+    public function plantillaProyecto(Planta $planta, Proyecto $proyecto): BinaryFileResponse
+    {
+        return Excel::download(new PartidaPlantillaExport, 'plantilla-partidas.xlsx');
     }
 
     // ---- Partidas: sub-acciones de Cotización, no un módulo aparte ----

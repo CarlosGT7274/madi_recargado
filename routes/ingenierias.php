@@ -125,7 +125,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/cotizaciones')
         ->scopeBindings()
         ->group(function () {
-            Route::get('/plantilla', [CotizacionController::class, 'plantilla'])
+            Route::get('/plantilla', [CotizacionController::class, 'plantillaProyecto'])
                 ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
             Route::get('/obra/{obra}', [CotizacionController::class, 'obraProyecto'])
                 ->middleware('permiso:'.Accion::READ)->name('obra')
