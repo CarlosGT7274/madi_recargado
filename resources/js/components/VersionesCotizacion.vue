@@ -100,7 +100,7 @@ function detalleTexto(version: VersionCotizacion): string {
                 <label v-if="puedeCrear">
                     <Button size="sm" as="span" class="cursor-pointer">
                         <Upload class="mr-2 size-4" />
-                        Nueva versión
+                        Subir Cotizacion
                     </Button>
                     <input ref="nuevaVersionInput" type="file" accept=".xlsx,.xls" class="hidden"
                         @change="onNuevaVersionChange" />
@@ -137,7 +137,7 @@ function detalleTexto(version: VersionCotizacion): string {
                     <label v-if="permitirSubirExcelPorVersion && puedeCrear" class="cursor-pointer">
                         <Button variant="outline" size="sm" as="span">
                             <Upload class="mr-1.5 size-3.5" />
-                            Subir Excel
+                            Guardar cotización de cliente
                         </Button>
                         <input type="file" accept=".xlsx,.xls" class="hidden"
                             @change="(e) => onSubirExcelVersion(version.id, e)" />

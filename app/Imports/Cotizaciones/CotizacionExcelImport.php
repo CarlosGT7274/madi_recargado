@@ -6,7 +6,6 @@ use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
-use App\Models\Proyecto;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -21,29 +20,24 @@ class CotizacionExcelImport implements ToCollection
     private int $partidasCreadas = 0;
 
     public function __construct(
-        private readonly Levantamiento|Proyecto $padre,
+        private readonly Levantamiento $levantamiento,
         private readonly CotizacionesAction $cotizacionesAction,
         private readonly PartidasAction $partidasAction,
     ) {}
 
     public function collection(Collection $filas): void
     {
-        $header = $this->leerEncabezado($filas);
+        $inicioTabla = $this->localizarEncabezadoTabla($filas);
+        $header = $this->leerEncabezado($filas, $inicioTabla);
 
-        $datos = [
+        $this->cotizacion = $this->cotizacionesAction->create($this->levantamiento, [
             'fecha' => now()->toDateString(),
             'cliente' => $header['cliente'] ?: null,
             'direccion' => $header['direccion'] ?: null,
             'proveedor' => $header['proveedor'] ?: null,
             'vendedor' => $header['vendedor'] ?: null,
             'obra' => $header['obra'] ?: null,
-        ];
-
-        $this->cotizacion = $this->padre instanceof Levantamiento
-            ? $this->cotizacionesAction->create($this->padre, $datos)
-            : $this->cotizacionesAction->createParaProyecto($this->padre, $datos);
-
-        $inicioTabla = $this->localizarEncabezadoTabla($filas);
+        ]);
 
         if ($inicioTabla === null) {
             $this->errores[0] = ['No se encontró la tabla de partidas ("No.") en el archivo. Se creó la cotización sin partidas.'];
@@ -114,15 +108,30 @@ class CotizacionExcelImport implements ToCollection
     }
 
     /**
+     * Recorre el archivo desde la fila 0 hasta la fila de la tabla ("No."),
+     * sin límite fijo de filas. Así no importa cuántas filas de
+     * instrucciones traiga la plantilla por delante — antes esto usaba
+     * take(10)/take(20), un número fijo que se rompía en cuanto la
+     * plantilla cambiaba de tamaño.
+     *
      * @return array<string, string|null>
      */
-    private function leerEncabezado(Collection $filas): array
+    private function leerEncabezado(Collection $filas, ?int $inicioTabla): array
     {
         $mapa = ['cliente' => null, 'direccion' => null, 'proveedor' => null, 'vendedor' => null, 'obra' => null];
 
-        foreach ($filas->take(10) as $fila) {
-            $etiqueta = strtolower(trim((string) ($fila[0] ?? '')));
+        // Si no encontramos la tabla, revisamos igual todo el archivo por
+        // seguridad (mejor leer de más que quedarnos sin nada).
+        $limite = $inicioTabla ?? $filas->count();
+
+        for ($i = 0; $i < $limite; $i++) {
+            $fila = $filas[$i];
+            $etiqueta = mb_strtolower(trim((string) ($fila[0] ?? '')));
             $valor = trim((string) ($fila[1] ?? ''));
+
+            if ($etiqueta === '' || $valor === '') {
+                continue;
+            }
 
             match (true) {
                 str_starts_with($etiqueta, 'cliente') => $mapa['cliente'] = $valor,
