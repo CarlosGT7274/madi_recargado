@@ -76,6 +76,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->where('obra', '.*');
             Route::get('/{cotizacion}', [CotizacionController::class, 'show'])
                 ->middleware('permiso:'.Accion::READ)->name('show');
+            Route::get('/{cotizacion}/pdf', [CotizacionController::class, 'pdf'])
+                ->middleware('permiso:'.Accion::READ)->name('pdf');
             Route::post('/', [CotizacionController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
             Route::put('/{cotizacion}', [CotizacionController::class, 'update'])
@@ -96,6 +98,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->group(function () {
             Route::get('/', [InsumoController::class, 'index'])
                 ->middleware('permiso:'.Accion::READ)->name('index');
+            Route::get('/pdf', [InsumoController::class, 'pdf'])
+                ->middleware('permiso:'.Accion::READ)->name('pdf');
             Route::get('/plantilla', [InsumoController::class, 'plantilla'])
                 ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
             Route::post('/importar', [InsumoController::class, 'importar'])
@@ -132,6 +136,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->where('obra', '.*');
             Route::get('/{cotizacion}', [CotizacionController::class, 'showProyecto'])
                 ->middleware('permiso:'.Accion::READ)->name('show');
+            Route::get('/{cotizacion}/pdf', [CotizacionController::class, 'pdfProyecto'])
+                ->middleware('permiso:'.Accion::READ)->name('pdf');
             Route::post('/', [CotizacionController::class, 'storeProyecto'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
             Route::post('/manual', [CotizacionController::class, 'storeManualProyecto'])

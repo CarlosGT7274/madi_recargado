@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Ingenierias;
 
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
+use App\Actions\Ingenierias\Cotizaciones\CotizacionPdfAction;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Exports\Cotizaciones\PartidaPlantillaExport;
 use App\Http\Controllers\Controller;
@@ -20,6 +21,7 @@ use App\Models\Proyecto;
 use App\Support\Accion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -131,19 +133,32 @@ class CotizacionController extends Controller
         return back();
     }
 
+    /**
+     * Redirige al Levantamiento (padre) en vez de back(): back() apunta al
+     * Referer, que es el propio Show de la cotización que se acaba de
+     * borrar — visitarlo de nuevo da 404. Mismo fix que
+     * LevantamientoController::destroy().
+     */
     public function destroy(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
     {
         $action->delete($cotizacion);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización eliminada.']);
 
-        return back();
+        return redirect()->route('ingenierias.plantas.proyectos.levantamientos.show', [
+            $planta->id, $proyecto->id, $levantamiento->id,
+        ]);
     }
 
     /** Plantilla de partidas — flujo con Levantamiento. */
     public function plantilla(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento): BinaryFileResponse
     {
         return Excel::download(new PartidaPlantillaExport, 'plantilla-partidas.xlsx');
+    }
+
+    public function pdf(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionPdfAction $action): HttpResponse
+    {
+        return $action->generar($cotizacion)->stream("cotizacion-{$cotizacion->folio}.pdf");
     }
 
     // ---- Flujo de Proyecto directo: cotizaciones colgando del proyecto ----
@@ -221,19 +236,25 @@ class CotizacionController extends Controller
         return back();
     }
 
+    /** Mismo fix que destroy(): redirige al Proyecto (padre), no a back(). */
     public function destroyProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
     {
         $action->delete($cotizacion);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización eliminada.']);
 
-        return back();
+        return redirect()->route('ingenierias.plantas.proyectos.show', [$planta->id, $proyecto->id]);
     }
 
     /** Plantilla de partidas — flujo Proyecto directo (sin Levantamiento). */
     public function plantillaProyecto(Planta $planta, Proyecto $proyecto): BinaryFileResponse
     {
         return Excel::download(new PartidaPlantillaExport, 'plantilla-partidas.xlsx');
+    }
+
+    public function pdfProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionPdfAction $action): HttpResponse
+    {
+        return $action->generar($cotizacion)->stream("cotizacion-{$cotizacion->folio}.pdf");
     }
 
     // ---- Partidas: sub-acciones de Cotización, no un módulo aparte ----

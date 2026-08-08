@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Levantamiento {{ $levantamiento->folio }}</title>
+    <title>Cotización {{ $cotizacion->folio }}</title>
     <style>
         @page {
             margin: 130px 40px 70px 40px;
@@ -146,19 +146,19 @@
         }
 
         table.datos td.label {
-            width: 32%;
+            width: 28%;
             background: #f3f4f6;
             font-weight: bold;
             color: #374151;
         }
 
-        table.riesgos {
+        table.partidas {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 10px;
         }
 
-        table.riesgos th {
+        table.partidas th {
             background: #f3f4f6;
             border: 1px solid #d1d5db;
             padding: 5px 8px;
@@ -166,34 +166,47 @@
             font-size: 10px;
         }
 
-        table.riesgos td {
+        table.partidas td {
             border: 1px solid #d1d5db;
             padding: 5px 8px;
         }
 
-        .badge {
-            display: inline-block;
-            padding: 1px 6px;
-            border-radius: 8px;
-            font-size: 9px;
+        tr.seccion-partida td {
+            background: #f9fafb;
             font-weight: bold;
         }
 
-        .badge-si {
-            background: #d1fae5;
-            color: #065f46;
+        td.num {
+            text-align: right;
         }
 
-        .badge-no {
-            background: #f3f4f6;
-            color: #6b7280;
+        table.totales {
+            width: 60%;
+            margin-left: 40%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
         }
 
-        .notas-box {
+        table.totales td {
             border: 1px solid #d1d5db;
-            padding: 8px;
-            min-height: 24px;
-            white-space: pre-wrap;
+            padding: 6px 8px;
+        }
+
+        table.totales td.label {
+            background: #f3f4f6;
+            font-weight: bold;
+            color: #374151;
+        }
+
+        table.totales td.valor {
+            text-align: right;
+            font-weight: bold;
+        }
+
+        table.totales tr.total td {
+            background: #a40c32;
+            color: #ffffff;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -209,8 +222,8 @@
             </td>
             <td class="header-center">
                 <p class="titulo-empresa">MADI</p>
-                <p class="titulo-doc">Levantamiento de Requerimientos</p>
-                <p class="folio-doc">Folio: {{ $levantamiento->folio }}</p>
+                <p class="titulo-doc">Cotización</p>
+                <p class="folio-doc">Folio: {{ $cotizacion->folio }}</p>
             </td>
             <td class="header-logo-right">
                 @if($logoDerecho)
@@ -226,7 +239,7 @@
     <div class="footer-rule"></div>
     <table class="footer-table">
         <tr>
-            <td class="footer-left">Folio: {{ $levantamiento->folio }}</td>
+            <td class="footer-left">Folio: {{ $cotizacion->folio }}</td>
             <td class="footer-center">MADI</td>
             <td class="footer-right"></td>
         </tr>
@@ -234,84 +247,75 @@
 </footer>
 
 <main>
-    <h2 class="seccion">Identificación</h2>
+    <h2 class="seccion">Información General</h2>
     <table class="datos">
         <tr>
             <td class="label">Folio</td>
-            <td>{{ $levantamiento->folio }}</td>
-            <td class="label">Prioridad</td>
-            <td>{{ $prioridadLabel[$levantamiento->prioridad] ?? $levantamiento->prioridad }}</td>
+            <td>{{ $cotizacion->folio }}</td>
+            <td class="label">Fecha</td>
+            <td>{{ optional($cotizacion->fecha)->format('d/m/Y') ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Cliente</td>
+            <td>{{ $cotizacion->cliente ?? '—' }}</td>
+            <td class="label">Dirección</td>
+            <td>{{ $cotizacion->direccion ?? '—' }}</td>
         </tr>
         <tr>
             <td class="label">Obra</td>
-            <td colspan="3">{{ $levantamiento->obra ?? '—' }}</td>
+            <td>{{ $cotizacion->obra ?? '—' }}</td>
+            <td class="label">Vendedor</td>
+            <td>{{ $cotizacion->vendedor ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Proveedor</td>
+            <td colspan="3">{{ $cotizacion->proveedor ?? '—' }}</td>
         </tr>
     </table>
 
-    <h2 class="seccion">Datos Generales</h2>
-    <table class="datos">
-        <tr>
-            <td class="label">Solicitante</td>
-            <td>{{ $levantamiento->solicitante ?? '—' }}</td>
-            <td class="label">Fecha de Solicitud</td>
-            <td>{{ optional($levantamiento->fecha_solicitud)->format('d/m/Y') ?? '—' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Usuario Requiriente</td>
-            <td>{{ $levantamiento->usuario_requiriente ?? '—' }}</td>
-            <td class="label">Correo</td>
-            <td>{{ $levantamiento->correo_usuario ?? '—' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Área de Trabajo</td>
-            <td>{{ $levantamiento->area_trabajo ?? '—' }}</td>
-            <td class="label">Medio de Solicitud</td>
-            <td>{{ $medioSolicitudLabel[$levantamiento->medio_solicitud] ?? ($levantamiento->medio_solicitud ?? '—') }}</td>
-        </tr>
-        <tr>
-            <td class="label">Fecha Lev. Programada</td>
-            <td>{{ optional($levantamiento->fecha_levantamiento_programada)->format('d/m/Y') ?? '—' }}</td>
-            <td class="label">Fecha Envío Cotización Prog.</td>
-            <td>{{ optional($levantamiento->fecha_envio_cotizacion_programada)->format('d/m/Y') ?? '—' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Título de Cotización</td>
-            <td colspan="3">{{ $levantamiento->titulo_cotizacion ?? '—' }}</td>
-        </tr>
-    </table>
+    <h2 class="seccion">Partidas</h2>
 
-    <h2 class="seccion">Trabajos Especiales</h2>
-    <table class="riesgos">
-        <tr>
-            <th>Actividad</th>
-            <th>¿Aplica?</th>
-            <th>¿Personal Certificado?</th>
-            <th>Notas</th>
-        </tr>
-        @foreach ($riesgos as $riesgo)
-            <tr>
-                <td>{{ $riesgo['titulo'] }}</td>
-                <td>
-                    <span class="badge {{ $riesgo['aplica'] ? 'badge-si' : 'badge-no' }}">
-                        {{ $riesgo['aplica'] ? 'SÍ' : 'NO' }}
-                    </span>
-                </td>
-                <td>
-                    <span class="badge {{ $riesgo['certificado'] ? 'badge-si' : 'badge-no' }}">
-                        {{ $riesgo['certificado'] ? 'SÍ' : 'NO' }}
-                    </span>
-                </td>
-                <td>{{ $riesgo['notas'] ?: '—' }}</td>
+    @forelse ($partidas as $raiz)
+        <table class="partidas">
+            <tr class="seccion-partida">
+                <td colspan="5">{{ $raiz['no'] }} · {{ $raiz['descripcion'] }}</td>
             </tr>
-        @endforeach
+            <tr>
+                <th style="width:50px;">No.</th>
+                <th>Concepto</th>
+                <th style="width:60px;">Unidad</th>
+                <th style="width:70px;">Cantidad</th>
+                <th style="width:90px;">P. Unitario</th>
+            </tr>
+            @foreach ($raiz['hijas'] as $hija)
+                <tr>
+                    <td>{{ $hija['no'] }}</td>
+                    <td>{{ $hija['descripcion'] }}</td>
+                    <td>{{ $hija['unidad'] ?? '—' }}</td>
+                    <td class="num">{{ number_format($hija['cantidad'], 2) }}</td>
+                    <td class="num">${{ number_format($hija['precioUnitario'], 2) }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @empty
+        <p>Aún no hay partidas registradas.</p>
+    @endforelse
+
+    <h2 class="seccion">Totales</h2>
+    <table class="totales">
+        <tr>
+            <td class="label">Subtotal</td>
+            <td class="valor">${{ number_format((float) $cotizacion->subtotal, 2) }}</td>
+        </tr>
+        <tr>
+            <td class="label">IVA</td>
+            <td class="valor">${{ number_format((float) $cotizacion->iva, 2) }}</td>
+        </tr>
+        <tr class="total">
+            <td class="label" style="color:#ffffff; background:transparent;">Total</td>
+            <td class="valor">${{ number_format((float) $cotizacion->total, 2) }}</td>
+        </tr>
     </table>
-
-    <h2 class="seccion">Maquinaria y Notas</h2>
-    <p style="margin: 0 0 3px 0; font-weight: bold; color: #374151;">Notas de Maquinaria</p>
-    <div class="notas-box">{{ $levantamiento->notas_maquinaria ?: '—' }}</div>
-
-    <p style="margin: 10px 0 3px 0; font-weight: bold; color: #374151;">Notas Admin</p>
-    <div class="notas-box">{{ $levantamiento->notas_admin ?: '—' }}</div>
 </main>
 
 <script type="text/php">

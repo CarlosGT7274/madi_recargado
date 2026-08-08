@@ -107,10 +107,7 @@ function eliminar(): void {
     if (!confirm(`¿Eliminar el levantamiento "${props.levantamiento.folio}"? Esta acción no se puede deshacer.`)) {
         return;
     }
-    router.delete(
-        LevantamientoController.destroy(rutaCotizaciones.value).url,
-        { onSuccess: () => router.visit(ProyectoController.show([props.planta.id, props.proyecto.id]).url) },
-    );
+    router.delete(LevantamientoController.destroy(rutaCotizaciones.value).url);
 }
 
 function formatoMoneda(valor: number | null): string {
@@ -221,7 +218,7 @@ function formatoMoneda(valor: number | null): string {
                         <div class="flex items-center justify-between text-xs text-muted-foreground">
                             <span>{{ formatoMoneda(grupo.ultimaVersion.total) }}</span>
                             <span>{{ grupo.totalVersiones }} {{ grupo.totalVersiones === 1 ? 'versión' : 'versiones'
-                            }}</span>
+                                }}</span>
                         </div>
                     </Link>
                 </div>

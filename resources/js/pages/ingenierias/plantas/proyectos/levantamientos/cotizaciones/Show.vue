@@ -1,6 +1,7 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
+import PermissionButton from '@/components/PermissionButton.vue';
 
 interface Props {
     planta: PlantaRef;
@@ -32,6 +33,7 @@ import {
     Send,
     ShieldCheck,
     ShoppingCart,
+    Trash2,
     Upload,
     User,
     XCircle,
@@ -51,6 +53,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
+import { usePermissions } from '@/composables/usePermissions';
 
 interface PlantaResumen { id: number; nombre: string }
 interface LevantamientoResumen { id: number; folio: string }
@@ -110,12 +113,18 @@ const props = defineProps<{
     puedeAprobarOc: boolean;
 }>();
 
+const { hasPermission, Accion } = usePermissions();
+const endpoint = 'ingenierias.plantas.proyectos.levantamientos.cotizaciones';
+const puedeEliminar = computed(() => hasPermission(endpoint, Accion.DELETE));
+
 const rutaOc = computed(() => ({
     planta: props.planta.id,
     proyecto: props.proyecto.id,
     levantamiento: props.levantamiento.id,
     cotizacion: props.cotizacion.id,
 }));
+
+const urlPdf = computed(() => CotizacionController.pdf(rutaOc.value).url);
 
 const ocDialogOpen = ref(false);
 const archivoOcInput = ref<HTMLInputElement | null>(null);
@@ -155,6 +164,13 @@ function rechazarRevision(): void {
     router.post(CotizacionController.rechazarCompra(rutaOc.value).url, {}, { preserveScroll: true });
 }
 
+function eliminar(): void {
+    if (!confirm(`¿Eliminar la cotización "${props.cotizacion.folio}"? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    router.delete(CotizacionController.destroy(rutaOc.value).url);
+}
+
 const estadoLabel: Record<string, string> = {
     borrador: 'Borrador',
     enviada: 'Enviada',
@@ -187,11 +203,23 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <p class="text-2xl font-bold">{{ cotizacion.folio }}</p>
                     <p class="mt-1 text-sm text-indigo-100">{{ cotizacion.fecha ?? '—' }}</p>
                 </div>
+
                 <div class="flex flex-col items-end gap-2">
-                    <Button variant="secondary" size="sm">
-                        <Download class="mr-2 size-4" />
-                        Exportar
-                    </Button>
+                    <div class="flex items-center gap-2">
+                        <a :href="urlPdf" target="_blank" rel="noopener noreferrer">
+                            <Button variant="secondary" size="sm">
+                                <Download class="mr-2 size-4" />
+                                Exportar
+                            </Button>
+                        </a>
+
+                        <PermissionButton endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones"
+                            :accion="Accion.DELETE" variant="secondary" size="sm" @click="eliminar">
+                            <Trash2 class="mr-2 size-4" />
+                            Eliminar
+                        </PermissionButton>
+                    </div>
+
                     <span class="rounded-md px-3 py-1 text-xs font-bold uppercase"
                         :class="cotizacion.completada ? 'bg-emerald-500' : 'bg-white/20'">
                         {{ cotizacion.completada ? 'Completada' : (estadoLabel[cotizacion.estado] ?? cotizacion.estado)

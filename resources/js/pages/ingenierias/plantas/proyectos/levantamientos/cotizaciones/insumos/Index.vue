@@ -25,6 +25,8 @@ import { computed, ref } from 'vue';
 import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
+import { ArrowLeft } from '@lucide/vue';
+import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 
 interface PlantaRef { id: number; nombre: string }
 interface ProyectoRef { id: number; nombre: string }
@@ -116,6 +118,12 @@ function estatusBadgeClass(estatus: string): string {
     <Head title="Explosión de Insumos" />
 
     <PageLayout title="" description="">
+        <template #breadcrumbs>
+            <Link :href="CotizacionController.show(rutaInsumos).url"
+                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                <ArrowLeft class="size-4" />
+            </Link>
+        </template>
         <!-- Header morado -->
         <div class="overflow-hidden rounded-2xl border shadow-sm">
             <div
@@ -146,11 +154,12 @@ function estatusBadgeClass(estatus: string): string {
                         <input ref="archivoInput" type="file" accept=".xlsx,.xls" class="hidden" @change="subirExcel" />
                     </label>
 
-                    <Button variant="outline" size="sm" class="border-white/30 bg-white/10 text-white" disabled
-                        title="Próximamente">
-                        <Download class="mr-2 size-4" />
-                        Exportar
-                    </Button>
+                    <a :href="InsumoController.pdf(rutaInsumos).url" target="_blank">
+                        <Button variant="secondary" size="sm">
+                            <Download class="mr-2 size-4" />
+                            Exportar PDF
+                        </Button>
+                    </a>
 
                     <Button variant="outline" size="sm" class="border-white/30 bg-white/10 text-white" disabled
                         title="Próximamente">

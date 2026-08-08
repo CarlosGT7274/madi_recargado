@@ -91,7 +91,7 @@ class LevantamientoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Levantamiento eliminado.']);
 
-        return back();
+        return redirect()->route('ingenierias.plantas.proyectos.show', [$planta->id, $proyecto->id]);
     }
 
     public function create(Planta $planta, Proyecto $proyecto): Response

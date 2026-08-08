@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Ingenierias;
 
+use App\Actions\Ingenierias\Insumos\InsumoPdfAction;
 use App\Actions\Ingenierias\Insumos\InsumosAction;
 use App\Exports\Ingenierias\Insumos\InsumoPlantillaExport;
 use App\Http\Controllers\Controller;
@@ -14,6 +15,7 @@ use App\Models\Planta;
 use App\Models\Proyecto;
 use App\Support\Ingenierias\Insumos\InsumoParserResolver;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -80,5 +82,15 @@ class InsumoController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Insumo eliminado.']);
 
         return back();
+    }
+
+    public function pdf(
+        Planta $planta,
+        Proyecto $proyecto,
+        Levantamiento $levantamiento,
+        Cotizacion $cotizacion,
+        InsumoPdfAction $action,
+    ): HttpResponse {
+        return $action->generar($cotizacion)->stream("insumos-{$cotizacion->folio}.pdf");
     }
 }
