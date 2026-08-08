@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Ingenierias;
 
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
+use App\Actions\Ingenierias\Levantamientos\LevantamientoPdfAction;
 use App\Actions\Ingenierias\Levantamientos\LevantamientosAction;
 use App\Exports\LevantamientoPlantillaExport;
 use App\Http\Controllers\Controller;
@@ -14,6 +15,7 @@ use App\Models\Levantamiento;
 use App\Models\Planta;
 use App\Models\Proyecto;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -114,6 +116,11 @@ class LevantamientoController extends Controller
             new LevantamientoPlantillaExport,
             "plantilla-levantamientos-{$planta->folio}.xlsx",
         );
+    }
+
+    public function pdf(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, LevantamientoPdfAction $action): HttpResponse
+    {
+        return $action->generar($levantamiento)->stream("levantamiento-{$levantamiento->folio}.pdf");
     }
 
     public function importar(

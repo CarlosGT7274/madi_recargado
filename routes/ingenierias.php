@@ -55,6 +55,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('data');
             Route::get('/{levantamiento}', [LevantamientoController::class, 'show'])
                 ->middleware('permiso:'.Accion::READ)->name('show');
+            Route::get('/{levantamiento}/pdf', [LevantamientoController::class, 'pdf'])
+                ->middleware('permiso:'.Accion::READ)->name('pdf');
             Route::post('/', [LevantamientoController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
             Route::put('/{levantamiento}', [LevantamientoController::class, 'update'])
@@ -119,7 +121,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
     // ---- Proyecto directo: cotización + OC + actividades, sin Levantamiento ----
-
     Route::name('ingenierias.plantas.proyectos.cotizaciones.')
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/cotizaciones')
         ->scopeBindings()

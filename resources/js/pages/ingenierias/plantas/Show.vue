@@ -24,6 +24,7 @@ import {
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import PageLayout from '@/components/PageLayout.vue';
+import PermissionButton from '@/components/PermissionButton.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { usePermissions } from '@/composables/usePermissions';
 
 type PlantaDetalle = {
     id: number;
@@ -65,6 +67,8 @@ const props = defineProps<{
     planta: PlantaDetalle;
     proyectos?: ProyectoResumen[];
 }>();
+
+const { Accion } = usePermissions();
 
 const editDialogOpen = ref(false);
 
@@ -111,6 +115,28 @@ const totales = computed(() => {
     const activos = lista.filter((p) => (estatusGrupo[p.estado] ?? 'pendiente') === 'pendiente').length;
     return { terminados, activos, total: lista.length };
 });
+
+// --- Filtro por tipo de flujo ---
+type FiltroTipo = 'todos' | 'grande' | 'chico';
+const filtroTipo = ref<FiltroTipo>('todos');
+
+const filtros: { value: FiltroTipo; label: string }[] = [
+    { value: 'todos', label: 'Todos' },
+    { value: 'grande', label: 'Proyecto estándar' },
+    { value: 'chico', label: 'Proyecto directo' },
+];
+
+const proyectosFiltrados = computed(() => {
+    const lista = props.proyectos ?? [];
+    if (filtroTipo.value === 'todos') return lista;
+    return lista.filter((p) => p.tipo === filtroTipo.value);
+});
+
+function contarPorTipo(tipo: FiltroTipo): number {
+    const lista = props.proyectos ?? [];
+    if (tipo === 'todos') return lista.length;
+    return lista.filter((p) => p.tipo === tipo).length;
+}
 </script>
 
 <template>
@@ -128,12 +154,6 @@ const totales = computed(() => {
                         <DialogTitle>Editar planta</DialogTitle>
                         <DialogDescription>Actualiza los datos de esta planta.</DialogDescription>
                     </DialogHeader>
-
-                    <div class="grid gap-2">
-                        <Label for="edit-folio">Folio</Label>
-                        <Input id="edit-folio" name="folio" :default-value="planta.folio" />
-                        <InputError :message="errors.folio" />
-                    </div>
 
                     <div class="grid gap-2">
                         <Label for="edit-nombre">Nombre</Label>
@@ -175,12 +195,11 @@ const totales = computed(() => {
                         </div>
                     </div>
 
-                    <Link :href="ProyectoController.create(planta.id)">
-                        <Button size="lg">
-                            <FolderPlus class="size-4" />
-                            Nuevo Proyecto
-                        </Button>
-                    </Link>
+                    <PermissionButton endpoint="ingenierias.plantas.proyectos" :accion="Accion.CREATE"
+                        :href="ProyectoController.create(planta.id)" size="lg">
+                        <FolderPlus class="size-4" />
+                        Nuevo Proyecto
+                    </PermissionButton>
                 </div>
 
                 <!-- Totales: resumen simple, sin calendario -->
@@ -216,6 +235,20 @@ const totales = computed(() => {
                 </Deferred>
             </div>
 
+            <!-- Filtro por tipo de flujo -->
+            <Deferred data="proyectos">
+                <template #fallback />
+
+                <div v-if="(proyectos?.length ?? 0) > 0" class="flex flex-wrap gap-2">
+                    <button v-for="filtro in filtros" :key="filtro.value" type="button"
+                        class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors" :class="filtroTipo === filtro.value
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-accent'" @click="filtroTipo = filtro.value">
+                        {{ filtro.label }} ({{ contarPorTipo(filtro.value) }})
+                    </button>
+                </div>
+            </Deferred>
+
             <!-- Proyectos: grid de tarjetas, pantalla de inicio del módulo -->
             <Deferred data="proyectos">
                 <template #fallback>
@@ -225,8 +258,9 @@ const totales = computed(() => {
                     </div>
                 </template>
 
-                <div v-if="proyectos?.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Link v-for="pry in proyectos" :key="pry.id" :href="ProyectoController.show([planta.id, pry.id])"
+                <div v-if="proyectosFiltrados.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <Link v-for="pry in proyectosFiltrados" :key="pry.id"
+                        :href="ProyectoController.show([planta.id, pry.id])"
                         class="group flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-sm transition-colors hover:bg-accent/50">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex items-center gap-3">
@@ -255,20 +289,24 @@ const totales = computed(() => {
                     </Link>
                 </div>
 
-                <div v-else
+                <div v-else-if="!(proyectos?.length ?? 0)"
                     class="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card/50 py-16 text-center shadow-sm">
                     <FolderOpen class="size-8 text-muted-foreground" />
                     <p class="text-sm font-medium">Aún no hay proyectos en esta planta</p>
                     <p class="max-w-sm text-sm text-muted-foreground">
                         Crea el primer proyecto para empezar a trabajar sobre esta planta.
                     </p>
-                    <Link :href="ProyectoController.create(planta.id)">
-                        <Button class="mt-2">
-                            <Plus class="mr-2 size-4" />
-                            Nuevo Proyecto
-                        </Button>
-                    </Link>
+                    <PermissionButton endpoint="ingenierias.plantas.proyectos" :accion="Accion.CREATE"
+                        :href="ProyectoController.create(planta.id)" class="mt-2">
+                        <Plus class="mr-2 size-4" />
+                        Nuevo Proyecto
+                    </PermissionButton>
                 </div>
+
+                <p v-else
+                    class="rounded-2xl border border-dashed bg-card/50 py-12 text-center text-sm text-muted-foreground">
+                    No hay proyectos de tipo "{{filtros.find(f => f.value === filtroTipo)?.label}}".
+                </p>
             </Deferred>
         </div>
     </PageLayout>

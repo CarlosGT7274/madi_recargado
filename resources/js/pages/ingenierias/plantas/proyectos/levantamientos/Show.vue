@@ -15,7 +15,7 @@ export default pageLayout(() => {
 
 <script setup lang="ts">
 import { Deferred, Form, Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, FileSpreadsheet, Layers, Plus, ShieldCheck, ShoppingCart, Upload } from '@lucide/vue';
+import { ArrowLeft, FileDown, FileSpreadsheet, Layers, Plus, ShieldCheck, ShoppingCart, Upload } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
@@ -77,6 +77,10 @@ const rutaCotizaciones = computed(() => ({
     levantamiento: props.levantamiento.id,
 }));
 
+const urlPdf = computed(() =>
+    LevantamientoController.pdf(rutaCotizaciones.value).url,
+);
+
 function subirCotizacionExcel(): void {
     const archivo = archivoCotizacionInput.value?.files?.[0];
     if (!archivo) return;
@@ -127,6 +131,15 @@ function formatoMoneda(valor: number | null): string {
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft class="size-4" />
             </Link>
+        </template>
+
+        <template #actions>
+            <a :href="urlPdf" target="_blank" rel="noopener noreferrer">
+                <Button variant="outline">
+                    <FileDown class="mr-2 size-4" />
+                    Exportar PDF
+                </Button>
+            </a>
         </template>
 
         <Dialog v-model:open="createCotizacionDialogOpen">
@@ -208,7 +221,7 @@ function formatoMoneda(valor: number | null): string {
                         <div class="flex items-center justify-between text-xs text-muted-foreground">
                             <span>{{ formatoMoneda(grupo.ultimaVersion.total) }}</span>
                             <span>{{ grupo.totalVersiones }} {{ grupo.totalVersiones === 1 ? 'versión' : 'versiones'
-                                }}</span>
+                            }}</span>
                         </div>
                     </Link>
                 </div>

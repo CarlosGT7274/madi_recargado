@@ -8,9 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Plantas\StorePlantaRequest;
 use App\Http\Requests\Ingenierias\Plantas\UpdatePlantaRequest;
 use App\Models\Planta;
-use App\Support\Accion;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -53,12 +51,10 @@ class PlantaController extends Controller
 
     public function destroy(Planta $planta, PlantasAction $plantasAction): RedirectResponse
     {
-        Gate::authorize('permiso', ['Plantas', Accion::DELETE]);
-
         $plantasAction->delete($planta);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Planta eliminada.']);
 
-        return back();
+        return redirect()->route('ingenierias.plantas.index');
     }
 }
