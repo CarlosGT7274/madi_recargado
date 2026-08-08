@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\Concerns\HasArchivos;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Cotizacion extends Model
 {
@@ -40,9 +39,10 @@ class Cotizacion extends Model
         'vigencia_cotizacion',
         'notas',
         'estado',
+        'estatus_compra',
+        'aprobador_compra_id',
+        'fecha_aprobacion_compra',
         'fecha_aprobacion',
-        'tiene_insumos',
-        'tiene_orden_compra',
         'tiene_partidas',
         'presupuesto_consumido',
         'usuario_id',
@@ -55,8 +55,7 @@ class Cotizacion extends Model
         'total' => 'decimal:2',
         'costo_hora_total' => 'decimal:2',
         'fecha_aprobacion' => 'date',
-        'tiene_insumos' => 'boolean',
-        'tiene_orden_compra' => 'boolean',
+        'fecha_aprobacion_compra' => 'datetime',
         'tiene_partidas' => 'boolean',
         'presupuesto_consumido' => 'decimal:2',
     ];
@@ -76,6 +75,11 @@ class Cotizacion extends Model
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
+    public function aprobadorCompra()
+    {
+        return $this->belongsTo(User::class, 'aprobador_compra_id');
+    }
+
     public function partidas(): HasMany
     {
         return $this->hasMany(Partida::class, 'cotizacion_id');
@@ -86,21 +90,11 @@ class Cotizacion extends Model
         return $this->hasMany(Insumo::class, 'cotizacion_id');
     }
 
-    public function ordenCompra(): HasOne
-    {
-        return $this->hasOne(CompraOrden::class, 'cotizacion_id');
-    }
-
     public function tieneInsumos(): bool
     {
         return $this->insumos()->exists();
     }
 
-    /**
-     * Cotizaciones sin Levantamiento pertenecen al flujo de Proyecto directo
-     * (proyecto_id set en su lugar). Ahí no hay paso de Explosión de
-     * Insumos, así que "completada" solo depende de la Orden de Compra.
-     */
     public function esDeProyectoDirecto(): bool
     {
         return $this->levantamiento_id === null;
@@ -108,27 +102,25 @@ class Cotizacion extends Model
 
     /**
      * ÚNICA fuente de verdad de "completada/aprobada" en todo el sistema.
-     * El campo `estado` (borrador/enviada/rechazada) ya NO participa en esto;
-     * solo describe el paso comercial previo a que exista Insumos + OC.
-     * Cualquier vista, Action o modelo que necesite saber si algo está
-     * aprobado debe llamar (directa o transitivamente) a este método.
      */
     public function estaCompletada(): bool
     {
         if ($this->esDeProyectoDirecto()) {
-            return $this->tieneOrdenAprobada();
+            return $this->tieneAutorizacion();
         }
 
-        return $this->tieneInsumos() && $this->tieneOrdenAprobada();
+        return $this->tieneInsumos() && $this->tieneAutorizacion();
     }
 
-    public function tieneOrdenAprobada(): bool
+    /**
+     * El PDF que el cliente entrega para autorizar el trabajo (vive en
+     * `archivos`, polimórfico) o la aprobación administrativa sin PDF
+     * (estatus_compra). Reemplaza a la vieja tieneOrdenAprobada() que
+     * dependía de la tabla compras_ordenes, ya eliminada.
+     */
+    public function tieneAutorizacion(): bool
     {
-        if (! $this->ordenCompra) {
-            return false;
-        }
-
-        return $this->ordenCompra->archivos()->where('tipo_archivo', 'pdf')->exists()
-            || $this->ordenCompra->estatus_compra === 'aprobado';
+        return $this->archivos()->where('tipo_archivo', 'pdf')->exists()
+            || $this->estatus_compra === 'aprobado';
     }
 }

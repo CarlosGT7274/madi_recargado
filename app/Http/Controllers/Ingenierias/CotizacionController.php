@@ -19,6 +19,7 @@ use App\Models\Planta;
 use App\Models\Proyecto;
 use App\Support\Accion;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -26,6 +27,39 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CotizacionController extends Controller
 {
+    public function subirAutorizacionProyecto(Request $request, Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $request->validate(['archivo' => ['required', 'file', 'mimes:pdf']]);
+
+        $action->subirPdfAutorizacion($cotizacion, $request->file('archivo'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Orden de compra subida.']);
+
+        return back();
+    }
+
+    public function ordenCompra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion): Response
+    {
+        $pdf = $cotizacion->archivos()->where('tipo_archivo', 'pdf')->latest('fecha_creacion')->first();
+
+        return Inertia::render('ingenierias/plantas/proyectos/levantamientos/cotizaciones/orden-compra/Show', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre],
+            'levantamiento' => ['id' => $levantamiento->id, 'folio' => $levantamiento->folio],
+            'cotizacion' => [
+                'id' => $cotizacion->id,
+                'folio' => $cotizacion->folio,
+                'obra' => $cotizacion->obra,
+                'total' => (float) $cotizacion->total,
+                'tieneInsumos' => $cotizacion->tieneInsumos(),
+            ],
+            'archivoId' => $pdf?->id,
+            'pdfUrl' => $pdf?->urlPublica(),
+            'pdfNombre' => $pdf?->nombre_archivo,
+            'subidoEl' => $pdf?->fecha_creacion?->format('d/m/Y H:i'),
+        ]);
+    }
+
     /**
      * Única pantalla intermedia del flujo: versiones (Excel) de UNA obra.
      * El listado de obras agrupadas vive en Levantamiento/Show.vue.
@@ -221,6 +255,44 @@ class CotizacionController extends Controller
     public function destroyPartida(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, Partida $partida, PartidasAction $action): RedirectResponse
     {
         $action->delete($partida);
+
+        return back();
+    }
+
+    public function subirAutorizacion(Request $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $request->validate(['archivo' => ['required', 'file', 'mimes:pdf']]);
+
+        $action->subirPdfAutorizacion($cotizacion, $request->file('archivo'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Autorización subida.']);
+
+        return back();
+    }
+
+    public function solicitarRevisionCompra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->solicitarRevisionSinPdf($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Revisión solicitada.']);
+
+        return back();
+    }
+
+    public function aprobarCompra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->aprobarCompra($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización aprobada.']);
+
+        return back();
+    }
+
+    public function rechazarCompra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->rechazarCompra($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización rechazada.']);
 
         return back();
     }

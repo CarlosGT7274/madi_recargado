@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Ingenierias\ActividadController;
-use App\Http\Controllers\Ingenierias\CompraOrdenController;
 use App\Http\Controllers\Ingenierias\CotizacionController;
 use App\Http\Controllers\Ingenierias\InsumoController;
 use App\Http\Controllers\Ingenierias\LevantamientoController;
@@ -107,16 +106,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/levantamientos/{levantamiento}/cotizaciones/{cotizacion}/orden-compra')
         ->scopeBindings()
         ->group(function () {
-            Route::get('/', [CompraOrdenController::class, 'index'])
+            Route::get('/', [CotizacionController::class, 'ordenCompra'])
                 ->middleware('permiso:'.Accion::READ)->name('index');
-            Route::post('/', [CompraOrdenController::class, 'store'])
+            Route::post('/', [CotizacionController::class, 'subirAutorizacion'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
-            Route::post('/aprobar', [CompraOrdenController::class, 'aprobar'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('aprobar');
-            Route::post('/rechazar', [CompraOrdenController::class, 'rechazar'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('rechazar');
-            Route::post('/solicitar-revision', [CompraOrdenController::class, 'solicitarRevision'])
+            Route::post('/solicitar-revision', [CotizacionController::class, 'solicitarRevisionCompra'])
                 ->middleware('permiso:'.Accion::CREATE)->name('solicitar-revision');
+            Route::post('/aprobar', [CotizacionController::class, 'aprobarCompra'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('aprobar');
+            Route::post('/rechazar', [CotizacionController::class, 'rechazarCompra'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('rechazar');
         });
 
     // ---- Proyecto directo: cotización + OC + actividades, sin Levantamiento ----
@@ -146,7 +145,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/cotizaciones/{cotizacion}/orden-compra')
         ->scopeBindings()
         ->group(function () {
-            Route::post('/', [CompraOrdenController::class, 'storeProyecto'])
+            Route::post('/', [CotizacionController::class, 'subirAutorizacionProyecto'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
         });
 

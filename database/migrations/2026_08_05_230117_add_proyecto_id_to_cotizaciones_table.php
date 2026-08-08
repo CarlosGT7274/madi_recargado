@@ -6,32 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * `cotizaciones` nació con `proyecto_id` (proyecto como raíz) pero sin
+     * `levantamiento_id`. Se agrega aquí, nullable, porque el flujo de
+     * Proyecto directo (tipo 'chico') no pasa por Levantamiento —
+     * ver Cotizacion::esDeProyectoDirecto().
+     */
     public function up(): void
     {
         Schema::table('cotizaciones', function (Blueprint $table) {
-            $table->dropForeign(['levantamiento_id']);
-        });
-
-        Schema::table('cotizaciones', function (Blueprint $table) {
-            $table->unsignedBigInteger('levantamiento_id')->nullable()->change();
-            $table->foreign('levantamiento_id')->references('id')->on('levantamientos')->onDelete('cascade');
-
-            $table->foreignId('proyecto_id')->nullable()->after('levantamiento_id')
-                ->constrained('proyectos')->cascadeOnDelete();
+            $table->foreignId('levantamiento_id')->nullable()->after('id')
+                ->constrained('levantamientos')->cascadeOnDelete();
         });
     }
 
     public function down(): void
     {
         Schema::table('cotizaciones', function (Blueprint $table) {
-            $table->dropForeign(['proyecto_id']);
-            $table->dropColumn('proyecto_id');
             $table->dropForeign(['levantamiento_id']);
-        });
-
-        Schema::table('cotizaciones', function (Blueprint $table) {
-            $table->unsignedBigInteger('levantamiento_id')->nullable(false)->change();
-            $table->foreign('levantamiento_id')->references('id')->on('levantamientos')->onDelete('cascade');
+            $table->dropColumn('levantamiento_id');
         });
     }
 };

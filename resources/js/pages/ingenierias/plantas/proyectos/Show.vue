@@ -86,7 +86,7 @@ type ObraAgrupada = {
         folio: string;
         total: number | null;
         completada: boolean;
-        tieneOrdenAprobada: boolean;
+        tieneAutorizacion: boolean;
     };
 };
 
@@ -498,7 +498,7 @@ function formatoMoneda(valor: number | null): string {
                                     </span>
                                 </div>
 
-                                <div v-if="grupo.ultimaVersion.tieneOrdenAprobada"
+                                <div v-if="grupo.ultimaVersion.tieneAutorizacion"
                                     class="flex items-center gap-1.5 text-xs text-muted-foreground">
                                     <ShoppingCart class="size-3.5" />
                                     Con orden de compra

@@ -49,7 +49,7 @@ interface UltimaVersion {
     total: number | null;
     completada: boolean;
     tieneInsumos: boolean;
-    tieneOrdenAprobada: boolean;
+    tieneAutorizacion: boolean;
 }
 
 interface ObraAgrupada {
@@ -199,7 +199,7 @@ function formatoMoneda(valor: number | null): string {
                             </span>
                         </div>
 
-                        <div v-if="grupo.ultimaVersion.tieneOrdenAprobada"
+                        <div v-if="grupo.ultimaVersion.tieneAutorizacion"
                             class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <ShoppingCart class="size-3.5" />
                             Con orden de compra

@@ -1,6 +1,7 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { index as rolesIndex } from '@/routes/seguridad/roles';
+import { toast } from 'vue-sonner';
 
 export default {
     layout: () => ({
@@ -108,18 +109,20 @@ const guardar = () => {
     procesando.value = true;
     router.put(permisosRole.url(props.role.id), { permisos: valores }, {
         preserveScroll: true,
+        onError: (errors) => {
+            toast.error('No se pudieron guardar los permisos. Verifica tus propios permisos e intenta de nuevo.');
+        },
         onFinish: () => (procesando.value = false),
     });
 };
+
 </script>
 
 <template>
+
     <Head :title="`Rol: ${role.nombre}`" />
-    <PageLayout
-        :title="role.nombre"
-        :description="`${role.usuarios_count} usuarios con este rol`"
-        endpoint="seguridad.roles"
-    >
+    <PageLayout :title="role.nombre" :description="`${role.usuarios_count} usuarios con este rol`"
+        endpoint="seguridad.roles">
         <template #actions>
             <Button variant="outline" size="sm" @click="seleccionarTodo">
                 Seleccionar todo
@@ -133,13 +136,11 @@ const guardar = () => {
         </template>
 
         <div class="overflow-hidden rounded-xl border">
-            <div class="grid grid-cols-[1fr_repeat(4,80px)_90px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+            <div
+                class="grid grid-cols-[1fr_repeat(4,80px)_90px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
                 <div class="flex items-center gap-2">
-                    <Checkbox
-                        :model-value="estadoGlobal"
-                        aria-label="Seleccionar todos los permisos"
-                        @update:model-value="(v) => v === true ? seleccionarTodo() : limpiarTodo()"
-                    >
+                    <Checkbox :model-value="estadoGlobal" aria-label="Seleccionar todos los permisos"
+                        @update:model-value="(v) => v === true ? seleccionarTodo() : limpiarTodo()">
                         <template #default="{ state }">
                             <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                             <Check v-else class="size-3.5" />
@@ -147,17 +148,10 @@ const guardar = () => {
                     </Checkbox>
                     <span>Módulo</span>
                 </div>
-                <div
-                    v-for="accion in ACCIONES"
-                    :key="accion.bit"
-                    class="flex flex-col items-center gap-1"
-                >
+                <div v-for="accion in ACCIONES" :key="accion.bit" class="flex flex-col items-center gap-1">
                     <span>{{ accion.label }}</span>
-                    <Checkbox
-                        :model-value="estadoColumna(accion.bit)"
-                        :aria-label="`Alternar columna ${accion.label}`"
-                        @update:model-value="(v) => alternarColumna(accion.bit, v === true)"
-                    >
+                    <Checkbox :model-value="estadoColumna(accion.bit)" :aria-label="`Alternar columna ${accion.label}`"
+                        @update:model-value="(v) => alternarColumna(accion.bit, v === true)">
                         <template #default="{ state }">
                             <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                             <Check v-else class="size-3.5" />
@@ -167,15 +161,8 @@ const guardar = () => {
                 <span />
             </div>
 
-            <PermisoTreeRow
-                v-for="nodo in permisosArbol"
-                :key="nodo.id"
-                :nodo="nodo"
-                :valores="valores"
-                @cambiar="cambiar"
-                @quitar="quitar"
-                @modulo="alternarModulo"
-            />
+            <PermisoTreeRow v-for="nodo in permisosArbol" :key="nodo.id" :nodo="nodo" :valores="valores"
+                @cambiar="cambiar" @quitar="quitar" @modulo="alternarModulo" />
         </div>
     </PageLayout>
 </template>

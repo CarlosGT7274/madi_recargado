@@ -33,7 +33,7 @@ class PrestamoEmpleado extends Model
 
     public function empleado()
     {
-        return $this->belongsTo(User::class, 'empleado_id');
+        return $this->belongsTo(Empleado::class, 'empleado_id');
     }
 
     public function creadoPor()

@@ -17,34 +17,17 @@ export default pageLayout(() => {
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
-    ArrowRight,
-    Building2,
-    CheckCircle2,
-    Clock,
-    DollarSign,
-    Download,
-    FileText,
-    Hash,
-    MapPin,
-    ShoppingCart,
-    Upload,
-    User,
+    ArrowRight, Building2, CheckCircle2, Clock, DollarSign, Download,
+    FileText, Hash, MapPin, ShoppingCart, Upload, User,
 } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
 import { computed, ref } from 'vue';
-import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/CompraOrdenController';
+import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 
 interface PlantaRef { id: number; nombre: string }
 interface ProyectoRef { id: number; nombre: string; folio: string }
-
-interface OrdenCompraInfo {
-    id: number;
-    estatusCompra: string | null;
-    pdfUrl: string | null;
-    pdfNombre: string | null;
-}
 
 interface CotizacionDetalle {
     id: number;
@@ -61,7 +44,8 @@ interface CotizacionDetalle {
     estado: string;
     creado: string | null;
     completada: boolean;
-    ordenCompra: OrdenCompraInfo | null;
+    estatusCompra: string;
+    pdfAutorizacion: string | null;
 }
 
 interface PartidaHija {
@@ -102,7 +86,7 @@ function subirOrdenCompra(): void {
     if (!archivo) return;
 
     router.post(
-        CompraOrdenController.storeProyecto(rutaOc.value).url,
+        CotizacionController.subirAutorizacionProyecto(rutaOc.value).url,
         { archivo },
         { forceFormData: true, preserveScroll: true },
     );
@@ -233,18 +217,17 @@ function formatoMoneda(valor: number | null | undefined): string {
                 <p class="text-lg font-semibold">Orden de Compra</p>
             </div>
 
-            <div v-if="cotizacion.ordenCompra?.pdfUrl"
+            <div v-if="cotizacion.pdfAutorizacion"
                 class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-3">
                     <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
                         <CheckCircle2 class="size-4" />
                     </div>
                     <div>
-                        <p class="font-medium">{{ cotizacion.ordenCompra.pdfNombre }}</p>
-                        <p class="text-xs text-muted-foreground">Orden de compra cargada</p>
+                        <p class="font-medium">Orden de compra cargada</p>
                     </div>
                 </div>
-                <a :href="cotizacion.ordenCompra.pdfUrl" target="_blank">
+                <a :href="cotizacion.pdfAutorizacion" target="_blank">
                     <Button variant="outline" size="sm">
                         <Download class="mr-1.5 size-3.5" />
                         Descargar

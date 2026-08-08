@@ -13,7 +13,7 @@ export interface VersionCotizacion {
     completada: boolean;
     tienePartidas: boolean;
     tieneInsumos: boolean;
-    tieneOrdenAprobada: boolean;
+    tieneAutorizacion: boolean;
     archivoExcelUrl: string | null;
 }
 

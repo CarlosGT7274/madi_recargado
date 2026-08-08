@@ -87,7 +87,7 @@ class Proyecto extends Model
     {
         if ($this->tipo === 'chico') {
             return $this->cotizaciones()
-                ->with('archivos', 'ordenCompra.archivos')
+                ->with('archivos')
                 ->get()
                 ->contains(fn (Cotizacion $c) => $c->estaCompletada());
         }

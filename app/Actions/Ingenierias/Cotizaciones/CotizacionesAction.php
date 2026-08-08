@@ -3,12 +3,18 @@
 namespace App\Actions\Ingenierias\Cotizaciones;
 
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
+use App\Actions\Notificaciones\NotificacionesAction;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
+use App\Models\Permiso;
 use App\Models\Proyecto;
+use App\Models\Role;
 use App\Services\FolioService;
+use App\Support\Accion;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class CotizacionesAction
 {
@@ -26,7 +32,7 @@ class CotizacionesAction
     public function listAgrupado(Levantamiento $levantamiento): Collection
     {
         $cotizaciones = $levantamiento->cotizaciones()
-            ->with('archivos', 'ordenCompra.archivos', 'insumos')
+            ->with('archivos', 'insumos')
             ->latest('id')
             ->get();
 
@@ -36,7 +42,7 @@ class CotizacionesAction
     public function listAgrupadoProyecto(Proyecto $proyecto): Collection
     {
         $cotizaciones = $proyecto->cotizaciones()
-            ->with('archivos', 'ordenCompra.archivos')
+            ->with('archivos')
             ->latest('id')
             ->get();
 
@@ -63,7 +69,7 @@ class CotizacionesAction
     public function obra(Levantamiento $levantamiento, string $obra): array
     {
         $versiones = $levantamiento->cotizaciones()
-            ->with('archivos', 'ordenCompra.archivos', 'insumos')
+            ->with('archivos', 'insumos')
             ->where('obra', $obra)
             ->latest('id')
             ->get();
@@ -75,7 +81,7 @@ class CotizacionesAction
     public function obraProyecto(Proyecto $proyecto, string $obra): array
     {
         $versiones = $proyecto->cotizaciones()
-            ->with('archivos', 'ordenCompra.archivos')
+            ->with('archivos')
             ->where('obra', $obra)
             ->latest('id')
             ->get();
@@ -109,7 +115,7 @@ class CotizacionesAction
             'completada' => $c->estaCompletada(),
             'tienePartidas' => $c->tiene_partidas,
             'tieneInsumos' => $c->tieneInsumos(),
-            'tieneOrdenAprobada' => $c->tieneOrdenAprobada(),
+            'tieneAutorizacion' => $c->tieneAutorizacion(),
             'archivoExcelUrl' => $c->archivos
                 ->where('tipo_archivo', 'excel')
                 ->sortByDesc('fecha_creacion')
@@ -146,7 +152,7 @@ class CotizacionesAction
             'modificado' => $cotizacion->fecha_modificacion?->format('d/m/Y H:i'),
             'esDeProyectoDirecto' => $cotizacion->esDeProyectoDirecto(),
             'tiene_insumos' => $cotizacion->tieneInsumos(),
-            'tiene_orden_compra' => $cotizacion->tieneOrdenAprobada(),
+            'tiene_orden_compra' => $cotizacion->tieneAutorizacion(),
             'completada' => $cotizacion->estaCompletada(),
             'otrasVersiones' => $cotizacion->esDeProyectoDirecto()
                 ? $this->versionesDeObraProyecto($cotizacion->proyecto, $cotizacion->obra ?? '')
@@ -155,19 +161,15 @@ class CotizacionesAction
                 : $this->versionesDeObra($cotizacion->levantamiento, $cotizacion->obra ?? '')
                     ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
                     ->values(),
-            'ordenCompra' => $cotizacion->ordenCompra ? [
-                'id' => $cotizacion->ordenCompra->id,
-                'estatusCompra' => $cotizacion->ordenCompra->estatus_compra,
-                'pdfUrl' => $cotizacion->ordenCompra->pdf()?->urlPublica(),
-                'pdfNombre' => $cotizacion->ordenCompra->pdf()?->nombre_archivo,
-            ] : null,
+            'estatusCompra' => $cotizacion->estatus_compra,
+            'pdfAutorizacion' => $cotizacion->archivos()->where('tipo_archivo', 'pdf')->latest('fecha_creacion')->first()?->urlPublica(),
         ];
     }
 
     public function versionesDeObra(Levantamiento $levantamiento, string $obra): Collection
     {
         return $levantamiento->cotizaciones()
-            ->with('archivos', 'ordenCompra.archivos', 'insumos')
+            ->with('archivos', 'insumos')
             ->where('obra', $obra)
             ->latest('id')
             ->get()
@@ -177,7 +179,7 @@ class CotizacionesAction
     public function versionesDeObraProyecto(Proyecto $proyecto, string $obra): Collection
     {
         return $proyecto->cotizaciones()
-            ->with('archivos', 'ordenCompra.archivos')
+            ->with('archivos')
             ->where('obra', $obra)
             ->latest('id')
             ->get()
@@ -190,6 +192,7 @@ class CotizacionesAction
 
         return $levantamiento->cotizaciones()->create([
             ...$data,
+            'proyecto_id' => $levantamiento->proyecto_id,
             'usuario_id' => Auth::id(),
         ]);
     }
@@ -260,5 +263,106 @@ class CotizacionesAction
     public function delete(Cotizacion $cotizacion): void
     {
         $cotizacion->delete();
+    }
+
+    public function subirPdfAutorizacion(Cotizacion $cotizacion, UploadedFile $archivo): Cotizacion
+    {
+        if (! $cotizacion->esDeProyectoDirecto() && ! $cotizacion->tieneInsumos()) {
+            throw ValidationException::withMessages([
+                'archivo' => 'Debes completar la Explosión de Insumos antes de subir la Orden de Compra.',
+            ]);
+        }
+
+        $ruta = $archivo->store('archivos/cotizacion_autorizacion', 'public');
+
+        $cotizacion->archivos()->create([
+            'archivable_type' => 'cotizacion',
+            'almacenamiento' => 'url',
+            'nombre_archivo' => $archivo->getClientOriginalName(),
+            'tipo_archivo' => 'pdf',
+            'tipo_mime' => $archivo->getClientMimeType(),
+            'tamano_bytes' => $archivo->getSize(),
+            'url' => $ruta,
+            'storage_driver' => 'public',
+            'usuario_id' => Auth::id(),
+        ]);
+
+        return $cotizacion->fresh();
+    }
+
+    public function solicitarRevisionSinPdf(Cotizacion $cotizacion): Cotizacion
+    {
+        $cotizacion->update(['estatus_compra' => 'en_cotizacion']);
+
+        app(NotificacionesAction::class)->crearParaUsuarios(
+            $this->administradores(),
+            [
+                'mensaje' => "Cotización {$cotizacion->folio} solicita aprobación sin orden de compra.",
+                'destino_area' => 'compras',
+                'modulo' => 'ingenierias.compras',
+                'tipo_entidad' => 'cotizacion',
+                'entidad_id' => $cotizacion->id,
+            ]
+        );
+
+        return $cotizacion->fresh();
+    }
+
+    public function aprobarCompra(Cotizacion $cotizacion): Cotizacion
+    {
+        $cotizacion->update([
+            'estatus_compra' => 'aprobado',
+            'aprobador_compra_id' => Auth::id(),
+            'fecha_aprobacion_compra' => now(),
+        ]);
+
+        app(NotificacionesAction::class)->crearParaUsuario(
+            $cotizacion->usuario,
+            [
+                'mensaje' => 'Tu solicitud de revisión sin orden de compra fue aprobada.',
+                'destino_area' => 'compras',
+                'modulo' => 'ingenierias.compras',
+                'tipo_entidad' => 'cotizacion',
+                'entidad_id' => $cotizacion->id,
+            ]
+        );
+
+        return $cotizacion->fresh();
+    }
+
+    public function rechazarCompra(Cotizacion $cotizacion): Cotizacion
+    {
+        $cotizacion->update([
+            'estatus_compra' => 'rechazado',
+            'aprobador_compra_id' => Auth::id(),
+        ]);
+
+        app(NotificacionesAction::class)->crearParaUsuario(
+            $cotizacion->usuario,
+            [
+                'mensaje' => 'Tu solicitud de revisión sin orden de compra fue rechazada.',
+                'destino_area' => 'compras',
+                'modulo' => 'ingenierias.compras',
+                'tipo_entidad' => 'cotizacion',
+                'entidad_id' => $cotizacion->id,
+            ]
+        );
+
+        return $cotizacion->fresh();
+    }
+
+    private function administradores(): Collection
+    {
+        $raiz = Permiso::whereNull('padre_id')->where('endpoint', 'ingenierias')->first();
+
+        if ($raiz === null) {
+            return collect();
+        }
+
+        return Role::with('usuarios')
+            ->get()
+            ->filter(fn (Role $rol) => $rol->tienePermiso($raiz, Accion::ALL))
+            ->flatMap(fn (Role $rol) => $rol->usuarios)
+            ->values();
     }
 }

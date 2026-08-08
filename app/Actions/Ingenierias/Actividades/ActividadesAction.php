@@ -41,7 +41,7 @@ class ActividadesAction
     private function arbolDesdeCotizaciones(Proyecto $proyecto): Collection
     {
         return $proyecto->cotizaciones()
-            ->with('partidas', 'archivos', 'ordenCompra.archivos')
+            ->with('partidas', 'archivos')
             ->get()
             ->filter(fn (Cotizacion $c) => $c->estaCompletada())
             ->flatMap(fn (Cotizacion $c) => $this->partidasAction->arbol($c))

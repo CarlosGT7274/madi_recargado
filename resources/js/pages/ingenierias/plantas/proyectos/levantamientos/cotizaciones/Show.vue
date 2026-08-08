@@ -50,21 +50,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/CompraOrdenController';
+import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 
 interface PlantaResumen { id: number; nombre: string }
 interface LevantamientoResumen { id: number; folio: string }
-
-type EstatusCompra =
-    | 'pendiente' | 'en_cotizacion' | 'aprobado' | 'rechazado'
-    | 'orden_generada' | 'en_transito' | 'entregado' | null;
-
-interface OrdenCompraInfo {
-    id: number;
-    estatusCompra: EstatusCompra;
-    pdfUrl: string | null;
-    pdfNombre: string | null;
-}
 
 interface ProyectoResumen {
     id: number;
@@ -89,9 +78,9 @@ interface CotizacionDetalle {
     estado: string;
     creado: string | null;
     tiene_insumos: boolean;
-    tiene_orden_compra: boolean;
     completada: boolean;
-    ordenCompra: OrdenCompraInfo | null;
+    estatusCompra: string;
+    pdfAutorizacion: string | null;
 }
 
 interface PartidaHija {
@@ -134,7 +123,7 @@ const archivoOcInput = ref<HTMLInputElement | null>(null);
 const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
 
 const solicitudPendiente = computed(
-    () => props.cotizacion.ordenCompra?.estatusCompra === 'en_cotizacion' && !props.cotizacion.completada,
+    () => props.cotizacion.estatusCompra === 'en_cotizacion' && !props.cotizacion.completada,
 );
 
 const estadoDescripcion = computed(() =>
@@ -148,22 +137,22 @@ function subirOrdenCompra(): void {
     if (!archivo) return;
 
     router.post(
-        CompraOrdenController.store(rutaOc.value).url,
+        CotizacionController.subirAutorizacion(rutaOc.value).url,
         { archivo },
         { forceFormData: true, preserveScroll: true, onSuccess: () => (ocDialogOpen.value = false) },
     );
 }
 
 function solicitarRevision(): void {
-    router.post(CompraOrdenController.solicitarRevision(rutaOc.value).url, {}, { preserveScroll: true });
+    router.post(CotizacionController.solicitarRevisionCompra(rutaOc.value).url, {}, { preserveScroll: true });
 }
 
 function aprobarRevision(): void {
-    router.post(CompraOrdenController.aprobar(rutaOc.value).url, {}, { preserveScroll: true });
+    router.post(CotizacionController.aprobarCompra(rutaOc.value).url, {}, { preserveScroll: true });
 }
 
 function rechazarRevision(): void {
-    router.post(CompraOrdenController.rechazar(rutaOc.value).url, {}, { preserveScroll: true });
+    router.post(CotizacionController.rechazarCompra(rutaOc.value).url, {}, { preserveScroll: true });
 }
 
 const estadoLabel: Record<string, string> = {
@@ -211,7 +200,6 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </div>
             </div>
 
-            <!-- Banner de revisión administrativa pendiente -->
             <div v-if="solicitudPendiente"
                 class="border-b border-amber-200 bg-amber-50 px-6 py-5 dark:border-amber-900 dark:bg-amber-950/30">
                 <div class="flex items-start gap-3">
@@ -244,8 +232,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </div>
             </div>
 
-            <!-- Banner de rechazo -->
-            <div v-else-if="cotizacion.ordenCompra?.estatusCompra === 'rechazado'"
+            <div v-else-if="cotizacion.estatusCompra === 'rechazado'"
                 class="flex items-start gap-3 border-b border-red-200 bg-red-50 px-6 py-5 dark:border-red-900 dark:bg-red-950/30">
                 <FileWarning class="mt-0.5 size-5 shrink-0 text-red-600" />
                 <div>
@@ -347,7 +334,6 @@ function formatoMoneda(valor: number | null | undefined): string {
             </div>
         </div>
 
-        <!-- Proceso de Cotización -->
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <p class="text-lg font-semibold">Proceso de Cotización</p>
             <p class="mb-5 text-sm text-muted-foreground">Completa las fases en orden para procesar la cotización</p>
@@ -364,10 +350,10 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </span>
                 <ArrowRight class="size-4 text-muted-foreground" />
                 <span class="flex items-center gap-1.5"
-                    :class="cotizacion.tiene_orden_compra ? 'text-emerald-600' : 'text-muted-foreground'">
+                    :class="cotizacion.completada ? 'text-emerald-600' : 'text-muted-foreground'">
                     <span class="flex size-6 items-center justify-center rounded-full"
-                        :class="cotizacion.tiene_orden_compra ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'">
-                        <CheckCircle2 v-if="cotizacion.tiene_orden_compra" class="size-4" />
+                        :class="cotizacion.completada ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'">
+                        <CheckCircle2 v-if="cotizacion.completada" class="size-4" />
                         <span v-else class="text-xs">2</span>
                     </span>
                     Orden de Compra
@@ -375,7 +361,6 @@ function formatoMoneda(valor: number | null | undefined): string {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <!-- Card 1: Insumos -->
                 <div class="rounded-xl border p-4"
                     :class="cotizacion.tiene_insumos ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : ''">
                     <div class="mb-3 flex items-center gap-2">
@@ -403,12 +388,11 @@ function formatoMoneda(valor: number | null | undefined): string {
                     </Link>
                 </div>
 
-                <!-- Card 2: Orden de Compra -->
                 <div class="rounded-xl border p-4"
-                    :class="[!ocHabilitada && 'opacity-60', cotizacion.tiene_orden_compra ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : '']">
+                    :class="[!ocHabilitada && 'opacity-60', cotizacion.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : '']">
                     <div class="mb-3 flex items-center gap-2">
                         <ShoppingCart class="size-5"
-                            :class="cotizacion.tiene_orden_compra ? 'text-emerald-600' : 'text-muted-foreground'" />
+                            :class="cotizacion.completada ? 'text-emerald-600' : 'text-muted-foreground'" />
                         <div>
                             <p class="font-semibold">Orden de Compra</p>
                             <p class="text-xs text-muted-foreground">Sube el PDF de la orden o solicita revisión</p>
@@ -420,11 +404,11 @@ function formatoMoneda(valor: number | null | undefined): string {
                             este paso.</p>
                     </template>
 
-                    <template v-else-if="cotizacion.tiene_orden_compra">
+                    <template v-else-if="cotizacion.completada">
                         <div class="rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20">
                             <p class="font-medium text-emerald-700 dark:text-emerald-400">✓ Fase completada</p>
                         </div>
-                        <Link class="mt-3 block" :href="CompraOrdenController.index(rutaOc)">
+                        <Link class="mt-3 block" :href="CotizacionController.ordenCompra(rutaOc)">
                             <Button class="w-full bg-emerald-600 text-white hover:bg-emerald-700">Ver Orden de
                                 Compra</Button>
                         </Link>

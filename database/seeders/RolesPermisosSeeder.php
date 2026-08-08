@@ -19,44 +19,38 @@ class RolesPermisosSeeder extends Seeder
             ['nombre' => 'Sistema'],
             ['padre_id' => null, 'endpoint' => null, 'activo' => true]
         );
-
         $inventario = Permiso::updateOrCreate(
             ['nombre' => 'Inventario'],
             ['padre_id' => null, 'endpoint' => 'inventario', 'activo' => true]
         );
-
         $seguridad = Permiso::updateOrCreate(
             ['nombre' => 'Seguridad'],
             ['padre_id' => null, 'endpoint' => 'seguridad', 'activo' => true]
         );
-
         $roles = Permiso::updateOrCreate(
             ['nombre' => 'Roles'],
             ['padre_id' => $seguridad->id, 'endpoint' => 'roles', 'activo' => true]
         );
-
         $usuarios = Permiso::updateOrCreate(
             ['nombre' => 'Usuarios'],
             ['padre_id' => $seguridad->id, 'endpoint' => 'usuarios', 'activo' => true]
         );
-
         $ingenierias = Permiso::updateOrCreate(
             ['nombre' => 'Ingenierías'],
             ['padre_id' => null, 'endpoint' => 'ingenierias', 'activo' => true]
         );
-
         $plantas = Permiso::updateOrCreate(
             ['nombre' => 'Plantas'],
             ['padre_id' => $ingenierias->id, 'endpoint' => 'plantas', 'activo' => true]
         );
 
-        $superAdmin->otorgar($seguridad, Accion::ALL);
-        $superAdmin->otorgar($sistema, Accion::READ);
-        $superAdmin->otorgar($inventario, Accion::ALL);
-        $superAdmin->otorgar($roles, Accion::ALL);
-        $superAdmin->otorgar($usuarios, Accion::ALL);
-        $superAdmin->otorgar($ingenierias, Accion::READ);
-        $superAdmin->otorgar($plantas, Accion::ALL);
+        // Super Administrador: ALL en todo, sin excepción. Es la raíz de
+        // confianza del sistema — cualquier permiso parcial aquí es un bug,
+        // no una decisión de negocio (ver caso ingenierias => READ, que
+        // dejaba sin botones de aprobación a este mismo rol).
+        foreach ([$sistema, $inventario, $seguridad, $roles, $usuarios, $ingenierias, $plantas] as $permiso) {
+            $superAdmin->otorgar($permiso, Accion::ALL);
+        }
 
         $supervisor->otorgar($sistema, Accion::READ);
         $supervisor->otorgar($inventario, Accion::READ | Accion::UPDATE);

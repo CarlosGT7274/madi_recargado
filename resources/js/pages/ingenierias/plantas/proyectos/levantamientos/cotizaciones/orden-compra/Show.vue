@@ -1,29 +1,9 @@
-<script lang="ts">
-import { usePage } from '@inertiajs/vue3';
-import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
-
-interface Props {
-    planta: PlantaRef;
-    proyecto: ProyectoRef;
-    levantamiento: LevantamientoRef;
-    cotizacion: CotizacionRef;
-}
-
-export default pageLayout(() => {
-    const { planta, proyecto, levantamiento, cotizacion } = usePage<Props>().props;
-    return [
-        ...breadcrumbsCotizacion(planta, proyecto, levantamiento, cotizacion),
-        { title: 'Orden de Compra', href: '' },
-    ];
-});
-</script>
-
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { CheckCircle2, FileWarning, ShoppingCart, Upload } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import ArchivoController from '@/actions/App/Http/Controllers/ArchivoController';
-import CompraOrdenController from '@/actions/App/Http/Controllers/Ingenierias/CompraOrdenController';
+import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
 
@@ -39,20 +19,15 @@ interface CotizacionInfo {
     tieneInsumos: boolean;
 }
 
-interface OrdenCompraInfo {
-    id: number;
-    archivoId: number | null;
-    pdfUrl: string | null;
-    pdfNombre: string | null;
-    subidoEl: string | null;
-}
-
 const props = defineProps<{
     planta: PlantaRef;
     proyecto: ProyectoRef;
     levantamiento: LevantamientoRef;
     cotizacion: CotizacionInfo;
-    ordenCompra: OrdenCompraInfo | null;
+    archivoId: number | null;
+    pdfUrl: string | null;
+    pdfNombre: string | null;
+    subidoEl: string | null;
 }>();
 
 const rutaOc = computed(() => ({
@@ -69,7 +44,7 @@ function subirArchivo(): void {
     if (!archivo) return;
 
     router.post(
-        CompraOrdenController.store(rutaOc.value).url,
+        CotizacionController.subirAutorizacion(rutaOc.value).url,
         { archivo },
         { forceFormData: true, preserveScroll: true },
     );
@@ -81,14 +56,11 @@ function eliminarPdf(archivoId: number): void {
 </script>
 
 <template>
-
     <Head title="Orden de Compra" />
 
     <PageLayout title="" description="">
-        <!-- Header -->
         <div class="overflow-hidden rounded-2xl border shadow-sm">
-            <div
-                class="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-6 text-white">
+            <div class="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-6 text-white">
                 <div class="flex items-center gap-3">
                     <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/15">
                         <ShoppingCart class="size-6" />
@@ -99,20 +71,17 @@ function eliminarPdf(archivoId: number): void {
                     </div>
                 </div>
 
-                <span v-if="ordenCompra?.pdfUrl"
-                    class="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold uppercase">
+                <span v-if="pdfUrl" class="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold uppercase">
                     <CheckCircle2 class="size-3.5" />
                     Cumplido
                 </span>
-                <span v-else
-                    class="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold uppercase">
+                <span v-else class="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold uppercase">
                     <FileWarning class="size-3.5" />
                     Pendiente
                 </span>
             </div>
         </div>
 
-        <!-- Bloqueo por insumos -->
         <div v-if="!cotizacion.tieneInsumos"
             class="mt-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/30">
             <FileWarning class="mt-0.5 size-5 shrink-0 text-amber-600" />
@@ -124,35 +93,32 @@ function eliminarPdf(archivoId: number): void {
             </div>
         </div>
 
-        <!-- Ya hay PDF: visor -->
-        <div v-else-if="ordenCompra?.pdfUrl" class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
+        <div v-else-if="pdfUrl" class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p class="font-semibold">{{ ordenCompra.pdfNombre }}</p>
-                    <p class="text-xs text-muted-foreground">Subido el {{ ordenCompra.subidoEl ?? '—' }}</p>
+                    <p class="font-semibold">{{ pdfNombre }}</p>
+                    <p class="text-xs text-muted-foreground">Subido el {{ subidoEl ?? '—' }}</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a :href="ordenCompra.pdfUrl" target="_blank">
+                    <a :href="pdfUrl" target="_blank">
                         <Button variant="outline" size="sm">Abrir en pestaña nueva</Button>
                     </a>
                     <Button variant="outline" size="sm" class="text-destructive hover:bg-destructive/10"
-                        @click="ordenCompra.archivoId && eliminarPdf(ordenCompra.archivoId)">
+                        @click="archivoId && eliminarPdf(archivoId)">
                         Quitar y reemplazar
                     </Button>
                 </div>
             </div>
 
             <div class="overflow-hidden rounded-xl border bg-muted/20">
-                <iframe :src="ordenCompra.pdfUrl" class="h-[75vh] w-full" title="Orden de Compra" />
+                <iframe :src="pdfUrl" class="h-[75vh] w-full" title="Orden de Compra" />
             </div>
         </div>
 
-        <!-- No hay PDF todavía: zona de carga -->
         <div v-else class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
             <p class="mb-4 font-semibold">Sube el PDF de la Orden de Compra</p>
 
-            <label
-                class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-16 text-sm font-medium text-muted-foreground hover:bg-accent">
+            <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-16 text-sm font-medium text-muted-foreground hover:bg-accent">
                 <Upload class="size-6" />
                 <span class="text-primary">Seleccionar PDF</span>
                 <span class="text-xs">Con solo subirlo, este requisito queda cumplido</span>
