@@ -15,7 +15,7 @@ export default pageLayout(() => {
 
 <script setup lang="ts">
 import { Deferred, Form, Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, FileDown, FileSpreadsheet, Layers, Plus, ShieldCheck, ShoppingCart, Upload } from '@lucide/vue';
+import { ArrowLeft, Download, FileDown, FileSpreadsheet, Layers, Plus, ShieldCheck, ShoppingCart, Upload } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
@@ -182,10 +182,18 @@ function formatoMoneda(valor: number | null): string {
                     <FileSpreadsheet class="size-4" />
                     Cotizaciones
                 </div>
-                <Button size="sm" @click="createCotizacionDialogOpen = true">
-                    <Plus class="mr-2 size-4" />
-                    Subir cotización
-                </Button>
+                <div class="flex items-center gap-2">
+                    <a :href="CotizacionController.plantilla(rutaCotizaciones).url">
+                        <Button size="sm" variant="outline">
+                            <Download class="mr-2 size-4" />
+                            Plantilla
+                        </Button>
+                    </a>
+                    <Button size="sm" @click="createCotizacionDialogOpen = true">
+                        <Plus class="mr-2 size-4" />
+                        Subir cotización
+                    </Button>
+                </div>
             </div>
 
             <Deferred data="obras">
