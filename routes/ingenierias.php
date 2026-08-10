@@ -104,6 +104,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::CREATE)->name('plantilla');
             Route::post('/importar', [InsumoController::class, 'importar'])
                 ->middleware('permiso:'.Accion::CREATE)->name('importar');
+            Route::put('/{insumo}', [InsumoController::class, 'update'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('update');
             Route::delete('/{insumo}', [InsumoController::class, 'destroy'])
                 ->middleware('permiso:'.Accion::DELETE)->name('destroy');
         });

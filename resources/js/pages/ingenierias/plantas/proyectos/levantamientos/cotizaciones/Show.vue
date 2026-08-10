@@ -41,7 +41,7 @@ import {
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoController';
 import {
     Dialog,
@@ -140,6 +140,18 @@ const estadoDescripcion = computed(() =>
         ? 'Insumos y Orden de Compra están completos.'
         : 'Faltan pasos por completar en esta cotización.'
 );
+
+/**
+ * `cotizacion.tiene_insumos`/`completada` se calculan en el servidor y se
+ * envían como snapshot estático. Cuando el usuario navega con "atrás" del
+ * navegador, Inertia puede restaurar esta página desde el caché del
+ * historial en vez de pedir datos frescos, dejando el badge "Fase
+ * completada" desfasado hasta la siguiente visita real. Forzamos un
+ * refresh puntual de esta prop al montar para que nunca se quede vieja.
+ */
+onMounted(() => {
+    router.reload({ only: ['cotizacion'] });
+});
 
 function subirOrdenCompra(): void {
     const archivo = archivoOcInput.value?.files?.[0];

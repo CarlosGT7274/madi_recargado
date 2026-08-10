@@ -19,6 +19,8 @@ class PlantillaPropiaInsumoParser implements InsumoParser
 
     public function parsear(Collection $filas): InsumoParseResultado
     {
+        $filas = $filas->first();
+
         $resultado = [];
         $errores = [];
 

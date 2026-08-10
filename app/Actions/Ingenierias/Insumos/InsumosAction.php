@@ -57,6 +57,29 @@ class InsumosAction
         ];
     }
 
+    /**
+     * Edición inline: recalcula `importe` siempre que cambie cantidad o
+     * precio, sin depender de que el front mande ambos juntos.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function update(Insumo $insumo, array $data): Insumo
+    {
+        $cantidad = array_key_exists('cantidad_presupuestada', $data)
+            ? $data['cantidad_presupuestada']
+            : $insumo->cantidad_presupuestada;
+
+        $precio = array_key_exists('precio', $data)
+            ? $data['precio']
+            : $insumo->precio;
+
+        $data['importe'] = round((float) $cantidad * (float) ($precio ?? 0), 2);
+
+        $insumo->update($data);
+
+        return $insumo;
+    }
+
     public function delete(Insumo $insumo): void
     {
         $insumo->delete();

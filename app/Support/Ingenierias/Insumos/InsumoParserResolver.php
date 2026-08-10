@@ -2,6 +2,7 @@
 
 namespace App\Support\Ingenierias\Insumos;
 
+use App\Support\Ingenierias\Insumos\Parsers\PlantillaExternaInsumoParser;
 use App\Support\Ingenierias\Insumos\Parsers\PlantillaPropiaInsumoParser;
 use InvalidArgumentException;
 
@@ -10,7 +11,7 @@ class InsumoParserResolver
     /** @var array<string, class-string<InsumoParser>> */
     private const MAPA = [
         'propia' => PlantillaPropiaInsumoParser::class,
-        // 'externa' => PlantillaExternaInsumoParser::class, // pendiente: segundo formato
+        'externa' => PlantillaExternaInsumoParser::class,
     ];
 
     public static function resolver(string $tipo): InsumoParser

@@ -4,10 +4,11 @@ namespace App\Imports\Ingenierias\Insumos;
 
 use App\Models\Cotizacion;
 use App\Support\Ingenierias\Insumos\InsumoParser;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\ToCollection;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
-class InsumosExcelImport implements ToCollection
+class InsumosExcelImport
 {
     private int $creados = 0;
 
@@ -19,9 +20,11 @@ class InsumosExcelImport implements ToCollection
         private readonly InsumoParser $parser,
     ) {}
 
-    public function collection(Collection $filas): void
+    public function procesar(UploadedFile $archivo): void
     {
-        $resultado = $this->parser->parsear($filas);
+        $hojas = $this->leerHojas($archivo);
+
+        $resultado = $this->parser->parsear($hojas);
         $this->errores = $resultado->errores;
 
         foreach ($resultado->filas as $fila) {
@@ -34,6 +37,28 @@ class InsumosExcelImport implements ToCollection
             ]);
             $this->creados++;
         }
+    }
+
+    /**
+     * Lee TODAS las hojas del libro (no solo la activa). Usamos
+     * PhpSpreadsheet directo en vez de Excel::import()/ToCollection
+     * porque ese mecanismo, sin WithMultipleSheets, solo entrega la
+     * primera hoja al callback — insuficiente para formatos como Walmart
+     * que traen una hoja por categoría.
+     *
+     * @return Collection<string, Collection<int, array<int, mixed>>>
+     */
+    private function leerHojas(UploadedFile $archivo): Collection
+    {
+        $spreadsheet = IOFactory::load($archivo->getRealPath());
+        $hojas = collect();
+
+        foreach ($spreadsheet->getAllSheets() as $hoja) {
+            $filas = collect($hoja->toArray(null, true, true, false));
+            $hojas->put($hoja->getTitle(), $filas);
+        }
+
+        return $hojas;
     }
 
     public function creados(): int

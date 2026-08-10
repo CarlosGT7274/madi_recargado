@@ -7,6 +7,7 @@ use App\Actions\Ingenierias\Insumos\InsumosAction;
 use App\Exports\Ingenierias\Insumos\InsumoPlantillaExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Insumos\ImportInsumosRequest;
+use App\Http\Requests\Ingenierias\Insumos\UpdateInsumoRequest;
 use App\Imports\Ingenierias\Insumos\InsumosExcelImport;
 use App\Models\Cotizacion;
 use App\Models\Insumo;
@@ -59,12 +60,26 @@ class InsumoController extends Controller
     ): RedirectResponse {
         $parser = InsumoParserResolver::resolver($request->validated('tipo_plantilla') ?? 'propia');
         $import = new InsumosExcelImport($cotizacion, $parser);
-        Excel::import($import, $request->file('archivo'));
+        $import->procesar($request->file('archivo'));
 
         Inertia::flash('toast', [
             'type' => empty($import->errores()) ? 'success' : 'warning',
             'message' => "{$import->creados()} insumos importados.",
         ]);
+
+        return back();
+    }
+
+    public function update(
+        UpdateInsumoRequest $request,
+        Planta $planta,
+        Proyecto $proyecto,
+        Levantamiento $levantamiento,
+        Cotizacion $cotizacion,
+        Insumo $insumo,
+        InsumosAction $action,
+    ): RedirectResponse {
+        $action->update($insumo, $request->validated());
 
         return back();
     }
