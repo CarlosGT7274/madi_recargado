@@ -34,9 +34,12 @@ return new class extends Migration
         // tanto en flujo grande como directo).
         DB::statement('
             UPDATE partidas
-            INNER JOIN cotizaciones ON cotizaciones.id = partidas.cotizacion_id
-            SET partidas.proyecto_id = cotizaciones.proyecto_id
-            WHERE partidas.cotizacion_id IS NOT NULL
+            SET proyecto_id = (
+                SELECT proyecto_id 
+                FROM cotizaciones 
+                WHERE cotizaciones.id = partidas.cotizacion_id
+            )
+            WHERE cotizacion_id IS NOT NULL
         ');
 
         if (Schema::hasTable('planeacion_actividades')) {

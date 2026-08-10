@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Planeacion extends Model
 {
+    use HasFactory;
+
     protected $table = 'planeaciones';
 
     const CREATED_AT = 'fecha_creacion';
@@ -64,5 +68,15 @@ class Planeacion extends Model
     public function asignaciones(): HasMany
     {
         return $this->hasMany(PlaneacionAsignacion::class, 'planeacion_id');
+    }
+
+    public function fechaInicio(): Carbon
+    {
+        return Carbon::now()->setISODate($this->anio, $this->semana, 1)->startOfDay();
+    }
+
+    public function fechaFin(): Carbon
+    {
+        return $this->fechaInicio()->copy()->addDays(6)->endOfDay();
     }
 }

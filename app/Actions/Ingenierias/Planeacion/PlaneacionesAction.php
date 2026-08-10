@@ -7,6 +7,7 @@ use App\Models\Planeacion;
 use App\Models\Proyecto;
 use App\Models\User;
 use App\Support\Accion;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -23,37 +24,45 @@ class PlaneacionesAction
      * lo mismo para 'ingenierias'). Si el usuario tiene el bit ALL sobre
      * el endpoint 'planeacion', es supervisor/ingeniero; si no, residente.
      */
-    public function esSupervisor(User $usuario): bool
+    public function puedeAprobar(User $usuario): bool
     {
-        return $usuario->puedePorEndpoint('planeacion', Accion::ALL);
+        return $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::ALL);
     }
 
-    /**
-     * Historial de planeaciones de un proyecto. El residente ve solo las
-     * que él capturó; el supervisor las ve todas.
-     */
+    public function listPropias(User $usuario): Collection
+    {
+        $query = Planeacion::where('usuario_id', $usuario->id)
+            ->with('proyecto', 'planta', 'usuario', 'aprobador');
+
+        return $query->latest('anio')->latest('semana')->get()->map(fn (Planeacion $p) => $this->resumen($p));
+    }
+
     public function listPorProyecto(Proyecto $proyecto, User $usuario): Collection
     {
         $query = $proyecto->planeaciones()->with('usuario', 'aprobador');
 
-        if (! $this->esSupervisor($usuario)) {
+        if (! $this->puedeAprobar($usuario)) {
             $query->where('usuario_id', $usuario->id);
         }
 
         return $query->latest('anio')->latest('semana')->get()->map(fn (Planeacion $p) => $this->resumen($p));
     }
 
-    /**
-     * Vista consolidada del supervisor: todas las planeaciones de las
-     * plantas que tiene asignadas.
-     */
-    public function listParaSupervisor(User $usuario): Collection
+    public function listProgramacion(User $usuario, ?Carbon $desde, ?Carbon $hasta): Collection
     {
         $plantaIds = $usuario->plantasAsignadas()->pluck('plantas.id');
 
-        return Planeacion::whereIn('planta_id', $plantaIds)
-            ->with('proyecto', 'planta', 'usuario')
-            ->latest('anio')->latest('semana')
+        $query = Planeacion::whereIn('planta_id', $plantaIds)
+            ->with('proyecto', 'planta', 'usuario');
+
+        if ($desde && $hasta) {
+            $query->where(function ($q) use ($desde, $hasta) {
+                // Approximate filtering based on anio and semana for the date range
+                $q->whereBetween('anio', [$desde->year, $hasta->year]);
+            });
+        }
+
+        return $query->latest('anio')->latest('semana')
             ->get()
             ->map(fn (Planeacion $p) => $this->resumen($p));
     }

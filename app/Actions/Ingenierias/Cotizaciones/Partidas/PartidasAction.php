@@ -1,4 +1,3 @@
-// app/Actions/Ingenierias/Cotizaciones/Partidas/PartidasAction.php
 <?php
 
 namespace App\Actions\Ingenierias\Cotizaciones\Partidas;

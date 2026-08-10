@@ -53,6 +53,6 @@ class Planta extends Model
     public function ingenieros(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'planta_usuario', 'planta_id', 'usuario_id')
-            ->withTimestamps();
+            ->withTimestamps('created_at', 'updated_at');
     }
 }

@@ -7,14 +7,16 @@ use App\Support\Accion;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::name('planeacion.')
+    Route::name('ingenierias.planeacion.')
         ->prefix('planeacion')
         ->group(function () {
             Route::get('/', [PlaneacionController::class, 'index'])
                 ->middleware('permiso:'.Accion::READ)->name('index');
+            Route::get('/nueva', [PlaneacionController::class, 'create'])
+                ->middleware('permiso:'.Accion::CREATE)->name('create');
         });
 
-    Route::name('planeacion.plantas.proyectos.')
+    Route::name('ingenierias.planeacion.plantas.proyectos.')
         ->prefix('planeacion/plantas/{planta}/proyectos/{proyecto}')
         ->scopeBindings()
         ->group(function () {
@@ -24,7 +26,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::CREATE)->name('planeaciones.store');
         });
 
-    Route::name('planeacion.')
+    Route::name('ingenierias.planeacion.')
         ->prefix('planeacion/{planeacion}')
         ->group(function () {
             Route::get('/', [PlaneacionController::class, 'show'])

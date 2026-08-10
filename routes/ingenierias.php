@@ -162,6 +162,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->prefix('ingenierias/plantas/{planta}/proyectos/{proyecto}/actividades')
         ->scopeBindings()
         ->group(function () {
+            Route::get('/data', [ActividadController::class, 'data'])
+                ->middleware('permiso:'.Accion::READ)->name('data');
             Route::post('/', [ActividadController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
             Route::put('/{actividad}', [ActividadController::class, 'update'])

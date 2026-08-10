@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Proyecto extends Model
 {
+    use HasFactory;
+
     protected $table = 'proyectos';
 
     const CREATED_AT = 'fecha_creacion';
@@ -86,7 +89,7 @@ class Proyecto extends Model
     public function residentes(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'proyecto_usuario', 'proyecto_id', 'usuario_id')
-            ->withTimestamps();
+            ->withTimestamps('created_at', 'updated_at');
     }
 
     public function estaCompletado(): bool

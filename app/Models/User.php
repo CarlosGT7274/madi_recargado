@@ -39,12 +39,12 @@ class User extends Authenticatable
     public function plantasAsignadas(): BelongsToMany
     {
         return $this->belongsToMany(Planta::class, 'planta_usuario', 'usuario_id', 'planta_id')
-            ->withTimestamps();
+            ->withTimestamps('created_at', 'updated_at');
     }
 
     public function proyectosAsignados(): BelongsToMany
     {
         return $this->belongsToMany(Proyecto::class, 'proyecto_usuario', 'usuario_id', 'proyecto_id')
-            ->withTimestamps();
+            ->withTimestamps('created_at', 'updated_at');
     }
 }
