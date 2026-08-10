@@ -3,20 +3,21 @@
 namespace App\Actions\Ingenierias\Actividades;
 
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
-use App\Models\Cotizacion;
-use App\Models\PlaneacionActividad;
+use App\Models\Partida;
 use App\Models\Proyecto;
 use Illuminate\Support\Collection;
 
 /**
- * CRUD del árbol de actividades (equivalente a "partidas") de un Proyecto
- * directo. Las actividades capturadas a mano viven en
- * planeacion_actividades, con autorreferencia parent_id.
+ * Árbol de "actividades" de un Proyecto directo. Desde el merge de
+ * 2026-08-10, Partida es la ÚNICA fuente de verdad: una actividad manual
+ * es una Partida con cotizacion_id NULL; una actividad que viene de una
+ * cotización aprobada es una Partida con cotizacion_id set. Ya no existe
+ * ninguna tabla/modelo separado para actividades — este Action solo arma
+ * el árbol de visualización y delega la escritura a PartidasAction.
  *
- * Además, arbol() mezcla —sin duplicar storage— las Partidas de cualquier
- * cotización del proyecto que ya esté Cotizacion::estaCompletada(): esas
- * partidas representan el trabajo aprobado y deben verse aquí para
- * alimentar Planeación, igual que las actividades manuales.
+ * Solo se muestran como "actividad" las partidas manuales (siempre) y las
+ * de cotizaciones que ya estén Cotizacion::estaCompletada() (representan
+ * trabajo aprobado, listo para alimentar Planeación).
  */
 class ActividadesAction
 {
@@ -26,82 +27,43 @@ class ActividadesAction
 
     public function arbol(Proyecto $proyecto): Collection
     {
-        $manuales = $proyecto->actividades()
-            ->whereNull('parent_id')
-            ->with('hijas')
+        return $proyecto->partidas()
+            ->whereNull('partida_id')
+            ->with(['hijas', 'cotizacion.archivos'])
             ->orderBy('id')
             ->get()
-            ->map(fn (PlaneacionActividad $a) => $this->nodo($a));
-
-        $desdeCotizaciones = $this->arbolDesdeCotizaciones($proyecto);
-
-        return $manuales->concat($desdeCotizaciones)->values();
-    }
-
-    private function arbolDesdeCotizaciones(Proyecto $proyecto): Collection
-    {
-        return $proyecto->cotizaciones()
-            ->with('partidas', 'archivos')
-            ->get()
-            ->filter(fn (Cotizacion $c) => $c->estaCompletada())
-            ->flatMap(fn (Cotizacion $c) => $this->partidasAction->arbol($c))
-            ->map(fn (array $raiz) => $this->nodoDesdePartida($raiz));
-    }
-
-    /**
-     * Convierte un nodo de PartidasAction::arbol() (id/no/descripcion/hijas)
-     * a la misma forma que nodo(). Usa ids negativos para no colisionar con
-     * los ids (positivos) de planeacion_actividades: son tablas distintas,
-     * ambas autoincrementales desde 1.
-     *
-     * @param  array<string, mixed>  $partida
-     * @return array<string, mixed>
-     */
-    private function nodoDesdePartida(array $partida, bool $esHija = false): array
-    {
-        return [
-            'id' => -1 * (int) $partida['id'],
-            'codigo' => $esHija ? ($partida['no'] ?? null) : null,
-            'nombre' => $partida['descripcion'],
-            'notas' => null,
-            'origen' => 'cotizacion',
-            'hijas' => isset($partida['hijas'])
-                ? collect($partida['hijas'])
-                    ->map(fn (array $h) => $this->nodoDesdePartida($h, esHija: true))
-                    ->all()
-                : [],
-        ];
+            ->filter(fn (Partida $p) => $p->esManual() || $p->cotizacion?->estaCompletada())
+            ->map(fn (Partida $p) => $this->nodo($p))
+            ->values();
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function nodo(PlaneacionActividad $actividad): array
+    private function nodo(Partida $partida): array
     {
         return [
-            'id' => $actividad->id,
-            'codigo' => $actividad->codigo,
-            'nombre' => $actividad->nombre,
-            'notas' => $actividad->notas,
-            'origen' => 'manual',
-            'hijas' => $actividad->hijas->map(fn (PlaneacionActividad $h) => $this->nodo($h))->all(),
+            'id' => $partida->id,
+            'codigo' => $partida->numero_partida,
+            'nombre' => $partida->descripcion,
+            'notas' => $partida->notas,
+            'origen' => $partida->esManual() ? 'manual' : 'cotizacion',
+            'hijas' => $partida->hijas->map(fn (Partida $h) => $this->nodo($h))->all(),
         ];
     }
 
-    public function create(Proyecto $proyecto, array $data): PlaneacionActividad
+    public function create(Proyecto $proyecto, array $data): Partida
     {
-        return $proyecto->actividades()->create($data);
+        return $this->partidasAction->createManual($proyecto, $data);
     }
 
-    public function update(PlaneacionActividad $actividad, array $data): PlaneacionActividad
+    public function update(Partida $actividad, array $data): Partida
     {
-        $actividad->update($data);
-
-        return $actividad;
+        return $this->partidasAction->update($actividad, $data);
     }
 
-    public function delete(PlaneacionActividad $actividad): void
+    public function delete(Partida $actividad): void
     {
-        $actividad->delete();
+        $this->partidasAction->delete($actividad);
     }
 }

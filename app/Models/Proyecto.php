@@ -67,6 +67,17 @@ class Proyecto extends Model
         return $this->partidas()->whereNull('cotizacion_id');
     }
 
+    /**
+     * Alias para el route model binding anidado (scopeBindings()) de
+     * ActividadController: Laravel resuelve /proyectos/{proyecto}/actividades/{actividad}
+     * llamando a $proyecto->actividades(), no a partidas(). "Actividad" es
+     * solo el nombre de la ruta/URL; el modelo real sigue siendo Partida.
+     */
+    public function actividades(): HasMany
+    {
+        return $this->partidas();
+    }
+
     public function planeaciones(): HasMany
     {
         return $this->hasMany(Planeacion::class, 'proyecto_id');

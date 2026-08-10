@@ -7,6 +7,7 @@ require __DIR__.'/seguridad.php';
 require __DIR__.'/ingenierias.php';
 require __DIR__.'/archivos.php';
 require __DIR__.'/notificaciones.php';
+require __DIR__.'/planeacion.php';
 
 Route::get('/', function () {
     return redirect()->route(auth()->check() ? 'dashboard' : 'login');

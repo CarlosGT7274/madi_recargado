@@ -1,9 +1,11 @@
+// app/Actions/Ingenierias/Cotizaciones/Partidas/PartidasAction.php
 <?php
 
 namespace App\Actions\Ingenierias\Cotizaciones\Partidas;
 
 use App\Models\Cotizacion;
 use App\Models\Partida;
+use App\Models\Proyecto;
 use Illuminate\Support\Collection;
 
 class PartidasAction
@@ -22,16 +24,39 @@ class PartidasAction
         ]);
     }
 
+    /**
+     * Crea una partida colgada de una Cotización. `proyecto_id` se
+     * denormaliza SIEMPRE desde la cotización — es el invariante que
+     * permite a Proyecto::partidas() (y por lo tanto Planeación) ver
+     * todas las partidas del proyecto sin importar su origen.
+     */
     public function create(Cotizacion $cotizacion, array $data): Partida
     {
         $data['numero_partida'] = $data['numero_partida']
             ?? (($cotizacion->partidas()->max('numero_partida') ?? 0) + 1);
         $data['importe'] = round($data['cantidad'] * $data['precio_unitario'], 2);
+        $data['proyecto_id'] = $cotizacion->proyecto_id;
 
         $partida = $cotizacion->partidas()->create($data);
         $this->recalcularTotales($cotizacion);
 
         return $partida;
+    }
+
+    /**
+     * Crea una partida manual (actividad de Proyecto directo, sin pasar
+     * por una cotización). cotizacion_id queda NULL a propósito.
+     */
+    public function createManual(Proyecto $proyecto, array $data): Partida
+    {
+        $data['numero_partida'] = $data['numero_partida']
+            ?? (($proyecto->partidasManuales()->whereNull('partida_id')->max('numero_partida') ?? 0) + 1);
+        $data['cotizacion_id'] = null;
+        $data['cantidad'] = $data['cantidad'] ?? 0;
+        $data['precio_unitario'] = $data['precio_unitario'] ?? 0;
+        $data['importe'] = round($data['cantidad'] * $data['precio_unitario'], 2);
+
+        return $proyecto->partidas()->create($data);
     }
 
     public function update(Partida $partida, array $data): Partida
@@ -41,7 +66,11 @@ class PartidasAction
         $data['importe'] = round($cantidad * $precio, 2);
 
         $partida->update($data);
-        $this->recalcularTotales($partida->cotizacion);
+
+        // Una partida manual no tiene cotización que recalcular.
+        if ($partida->cotizacion !== null) {
+            $this->recalcularTotales($partida->cotizacion);
+        }
 
         return $partida;
     }
@@ -50,7 +79,10 @@ class PartidasAction
     {
         $cotizacion = $partida->cotizacion;
         $partida->delete();
-        $this->recalcularTotales($cotizacion);
+
+        if ($cotizacion !== null) {
+            $this->recalcularTotales($cotizacion);
+        }
     }
 
     public function recalcularTotales(Cotizacion $cotizacion): void

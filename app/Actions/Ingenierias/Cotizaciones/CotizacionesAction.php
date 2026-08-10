@@ -247,13 +247,12 @@ class CotizacionesAction
         $cotizacion = $this->createParaProyecto($proyecto, $data);
 
         foreach ($categorias as $indiceCategoria => $categoria) {
-            $padre = $cotizacion->partidas()->create([
+            $padre = $this->partidasAction->create($cotizacion, [
                 'partida_id' => null,
                 'numero_partida' => $indiceCategoria + 1,
                 'descripcion' => $categoria['descripcion'],
                 'cantidad' => 0,
                 'precio_unitario' => 0,
-                'importe' => 0,
             ]);
 
             foreach ($categoria['partidas'] as $indiceHija => $hija) {
