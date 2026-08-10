@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Support\Operacion;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
 
 class Role extends Model
 {
@@ -83,94 +83,6 @@ class Role extends Model
     public function mapaPermisosAsignados(): array
     {
         return $this->grantsMapa()->all();
-    }
-
-    /**
-     * Operaciones efectivas por endpoint, consumidas por el frontend.
-     * El frontend resuelve por prefijo, así que basta con exponer cada
-     * objeto con endpoint cuyo conjunto efectivo no sea vacío.
-     *
-     * @return array<string, array<int, string>>
-     */
-    public function mapaPermisosPorEndpoint(): array
-    {
-        return Permiso::with('padre.padre.padre')
-            ->whereNotNull('endpoint')
-            ->get()
-            ->mapWithKeys(function (Permiso $permiso): array {
-                $endpoint = $permiso->endpointCompleto();
-
-                if ($endpoint === null) {
-                    return [];
-                }
-
-                $operaciones = $this->operacionesEfectivasPara($permiso);
-
-                return $operaciones === [] ? [] : [$endpoint => $operaciones];
-            })
-            ->all();
-    }
-
-    /**
-     * Módulos visibles en el sidebar: objeto activo, con ruta registrada,
-     * y con la operación `leer` concedida (heredada o directa).
-     *
-     * @return Collection<int, array<string, mixed>>
-     */
-    public function menuVisible(): Collection
-    {
-        return $this->construirMenu(null);
-    }
-
-    protected function construirMenu(?int $padreId, ?string $prefijoPadre = null): Collection
-    {
-        return Permiso::query()
-            ->where('activo', true)
-            ->where('padre_id', $padreId)
-            ->orderBy('nombre')
-            ->get()
-            ->map(function (Permiso $permiso) use ($prefijoPadre) {
-                $endpointCompleto = Permiso::componerEndpoint($prefijoPadre, $permiso->endpoint);
-                $hijos = $this->construirMenu($permiso->id, $endpointCompleto);
-                $url = $this->resolverUrl($endpointCompleto);
-
-                $visible = $hijos->isNotEmpty()
-                    || ($url !== null && $this->tienePermiso($permiso, Operacion::LEER));
-
-                if (! $visible) {
-                    return null;
-                }
-
-                return [
-                    'id' => $permiso->id,
-                    'nombre' => $permiso->nombre,
-                    'endpoint' => $endpointCompleto,
-                    'padre_id' => $permiso->padre_id,
-                    'url' => $url,
-                    'hijos' => $hijos->values(),
-                ];
-            })
-            ->filter()
-            ->values();
-    }
-
-    protected function resolverUrl(?string $endpoint): ?string
-    {
-        if ($endpoint === null) {
-            return null;
-        }
-
-        $nombreRuta = "{$endpoint}.index";
-
-        if (! Route::has($nombreRuta)) {
-            return null;
-        }
-
-        try {
-            return route($nombreRuta);
-        } catch (\Throwable) {
-            return null;
-        }
     }
 
     /**

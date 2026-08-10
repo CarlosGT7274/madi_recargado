@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Concerns\HasBitmaskAuthorization;
+use App\Concerns\HasRoleAuthorization;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -10,7 +10,7 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasBitmaskAuthorization;
+    use HasRoleAuthorization;
 
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -19,7 +19,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'rol_id',
         'firma_url',
     ];
 

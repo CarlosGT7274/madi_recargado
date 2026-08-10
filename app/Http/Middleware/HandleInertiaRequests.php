@@ -42,8 +42,8 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
-            'permisos' => $request->user()?->rol?->mapaPermisosPorEndpoint() ?? [],
-            'menu' => $request->user()?->rol?->menuVisible() ?? collect(),
+            'permisos' => $request->user()?->mapaPermisosPorEndpoint() ?? [],
+            'menu' => $request->user()?->menuVisible() ?? collect(),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'notificaciones' => fn () => $request->user()
                 ? app(NotificacionesAction::class)->noLeidasDe($request->user())
