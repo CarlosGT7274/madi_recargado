@@ -11,6 +11,7 @@ use App\Models\Proyecto;
 use App\Models\Role;
 use App\Services\FolioService;
 use App\Support\Accion;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +19,16 @@ use Illuminate\Validation\ValidationException;
 
 class CotizacionesAction
 {
+    /**
+     * Label sintético para cotizaciones sin `obra` (columna NULL). Se usa
+     * como fallback de display Y como valor de ida-vuelta en la URL
+     * (obra/{obra}). whereObra() lo traduce de vuelta a NULL al consultar
+     * — sin esto, entrar al detalle de una obra sin nombre siempre daba
+     * 0 versiones aunque sí existieran, porque comparábamos el texto
+     * contra la columna real (NULL != "Sin nombre de obra").
+     */
+    private const SIN_OBRA = 'Sin nombre de obra';
+
     public function __construct(
         private readonly FolioService $folios,
         private readonly PartidasAction $partidasAction,
@@ -52,7 +63,7 @@ class CotizacionesAction
     private function agruparPorObra(Collection $cotizaciones): Collection
     {
         return $cotizaciones
-            ->groupBy(fn (Cotizacion $c) => $c->obra ?: 'Sin nombre de obra')
+            ->groupBy(fn (Cotizacion $c) => $c->obra ?: self::SIN_OBRA)
             ->map(function (Collection $versiones, string $obra) {
                 $ultima = $versiones->first();
 
@@ -68,11 +79,10 @@ class CotizacionesAction
 
     public function obra(Levantamiento $levantamiento, string $obra): array
     {
-        $versiones = $levantamiento->cotizaciones()
-            ->with('archivos', 'insumos')
-            ->where('obra', $obra)
-            ->latest('id')
-            ->get();
+        $versiones = $this->whereObra(
+            $levantamiento->cotizaciones()->with('archivos', 'insumos'),
+            $obra,
+        )->latest('id')->get();
 
         return $this->resumenObra($obra, $versiones);
     }
@@ -80,13 +90,24 @@ class CotizacionesAction
     /** Equivalente a obra(), para el flujo de Proyecto directo. */
     public function obraProyecto(Proyecto $proyecto, string $obra): array
     {
-        $versiones = $proyecto->cotizaciones()
-            ->with('archivos')
-            ->where('obra', $obra)
-            ->latest('id')
-            ->get();
+        $versiones = $this->whereObra(
+            $proyecto->cotizaciones()->with('archivos'),
+            $obra,
+        )->latest('id')->get();
 
         return $this->resumenObra($obra, $versiones);
+    }
+
+    /**
+     * Traduce el label sintético SIN_OBRA de vuelta a un WHERE NULL real.
+     * Único punto donde se compara `obra` contra un valor que viene de la
+     * URL — todo lo demás pasa por aquí para no repetir el mismo bug.
+     */
+    private function whereObra(HasMany $query, string $obra): HasMany
+    {
+        return $obra === self::SIN_OBRA
+            ? $query->whereNull('obra')
+            : $query->where('obra', $obra);
     }
 
     private function resumenObra(string $obra, Collection $versiones): array
@@ -126,6 +147,8 @@ class CotizacionesAction
 
     public function detail(Cotizacion $cotizacion): array
     {
+        $obraKey = $cotizacion->obra ?: self::SIN_OBRA;
+
         return [
             'id' => $cotizacion->id,
             'levantamiento_id' => $cotizacion->levantamiento_id,
@@ -155,10 +178,10 @@ class CotizacionesAction
             'tiene_orden_compra' => $cotizacion->tieneAutorizacion(),
             'completada' => $cotizacion->estaCompletada(),
             'otrasVersiones' => $cotizacion->esDeProyectoDirecto()
-                ? $this->versionesDeObraProyecto($cotizacion->proyecto, $cotizacion->obra ?? '')
+                ? $this->versionesDeObraProyecto($cotizacion->proyecto, $obraKey)
                     ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
                     ->values()
-                : $this->versionesDeObra($cotizacion->levantamiento, $cotizacion->obra ?? '')
+                : $this->versionesDeObra($cotizacion->levantamiento, $obraKey)
                     ->reject(fn (array $v) => $v['id'] === $cotizacion->id)
                     ->values(),
             'estatusCompra' => $cotizacion->estatus_compra,
@@ -168,22 +191,18 @@ class CotizacionesAction
 
     public function versionesDeObra(Levantamiento $levantamiento, string $obra): Collection
     {
-        return $levantamiento->cotizaciones()
-            ->with('archivos', 'insumos')
-            ->where('obra', $obra)
-            ->latest('id')
-            ->get()
-            ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
+        return $this->whereObra(
+            $levantamiento->cotizaciones()->with('archivos', 'insumos'),
+            $obra,
+        )->latest('id')->get()->map(fn (Cotizacion $c) => $this->resumenVersion($c));
     }
 
     public function versionesDeObraProyecto(Proyecto $proyecto, string $obra): Collection
     {
-        return $proyecto->cotizaciones()
-            ->with('archivos')
-            ->where('obra', $obra)
-            ->latest('id')
-            ->get()
-            ->map(fn (Cotizacion $c) => $this->resumenVersion($c));
+        return $this->whereObra(
+            $proyecto->cotizaciones()->with('archivos'),
+            $obra,
+        )->latest('id')->get()->map(fn (Cotizacion $c) => $this->resumenVersion($c));
     }
 
     public function create(Levantamiento $levantamiento, array $data): Cotizacion

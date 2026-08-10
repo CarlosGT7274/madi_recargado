@@ -27,6 +27,7 @@ import {
     Plus,
     ShoppingCart,
     Upload,
+    Download
 } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
@@ -318,6 +319,13 @@ function formatoMoneda(valor: number | null): string {
 
                     <div v-else class="flex flex-col items-end gap-2">
                         <div class="flex items-center gap-2">
+                            <a :href="CotizacionController.plantillaProyecto([planta.id, proyecto.id]).url">
+                                <Button variant="outline">
+                                    <Download class="size-4" />
+                                    Descargar Plantilla
+                                </Button>
+                            </a>
+
                             <label>
                                 <Button as="span" class="cursor-pointer">
                                     <Upload class="size-4" />

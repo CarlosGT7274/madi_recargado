@@ -18,13 +18,17 @@ export default pageLayout(() => {
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     ArrowRight, Building2, CheckCircle2, Clock, DollarSign, Download,
-    FileText, Hash, MapPin, ShoppingCart, Upload, User,
+    FileText, Hash, MapPin, ShoppingCart, Trash2, Upload, User,
 } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
+import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import PageLayout from '@/components/PageLayout.vue';
+import PermissionButton from '@/components/PermissionButton.vue';
 import { Button } from '@/components/ui/button';
 import { computed, ref } from 'vue';
-import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
+import { usePermissions } from '@/composables/usePermissions';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Eye } from '@lucide/vue';
 
 interface PlantaRef { id: number; nombre: string }
 interface ProyectoRef { id: number; nombre: string; folio: string }
@@ -73,11 +77,18 @@ const props = defineProps<{
     numeroPartidas: number;
 }>();
 
+const { Accion } = usePermissions();
+const endpoint = 'ingenierias.plantas.proyectos.cotizaciones';
+
 const rutaOc = computed(() => ({
     planta: props.planta.id,
     proyecto: props.proyecto.id,
     cotizacion: props.cotizacion.id,
 }));
+
+const verPdf = ref(false);
+
+const urlPdf = computed(() => CotizacionController.pdfProyecto(rutaOc.value).url);
 
 const archivoOcInput = ref<HTMLInputElement | null>(null);
 
@@ -90,6 +101,13 @@ function subirOrdenCompra(): void {
         { archivo },
         { forceFormData: true, preserveScroll: true },
     );
+}
+
+function eliminar(): void {
+    if (!confirm(`¿Eliminar la cotización "${props.cotizacion.folio}"? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    router.delete(CotizacionController.destroyProyecto(rutaOc.value).url);
 }
 
 const estadoLabel: Record<string, string> = {
@@ -123,10 +141,29 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <p class="text-2xl font-bold">{{ cotizacion.folio }}</p>
                     <p class="mt-1 text-sm text-indigo-100">{{ cotizacion.fecha ?? '—' }}</p>
                 </div>
-                <span class="rounded-md px-3 py-1 text-xs font-bold uppercase"
-                    :class="cotizacion.completada ? 'bg-emerald-500' : 'bg-white/20'">
-                    {{ cotizacion.completada ? 'Completada' : (estadoLabel[cotizacion.estado] ?? cotizacion.estado) }}
-                </span>
+
+                <div class="flex flex-col items-end gap-2">
+                    <div class="flex items-center gap-2">
+                        <a :href="urlPdf" target="_blank" rel="noopener noreferrer">
+                            <Button variant="secondary" size="sm">
+                                <Download class="mr-2 size-4" />
+                                Exportar
+                            </Button>
+                        </a>
+
+                        <PermissionButton :endpoint="endpoint" :accion="Accion.DELETE" variant="outline" size="sm"
+                            class="border-white/30 bg-white/10 text-white hover:bg-white/20" @click="eliminar">
+                            <Trash2 class="mr-2 size-4" />
+                            Eliminar
+                        </PermissionButton>
+                    </div>
+
+                    <span class="rounded-md px-3 py-1 text-xs font-bold uppercase"
+                        :class="cotizacion.completada ? 'bg-emerald-500' : 'bg-white/20'">
+                        {{ cotizacion.completada ? 'Completada' : (estadoLabel[cotizacion.estado] ?? cotizacion.estado)
+                        }}
+                    </span>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-6 border-b bg-card px-6 py-5 sm:grid-cols-3">
@@ -178,7 +215,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <dl class="space-y-2 text-sm">
                         <div class="flex items-center gap-2">
                             <FileText class="size-4 text-muted-foreground" /><span class="font-medium">Obra:</span>
-                            {{ cotizacion.obra ?? '—' }}
+                            {{ cotizacion.obra ?? 'Sin nombre de obra' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <User class="size-4 text-muted-foreground" /><span class="font-medium">Vendedor:</span>
@@ -217,23 +254,41 @@ function formatoMoneda(valor: number | null | undefined): string {
                 <p class="text-lg font-semibold">Orden de Compra</p>
             </div>
 
-            <div v-if="cotizacion.pdfAutorizacion"
-                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                        <CheckCircle2 class="size-4" />
+            <Collapsible v-if="cotizacion.pdfAutorizacion" v-model:open="verPdf">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                            <CheckCircle2 class="size-4" />
+                        </div>
+                        <div>
+                            <p class="font-medium">Orden de compra cargada</p>
+                        </div>
                     </div>
-                    <div>
-                        <p class="font-medium">Orden de compra cargada</p>
+
+                    <div class="flex items-center gap-2">
+                        <CollapsibleTrigger as-child>
+                            <Button variant="outline" size="sm">
+                                <Eye class="mr-1.5 size-3.5" />
+                                {{ verPdf ? 'Ocultar' : 'Ver' }}
+                                <ChevronDown class="ml-1.5 size-3.5 transition-transform"
+                                    :class="verPdf ? 'rotate-180' : ''" />
+                            </Button>
+                        </CollapsibleTrigger>
+
+                        <a :href="cotizacion.pdfAutorizacion" target="_blank">
+                            <Button variant="outline" size="sm">
+                                <Download class="mr-1.5 size-3.5" />
+                                Descargar
+                            </Button>
+                        </a>
                     </div>
                 </div>
-                <a :href="cotizacion.pdfAutorizacion" target="_blank">
-                    <Button variant="outline" size="sm">
-                        <Download class="mr-1.5 size-3.5" />
-                        Descargar
-                    </Button>
-                </a>
-            </div>
+
+                <CollapsibleContent class="mt-4 overflow-hidden rounded-xl border bg-muted/20">
+                    <iframe :src="cotizacion.pdfAutorizacion" class="h-[70vh] w-full" title="Orden de Compra" />
+                </CollapsibleContent>
+            </Collapsible>
 
             <label v-else
                 class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">

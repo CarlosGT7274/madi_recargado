@@ -6,6 +6,7 @@ use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
+use App\Models\Proyecto;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -20,7 +21,7 @@ class CotizacionExcelImport implements ToCollection
     private int $partidasCreadas = 0;
 
     public function __construct(
-        private readonly Levantamiento $levantamiento,
+        private readonly Levantamiento|Proyecto $padre,
         private readonly CotizacionesAction $cotizacionesAction,
         private readonly PartidasAction $partidasAction,
     ) {}
@@ -30,14 +31,18 @@ class CotizacionExcelImport implements ToCollection
         $inicioTabla = $this->localizarEncabezadoTabla($filas);
         $header = $this->leerEncabezado($filas, $inicioTabla);
 
-        $this->cotizacion = $this->cotizacionesAction->create($this->levantamiento, [
+        $datos = [
             'fecha' => now()->toDateString(),
             'cliente' => $header['cliente'] ?: null,
             'direccion' => $header['direccion'] ?: null,
             'proveedor' => $header['proveedor'] ?: null,
             'vendedor' => $header['vendedor'] ?: null,
             'obra' => $header['obra'] ?: null,
-        ]);
+        ];
+
+        $this->cotizacion = $this->padre instanceof Levantamiento
+            ? $this->cotizacionesAction->create($this->padre, $datos)
+            : $this->cotizacionesAction->createParaProyecto($this->padre, $datos);
 
         if ($inicioTabla === null) {
             $this->errores[0] = ['No se encontró la tabla de partidas ("No.") en el archivo. Se creó la cotización sin partidas.'];
