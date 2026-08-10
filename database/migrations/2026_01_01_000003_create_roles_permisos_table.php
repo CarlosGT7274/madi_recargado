@@ -7,8 +7,16 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * El único bitmask del sistema: READ=1, CREATE=2, UPDATE=4, DELETE=8,
-     * ALL=15. Por (rol, permiso). Referenciado por id, sin slugs.
+     * Asignación de PERMISOS a ROLES (Permission Assignment del Core RBAC).
+     *
+     * Cada fila es un permiso concreto otorgado a un rol, expresado como
+     * la tripleta del modelo estándar:
+     *
+     *     rol + objeto (permiso_id) + operación (operacion_id)
+     *
+     * Se acabó el `tinyint` de bits que había que interpretar con bitwise.
+     * Un rol "puede aprobar Planeación" es literalmente una fila
+     * (rol=Supervisor, objeto=Planeación, operación=aprobar).
      */
     public function up(): void
     {
@@ -16,9 +24,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('rol_id')->constrained('roles')->cascadeOnDelete();
             $table->foreignId('permiso_id')->constrained('permisos')->cascadeOnDelete();
-            $table->unsignedTinyInteger('permisos')->default(0);
+            $table->foreignId('operacion_id')->constrained('operaciones')->cascadeOnDelete();
 
-            $table->unique(['rol_id', 'permiso_id']);
+            $table->unique(['rol_id', 'permiso_id', 'operacion_id']);
         });
     }
 

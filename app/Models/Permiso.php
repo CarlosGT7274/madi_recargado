@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
+/**
+ * Objeto protegible del modelo Core RBAC. `permisos` sigue siendo nuestro
+ * árbol de objetos (`padre_id`, `endpoint`); NO es la tabla de "permisos"
+ * en el sentido RBAC (esos son objeto + operación, en `roles_permisos`).
+ */
 class Permiso extends Model
 {
     protected $table = 'permisos';
@@ -38,10 +43,15 @@ class Permiso extends Model
         return $this->hasMany(self::class, 'padre_id');
     }
 
-    public function roles(): BelongsToMany
+    /**
+     * Operaciones declaradas como válidas para este objeto. Solo estas
+     * pueden otorgarse a un rol o mostrarse en la matriz de permisos: no
+     * tiene sentido `aprobar` un objeto que no admite esa operación.
+     */
+    public function operaciones(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'roles_permisos', 'permiso_id', 'rol_id')
-            ->withPivot('permisos');
+        return $this->belongsToMany(Operacion::class, 'objeto_operacion', 'permiso_id', 'operacion_id')
+            ->orderBy('operaciones.orden');
     }
 
     /**
@@ -77,6 +87,11 @@ class Permiso extends Model
         return $segmentos === [] ? null : implode('.', $segmentos);
     }
 
+    /**
+     * Árbol de objetos con sus operaciones válidas. Cada nodo incluye la
+     * lista de operaciones aplicables para que el frontend construya la
+     * matriz de permisos SIN columnas universales hardcodeadas.
+     */
     public static function arbol(): Collection
     {
         return self::construirArbol(null);
@@ -84,7 +99,8 @@ class Permiso extends Model
 
     protected static function construirArbol(?int $padreId, ?string $prefijoPadre = null): Collection
     {
-        return self::where('activo', true)
+        return self::with('operaciones')
+            ->where('activo', true)
             ->where('padre_id', $padreId)
             ->orderBy('nombre')
             ->get()
@@ -95,6 +111,9 @@ class Permiso extends Model
                     'id' => $p->id,
                     'nombre' => $p->nombre,
                     'endpoint' => $endpointCompleto,
+                    'operaciones' => $p->operaciones
+                        ->map(fn (Operacion $o): array => ['clave' => $o->clave, 'nombre' => $o->nombre])
+                        ->values(),
                     'hijos' => self::construirArbol($p->id, $endpointCompleto),
                 ];
             });

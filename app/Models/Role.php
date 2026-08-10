@@ -2,12 +2,11 @@
 
 namespace App\Models;
 
-use App\Support\Accion;
+use App\Support\Operacion;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 class Role extends Model
@@ -23,78 +22,100 @@ class Role extends Model
         'activo' => 'boolean',
     ];
 
-    protected ?Collection $permisosMapa = null;
+    /**
+     * Grants directos del rol: [permiso_id => ['leer', 'aprobar', ...]].
+     * No incluye herencia por jerarquía; eso lo resuelve
+     * operacionesEfectivasPara().
+     */
+    protected ?Collection $grantsMapa = null;
 
-    public function usuarios(): HasMany
+    public function usuarios(): BelongsToMany
     {
-        return $this->hasMany(User::class, 'rol_id');
+        return $this->belongsToMany(User::class, 'role_user', 'rol_id', 'user_id')
+            ->withTimestamps();
     }
 
-    public function permisos(): BelongsToMany
+    protected function grantsMapa(): Collection
     {
-        return $this->belongsToMany(Permiso::class, 'roles_permisos', 'rol_id', 'permiso_id')
-            ->withPivot('permisos');
+        return $this->grantsMapa ??= DB::table('roles_permisos')
+            ->join('operaciones', 'operaciones.id', '=', 'roles_permisos.operacion_id')
+            ->where('roles_permisos.rol_id', $this->id)
+            ->get(['roles_permisos.permiso_id', 'operaciones.clave'])
+            ->groupBy('permiso_id')
+            ->map(fn (Collection $filas): array => $filas->pluck('clave')->all());
     }
 
-    protected function permisosMapa(): Collection
+    /**
+     * Operaciones efectivas del rol sobre un objeto: la UNIÓN de sus
+     * grants sobre el objeto y sobre todos sus ancestros. Un permiso
+     * otorgado en `Ingenierías` cubre a `Plantas` (herencia descendente),
+     * fiel a cómo el árbol de objetos representa módulos y submódulos.
+     *
+     * @return array<int, string>
+     */
+    public function operacionesEfectivasPara(Permiso $objeto): array
     {
-        return $this->permisosMapa ??= $this->permisos()
-            ->get()
-            ->mapWithKeys(fn (Permiso $permiso): array => [
-                $permiso->id => (int) $permiso->pivot->permisos,
-            ]);
-    }
-
-    public function permisosPara(Permiso $permiso): int
-    {
-        $mapa = $this->permisosMapa();
-        $actual = $permiso;
+        $mapa = $this->grantsMapa();
+        $claves = [];
+        $actual = $objeto;
 
         while ($actual !== null) {
             if ($mapa->has($actual->id)) {
-                return $mapa->get($actual->id);
+                $claves = array_merge($claves, $mapa->get($actual->id));
             }
 
             $actual = $actual->padre;
         }
 
-        return 0;
+        return array_values(array_unique($claves));
     }
 
-    public function tienePermiso(Permiso $permiso, int $accion): bool
+    public function tienePermiso(Permiso $objeto, string $operacion): bool
     {
-        return ($this->permisosPara($permiso) & $accion) === $accion;
+        return in_array($operacion, $this->operacionesEfectivasPara($objeto), true);
     }
 
     /**
-     * @return array<int, int>
+     * Grants directos por objeto, para pintar la matriz de un rol.
+     *
+     * @return array<int, array<int, string>>
      */
-    public function mapaPermisos(): array
+    public function mapaPermisosAsignados(): array
     {
-        return $this->permisosMapa()->all();
+        return $this->grantsMapa()->all();
     }
 
     /**
-     * @return array<string, int>
+     * Operaciones efectivas por endpoint, consumidas por el frontend.
+     * El frontend resuelve por prefijo, así que basta con exponer cada
+     * objeto con endpoint cuyo conjunto efectivo no sea vacío.
+     *
+     * @return array<string, array<int, string>>
      */
     public function mapaPermisosPorEndpoint(): array
     {
-        return $this->permisos()
-            ->with('padre.padre.padre')
+        return Permiso::with('padre.padre.padre')
+            ->whereNotNull('endpoint')
             ->get()
-            ->mapWithKeys(function (Permiso $permiso) {
+            ->mapWithKeys(function (Permiso $permiso): array {
                 $endpoint = $permiso->endpointCompleto();
 
-                return $endpoint ? [$endpoint => (int) $permiso->pivot->permisos] : [];
-            })->all();
+                if ($endpoint === null) {
+                    return [];
+                }
+
+                $operaciones = $this->operacionesEfectivasPara($permiso);
+
+                return $operaciones === [] ? [] : [$endpoint => $operaciones];
+            })
+            ->all();
     }
 
     /**
-     * Módulos visibles en el sidebar para este rol: solo permisos activos,
-     * con endpoint definido, con ruta registrada, y con bit READ concedido
-     * (heredado o directo).
+     * Módulos visibles en el sidebar: objeto activo, con ruta registrada,
+     * y con la operación `leer` concedida (heredada o directa).
      *
-     * @return Collection<int, array{id:int, nombre:string, endpoint:string, padre_id:?int, url:string}>
+     * @return Collection<int, array<string, mixed>>
      */
     public function menuVisible(): Collection
     {
@@ -114,7 +135,7 @@ class Role extends Model
                 $url = $this->resolverUrl($endpointCompleto);
 
                 $visible = $hijos->isNotEmpty()
-                    || ($url !== null && $this->tienePermiso($permiso, Accion::READ));
+                    || ($url !== null && $this->tienePermiso($permiso, Operacion::LEER));
 
                 if (! $visible) {
                     return null;
@@ -152,19 +173,71 @@ class Role extends Model
         }
     }
 
-    public function otorgar(Permiso $permiso, int $permisos): void
+    /**
+     * Otorga una operación concreta sobre un objeto. La validez
+     * (objeto_operacion) se valida en la capa de asignación/UI; aquí se
+     * confía en el llamador para permitir sembrar y probar con soltura.
+     */
+    public function otorgar(Permiso $objeto, string $operacion): void
     {
-        $this->permisos()->syncWithoutDetaching([
-            $permiso->id => ['permisos' => $permisos],
+        $operacionId = Operacion::query()->where('clave', $operacion)->value('id');
+
+        if ($operacionId === null) {
+            return;
+        }
+
+        DB::table('roles_permisos')->updateOrInsert([
+            'rol_id' => $this->id,
+            'permiso_id' => $objeto->id,
+            'operacion_id' => $operacionId,
         ]);
 
-        $this->permisosMapa = null;
+        $this->grantsMapa = null;
     }
 
-    public function revocar(Permiso $permiso): void
+    /**
+     * Otorga TODAS las operaciones del catálogo sobre un objeto. Útil para
+     * roles con control total y para sembrar/probar.
+     */
+    public function otorgarTodas(Permiso $objeto): void
     {
-        $this->permisos()->detach($permiso->id);
+        Operacion::query()->pluck('clave')->each(fn (string $clave) => $this->otorgar($objeto, $clave));
+    }
 
-        $this->permisosMapa = null;
+    /**
+     * Reemplaza los grants del rol sobre un objeto por el conjunto dado.
+     *
+     * @param  array<int, string>  $operaciones
+     */
+    public function sincronizarObjeto(Permiso $objeto, array $operaciones): void
+    {
+        $ids = Operacion::query()->whereIn('clave', $operaciones)->pluck('id');
+
+        DB::table('roles_permisos')
+            ->where('rol_id', $this->id)
+            ->where('permiso_id', $objeto->id)
+            ->delete();
+
+        $filas = $ids->map(fn (int $operacionId): array => [
+            'rol_id' => $this->id,
+            'permiso_id' => $objeto->id,
+            'operacion_id' => $operacionId,
+        ])->all();
+
+        if ($filas !== []) {
+            DB::table('roles_permisos')->insert($filas);
+        }
+
+        $this->grantsMapa = null;
+    }
+
+    public function revocar(Permiso $objeto): void
+    {
+        DB::table('roles_permisos')
+            ->where('rol_id', $this->id)
+            ->where('permiso_id', $objeto->id)
+            ->delete();
+
+        $this->grantsMapa = null;
     }
 }
