@@ -20,29 +20,15 @@ use Inertia\Response;
 
 class PlaneacionController extends Controller
 {
-    /**
-     * Única vista para cualquier rol: el scope de datos (tus planeaciones
-     * vs. las de tus plantas asignadas) lo decide PlaneacionesAction desde
-     * el permiso ALL sobre 'planeacion', no un componente distinto.
-     */
     public function index(Request $request, PlaneacionesAction $action): Response
     {
         $usuario = $request->user();
-        $puedeAprobar = $action->puedeAprobar($usuario);
 
-        if ($puedeAprobar) {
-            $desde = $request->date('desde');
-            $hasta = $request->date('hasta');
-
-            return Inertia::render('ingenierias/planeacion/Planificador', [
-                'planeaciones' => Inertia::defer(fn () => $action->listProgramacion($usuario, $desde, $hasta)),
-            ]);
-        }
-
-        return Inertia::render('ingenierias/planeacion/MisPlaneaciones', [
+        return Inertia::render('ingenierias/planeacion/Index', [
             'puedeCrear' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::CREATE),
             'puedeEliminar' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::DELETE),
-            'planeaciones' => Inertia::defer(fn () => $action->listPropias($usuario)),
+            'puedeGestionar' => $action->puedeAprobar($usuario),
+            'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
         ]);
     }
 

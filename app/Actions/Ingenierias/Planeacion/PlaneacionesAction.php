@@ -86,9 +86,31 @@ class PlaneacionesAction
             ] : null,
             'residente' => $p->usuario?->name,
             'aprobador' => $p->aprobador?->name,
+            // Necesarios para pintar el rango en el calendario anual — antes
+            // el frontend los usaba sin que existieran en este arreglo.
+            'fechaInicio' => $p->fechaInicio()->format('Y-m-d'),
+            'fechaFin' => $p->fechaFin()->format('Y-m-d'),
             'fechaEnvio' => $p->fecha_envio?->format('d/m/Y H:i'),
             'fechaAprobacion' => $p->fecha_aprobacion?->format('d/m/Y H:i'),
+            'comentariosAprobacion' => $p->comentarios_aprobacion,
         ];
+    }
+
+    /**
+     * Fuente ÚNICA de datos para la vista general de Planeación. El scope
+     * (propias vs. las de tus plantas asignadas) depende del permiso ALL,
+     * pero el resultado alimenta la MISMA pantalla — no una pantalla aparte.
+     */
+    public function listVistaGeneral(User $usuario): Collection
+    {
+        $query = $this->puedeAprobar($usuario)
+            ? Planeacion::whereIn('planta_id', $usuario->plantasAsignadas()->pluck('plantas.id'))
+            : Planeacion::where('usuario_id', $usuario->id);
+
+        return $query->with('proyecto', 'planta', 'usuario', 'aprobador')
+            ->latest('anio')->latest('semana')
+            ->get()
+            ->map(fn (Planeacion $p) => $this->resumen($p));
     }
 
     public function detail(Planeacion $planeacion): array
