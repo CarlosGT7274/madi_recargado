@@ -12,9 +12,11 @@ class Partida extends Model
 
     protected $fillable = [
         'cotizacion_id',
+        'proyecto_id',
         'partida_id',
         'numero_partida',
         'descripcion',
+        'notas',
         'cantidad',
         'unidad',
         'precio_unitario',
@@ -37,6 +39,16 @@ class Partida extends Model
         return $this->belongsTo(Cotizacion::class, 'cotizacion_id');
     }
 
+    /**
+     * proyecto_id se llena siempre (manual o vía cotización, denormalizado
+     * a propósito). Es lo que permite a Planeación consultar "las
+     * partidas de este proyecto" sin importar de dónde vinieron.
+     */
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
     public function padre(): BelongsTo
     {
         return $this->belongsTo(Partida::class, 'partida_id');
@@ -45,5 +57,11 @@ class Partida extends Model
     public function hijas(): HasMany
     {
         return $this->hasMany(Partida::class, 'partida_id')->orderBy('numero_partida');
+    }
+
+    /** true si es una actividad manual del proyecto (sin pasar por cotización). */
+    public function esManual(): bool
+    {
+        return $this->cotizacion_id === null;
     }
 }

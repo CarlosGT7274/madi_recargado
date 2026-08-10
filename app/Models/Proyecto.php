@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Proyecto extends Model
 {
@@ -43,46 +45,39 @@ class Proyecto extends Model
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
-    /**
-     * Cotizaciones que cuelgan directamente del proyecto (flujo directo,
-     * sin Levantamiento). Ver Cotizacion::esDeProyectoDirecto().
-     */
     public function cotizaciones()
     {
         return $this->hasMany(Cotizacion::class, 'proyecto_id');
     }
 
-    /**
-     * Alias para route model binding anidado (scopeBindings()): Laravel
-     * pluraliza "Cotizacion" con reglas de inglés y busca cotizacions().
-     */
     public function cotizacions()
     {
         return $this->cotizaciones();
     }
 
-    /**
-     * Árbol de actividades (equivalente a "partidas") del proyecto directo.
-     * Vive en planeacion_actividades vía proyecto_id, autorreferenciado con
-     * parent_id. No depende de Planeacion.
-     */
-    public function actividades()
+    /** TODAS las partidas del proyecto: manuales + las de sus cotizaciones. */
+    public function partidas(): HasMany
     {
-        return $this->hasMany(PlaneacionActividad::class, 'proyecto_id');
+        return $this->hasMany(Partida::class, 'proyecto_id');
     }
 
-    public function actividads()
+    /** Solo las capturadas a mano (sin cotización), para el árbol de "Actividades". */
+    public function partidasManuales(): HasMany
     {
-        return $this->actividades();
+        return $this->partidas()->whereNull('cotizacion_id');
     }
 
-    /**
-     * Deriva de la misma fuente de verdad que Obra y Cotización:
-     * Cotizacion::estaCompletada(). La columna `proyectos.estado`
-     * (activo/completado/cancelado) es un campo manual legado que se deja
-     * en la BD por ahora, pero ya no se lee para decidir esto — ver
-     * ProyectosAction::list()/detail().
-     */
+    public function planeaciones(): HasMany
+    {
+        return $this->hasMany(Planeacion::class, 'proyecto_id');
+    }
+
+    public function residentes(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'proyecto_usuario', 'proyecto_id', 'usuario_id')
+            ->withTimestamps();
+    }
+
     public function estaCompletado(): bool
     {
         if ($this->tipo === 'chico') {

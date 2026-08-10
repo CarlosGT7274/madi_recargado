@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Planta extends Model
@@ -42,5 +43,16 @@ class Planta extends Model
     public function proyectos(): HasMany
     {
         return $this->hasMany(Proyecto::class, 'planta_id');
+    }
+
+    public function planeaciones(): HasMany
+    {
+        return $this->hasMany(Planeacion::class, 'planta_id');
+    }
+
+    public function ingenieros(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'planta_usuario', 'planta_id', 'usuario_id')
+            ->withTimestamps();
     }
 }

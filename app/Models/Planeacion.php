@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Planeacion extends Model
 {
@@ -19,6 +21,8 @@ class Planeacion extends Model
         'proyecto_id',
         'usuario_id',
         'estado',
+        'reportada_nomina',
+        'fecha_reporte_nomina',
         'fecha_envio',
         'fecha_aprobacion',
         'fecha_rechazo',
@@ -26,27 +30,39 @@ class Planeacion extends Model
         'comentarios_aprobacion',
     ];
 
-    protected $casts = [
+    protected function casts(): array
+    {
+        return [
+            'reportada_nomina' => 'boolean',
+            'fecha_reporte_nomina' => 'datetime',
+            'fecha_envio' => 'datetime',
+            'fecha_aprobacion' => 'datetime',
+            'fecha_rechazo' => 'datetime',
+        ];
+    }
 
-    ];
-
-    public function planta()
+    public function planta(): BelongsTo
     {
         return $this->belongsTo(Planta::class, 'planta_id');
     }
 
-    public function proyecto()
+    public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
 
-    public function usuario()
+    public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
-    public function aprobador()
+    public function aprobador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'aprobador_id');
+    }
+
+    public function asignaciones(): HasMany
+    {
+        return $this->hasMany(PlaneacionAsignacion::class, 'planeacion_id');
     }
 }
