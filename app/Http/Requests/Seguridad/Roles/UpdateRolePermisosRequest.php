@@ -11,7 +11,7 @@ class UpdateRolePermisosRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->puede('Roles', Accion::UPDATE) ?? false;
+        return $this->user()?->puedePorEndpoint('seguridad.roles', Accion::UPDATE) ?? false;
     }
 
     /**
@@ -21,7 +21,8 @@ class UpdateRolePermisosRequest extends FormRequest
     {
         return [
             'permisos' => ['present', 'array'],
-            'permisos.*' => ['integer', 'between:0,15'],
+            'permisos.*' => ['array'],
+            'permisos.*.*' => ['string'],
         ];
     }
 

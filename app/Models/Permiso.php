@@ -38,10 +38,22 @@ class Permiso extends Model
         return $this->hasMany(self::class, 'padre_id');
     }
 
-    public function roles(): BelongsToMany
+    /** Catálogo: qué operaciones tienen sentido de negocio sobre este objeto. */
+    public function operacionesAplicables(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'roles_permisos', 'permiso_id', 'rol_id')
-            ->withPivot('permisos');
+        return $this->belongsToMany(Operacion::class, 'permiso_operaciones', 'permiso_id', 'operacion_id');
+    }
+
+    /**
+     * Declara qué operaciones aplican a este objeto. Idempotente — se
+     * puede volver a llamar en seeders sin duplicar filas.
+     *
+     * @param  array<int, string>  $claves
+     */
+    public function declararOperaciones(array $claves): void
+    {
+        $ids = Operacion::whereIn('clave', $claves)->pluck('id');
+        $this->operacionesAplicables()->syncWithoutDetaching($ids);
     }
 
     /**
@@ -98,5 +110,10 @@ class Permiso extends Model
                     'hijos' => self::construirArbol($p->id, $endpointCompleto),
                 ];
             });
+    }
+
+    public function permisoOperaciones(): HasMany
+    {
+        return $this->hasMany(PermisoOperacion::class, 'permiso_id');
     }
 }

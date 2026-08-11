@@ -6,9 +6,9 @@ use App\Support\Accion;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
+use InvalidArgumentException;
 
 class Role extends Model
 {
@@ -23,79 +23,49 @@ class Role extends Model
         'activo' => 'boolean',
     ];
 
-    protected ?Collection $permisosMapa = null;
+    /** @var Collection<string, bool>|null clave "{permiso_id}:{operacion_clave}" => true */
+    protected ?Collection $operacionesMapa = null;
 
-    public function usuarios(): HasMany
+    public function usuarios(): BelongsToMany
     {
-        return $this->hasMany(User::class, 'rol_id');
+        return $this->belongsToMany(User::class, 'roles_usuarios', 'rol_id', 'usuario_id');
     }
 
-    public function permisos(): BelongsToMany
+    public function permisoOperaciones(): BelongsToMany
     {
-        return $this->belongsToMany(Permiso::class, 'roles_permisos', 'rol_id', 'permiso_id')
-            ->withPivot('permisos');
+        return $this->belongsToMany(PermisoOperacion::class, 'roles_permisos_operaciones', 'rol_id', 'permiso_operacion_id');
     }
 
-    protected function permisosMapa(): Collection
+    protected function operacionesMapa(): Collection
     {
-        return $this->permisosMapa ??= $this->permisos()
+        return $this->operacionesMapa ??= $this->permisoOperaciones()
+            ->with('operacion')
             ->get()
-            ->mapWithKeys(fn (Permiso $permiso): array => [
-                $permiso->id => (int) $permiso->pivot->permisos,
-            ]);
+            ->mapWithKeys(fn (PermisoOperacion $po): array => ["{$po->permiso_id}:{$po->operacion->clave}" => true]);
     }
 
-    public function permisosPara(Permiso $permiso): int
+    public function tieneOperacion(Permiso $permiso, string $operacionClave): bool
     {
-        $mapa = $this->permisosMapa();
+        $mapa = $this->operacionesMapa();
         $actual = $permiso;
 
         while ($actual !== null) {
-            if ($mapa->has($actual->id)) {
-                return $mapa->get($actual->id);
+            if ($mapa->has("{$actual->id}:{$operacionClave}")) {
+                return true;
             }
 
             $actual = $actual->padre;
         }
 
-        return 0;
+        return false;
     }
 
-    public function tienePermiso(Permiso $permiso, int $accion): bool
+    /** Alias de compatibilidad — CompraOrdenAction/CotizacionesAction::administradores() lo llaman así. */
+    public function tienePermiso(Permiso $permiso, string $operacionClave): bool
     {
-        return ($this->permisosPara($permiso) & $accion) === $accion;
+        return $this->tieneOperacion($permiso, $operacionClave);
     }
 
-    /**
-     * @return array<int, int>
-     */
-    public function mapaPermisos(): array
-    {
-        return $this->permisosMapa()->all();
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    public function mapaPermisosPorEndpoint(): array
-    {
-        return $this->permisos()
-            ->with('padre.padre.padre')
-            ->get()
-            ->mapWithKeys(function (Permiso $permiso) {
-                $endpoint = $permiso->endpointCompleto();
-
-                return $endpoint ? [$endpoint => (int) $permiso->pivot->permisos] : [];
-            })->all();
-    }
-
-    /**
-     * Módulos visibles en el sidebar para este rol: solo permisos activos,
-     * con endpoint definido, con ruta registrada, y con bit READ concedido
-     * (heredado o directo).
-     *
-     * @return Collection<int, array{id:int, nombre:string, endpoint:string, padre_id:?int, url:string}>
-     */
     public function menuVisible(): Collection
     {
         return $this->construirMenu(null);
@@ -114,7 +84,7 @@ class Role extends Model
                 $url = $this->resolverUrl($endpointCompleto);
 
                 $visible = $hijos->isNotEmpty()
-                    || ($url !== null && $this->tienePermiso($permiso, Accion::READ));
+                    || ($url !== null && $this->tieneOperacion($permiso, Accion::READ));
 
                 if (! $visible) {
                     return null;
@@ -152,19 +122,47 @@ class Role extends Model
         }
     }
 
-    public function otorgar(Permiso $permiso, int $permisos): void
+    public function otorgarOperacion(Permiso $permiso, string $operacionClave): void
     {
-        $this->permisos()->syncWithoutDetaching([
-            $permiso->id => ['permisos' => $permisos],
-        ]);
+        $permisoOperacion = PermisoOperacion::query()
+            ->whereHas('operacion', fn ($q) => $q->where('clave', $operacionClave))
+            ->where('permiso_id', $permiso->id)
+            ->first();
 
-        $this->permisosMapa = null;
+        if ($permisoOperacion === null) {
+            throw new InvalidArgumentException(
+                "La operación '{$operacionClave}' no está declarada como aplicable para el permiso '{$permiso->nombre}'."
+            );
+        }
+
+        $this->permisoOperaciones()->syncWithoutDetaching([$permisoOperacion->id]);
+        $this->operacionesMapa = null;
+    }
+
+    public function otorgarCrud(Permiso $permiso): void
+    {
+        foreach (Accion::crud() as $operacionClave) {
+            $this->otorgarOperacion($permiso, $operacionClave);
+        }
+    }
+
+    public function revocarOperacion(Permiso $permiso, string $operacionClave): void
+    {
+        $permisoOperacion = PermisoOperacion::query()
+            ->whereHas('operacion', fn ($q) => $q->where('clave', $operacionClave))
+            ->where('permiso_id', $permiso->id)
+            ->first();
+
+        if ($permisoOperacion !== null) {
+            $this->permisoOperaciones()->detach($permisoOperacion->id);
+            $this->operacionesMapa = null;
+        }
     }
 
     public function revocar(Permiso $permiso): void
     {
-        $this->permisos()->detach($permiso->id);
-
-        $this->permisosMapa = null;
+        $ids = PermisoOperacion::where('permiso_id', $permiso->id)->pluck('id');
+        $this->permisoOperaciones()->detach($ids);
+        $this->operacionesMapa = null;
     }
 }

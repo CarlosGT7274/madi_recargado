@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -21,10 +22,10 @@ class VerificarPermiso
 {
     public function handle(Request $request, Closure $next, string $accion): Response
     {
-        $endpoint = $request->route()?->getName();
+        $endpoint = Str::beforeLast($request->route()?->getName() ?? '', '.');
 
         abort_unless(
-            $endpoint !== null && $request->user()?->puedePorEndpoint($endpoint, (int) $accion) === true,
+            $endpoint !== '' && $request->user()?->puedePorEndpoint($endpoint, $accion) === true,
             403,
         );
 

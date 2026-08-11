@@ -6,7 +6,6 @@ use App\Actions\Notificaciones\NotificacionesAction;
 use App\Models\Planeacion;
 use App\Models\Proyecto;
 use App\Models\User;
-use App\Support\Accion;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +25,7 @@ class PlaneacionesAction
      */
     public function puedeAprobar(User $usuario): bool
     {
-        return $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::ALL);
+        return $usuario->puedePorEndpoint('ingenierias.planeacion', 'aprobar');
     }
 
     public function listPropias(User $usuario): Collection

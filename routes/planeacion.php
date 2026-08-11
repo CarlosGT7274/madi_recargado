@@ -34,11 +34,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/', [PlaneacionController::class, 'destroy'])
                 ->middleware('permiso:'.Accion::DELETE)->name('destroy');
             Route::post('/enviar', [PlaneacionController::class, 'enviar'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('enviar');
+                ->middleware('permiso:enviar')->name('enviar');
             Route::post('/aprobar', [PlaneacionController::class, 'aprobar'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('aprobar');
+                ->middleware('permiso:aprobar')->name('aprobar');
             Route::post('/rechazar', [PlaneacionController::class, 'rechazar'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('rechazar');
+                ->middleware('permiso:rechazar')->name('rechazar');
             Route::post('/reportar-nomina', [PlaneacionController::class, 'reportarNomina'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('reportar-nomina');
 

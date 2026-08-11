@@ -10,7 +10,7 @@ class StoreRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->puede('Roles', Accion::CREATE) ?? false;
+        return $this->user()?->puedePorEndpoint('seguridad.roles', Accion::CREATE) ?? false;
     }
 
     /**

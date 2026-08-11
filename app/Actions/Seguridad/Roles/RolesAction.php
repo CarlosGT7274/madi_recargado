@@ -21,10 +21,15 @@ class RolesAction
             ]);
     }
 
-    /** Obtener detalle de un rol */
     public function detail(Role $role): array
     {
         $role->loadCount('usuarios');
+        $role->load('permisoOperaciones.operacion');
+
+        $asignados = [];
+        foreach ($role->permisoOperaciones as $po) {
+            $asignados[$po->permiso_id][] = $po->operacion->clave;
+        }
 
         return [
             'role' => [
@@ -34,7 +39,7 @@ class RolesAction
                 'usuarios_count' => $role->usuarios_count,
             ],
             'permisosArbol' => Permiso::arbol(),
-            'permisosAsignados' => (object) $role->mapaPermisos(),
+            'permisosAsignados' => (object) $asignados,
         ];
     }
 
@@ -52,11 +57,22 @@ class RolesAction
 
     public function syncPermissions(Role $role, array $permisos): void
     {
-        $pivotData = [];
-        foreach ($permisos as $id => $mask) {
-            $pivotData[$id] = ['permisos' => $mask];
+        $role->permisoOperaciones()->detach();
+
+        foreach ($permisos as $permisoId => $operaciones) {
+            $permiso = Permiso::find($permisoId);
+            if (! $permiso) {
+                continue;
+            }
+
+            foreach ((array) $operaciones as $clave) {
+                try {
+                    $role->otorgarOperacion($permiso, $clave);
+                } catch (\InvalidArgumentException $e) {
+                    // Ignorar
+                }
+            }
         }
-        $role->permisos()->sync($pivotData);
     }
 
     public function delete(Role $role): void

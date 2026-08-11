@@ -15,10 +15,11 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesPermisosSeeder::class);
 
-        User::factory()->create([
+        $usuario = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
-            'rol_id' => Role::where('nombre', 'Super Administrador')->value('id'),
         ]);
+
+        $usuario->roles()->attach(Role::where('nombre', 'Super Administrador')->value('id'));
     }
 }

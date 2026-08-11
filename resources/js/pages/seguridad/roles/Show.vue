@@ -1,7 +1,6 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { index as rolesIndex } from '@/routes/seguridad/roles';
-import { toast } from 'vue-sonner';
 
 export default {
     layout: () => ({
@@ -15,154 +14,141 @@ export default {
 
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { Check, Minus } from '@lucide/vue';
-import { computed, reactive, ref } from 'vue';
+import { ChevronDown, ChevronRight } from '@lucide/vue';
+import { reactive, ref } from 'vue';
 import PageLayout from '@/components/PageLayout.vue';
-import PermisoTreeRow from '@/components/PermisoTreeRow.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { PermisoNodo } from '@/types/roles';
 import { permisos as permisosRole } from '@/actions/App/Http/Controllers/Seguridad/RoleController';
+
+interface OperacionNodo {
+    permisoOperacionId: number | null;
+    clave: string;
+    nombre: string;
+}
+
+interface PermisoNodo {
+    id: number;
+    nombre: string;
+    endpoint: string | null;
+    operaciones: OperacionNodo[];
+    hijos: PermisoNodo[];
+}
 
 const props = defineProps<{
     role: { id: number; nombre: string; activo: boolean; usuarios_count: number };
     permisosArbol: PermisoNodo[];
-    permisosAsignados: Record<number, number>;
+    permisosAsignados: number[];
 }>();
 
-const ACCIONES = [
-    { bit: 1, label: 'Ver' },
-    { bit: 2, label: 'Crear' },
-    { bit: 4, label: 'Editar' },
-    { bit: 8, label: 'Eliminar' },
-] as const;
-
-const TODAS = 15;
-const valores = reactive<Record<number, number>>({ ...props.permisosAsignados });
+const concesiones = reactive<Set<number>>(new Set(props.permisosAsignados));
+const nodosExpandidos = reactive<Set<number>>(new Set());
 const procesando = ref(false);
 
-const idsSubarbol = (nodo: PermisoNodo): number[] => {
-    return [nodo.id, ...nodo.hijos.flatMap(idsSubarbol)];
-};
+function alternarExpandido(id: number): void {
+    if (nodosExpandidos.has(id)) {
+        nodosExpandidos.delete(id);
+    } else {
+        nodosExpandidos.add(id);
+    }
+}
 
-const idsTodos = computed(() => props.permisosArbol.flatMap(idsSubarbol));
+function estaConcedida(operacion: OperacionNodo): boolean {
+    return operacion.permisoOperacionId !== null && concesiones.has(operacion.permisoOperacionId);
+}
 
-const cambiar = (ids: number[], bit: number, activo: boolean) => {
-    ids.forEach((id) => {
-        const actual = valores[id] ?? 0;
-        const nuevo = activo ? actual | bit : actual & ~bit;
-        if (nuevo === 0) {
-            delete valores[id];
-        } else {
-            valores[id] = nuevo;
-        }
-    });
-};
+function alternarOperacion(operacion: OperacionNodo): void {
+    if (operacion.permisoOperacionId === null) return;
 
-const quitar = (permisoId: number) => {
-    delete valores[permisoId];
-};
+    if (concesiones.has(operacion.permisoOperacionId)) {
+        concesiones.delete(operacion.permisoOperacionId);
+    } else {
+        concesiones.add(operacion.permisoOperacionId);
+    }
+}
 
-type EstadoCheck = boolean | 'indeterminate';
+function idsDelSubarbol(nodo: PermisoNodo): number[] {
+    return [
+        ...nodo.operaciones.map((o) => o.permisoOperacionId).filter((id): id is number => id !== null),
+        ...nodo.hijos.flatMap(idsDelSubarbol),
+    ];
+}
 
-const calcularEstado = (coincidencias: number, total: number): EstadoCheck => {
-    if (total === 0 || coincidencias === 0) return false;
-    if (coincidencias === total) return true;
-    return 'indeterminate';
-};
+function otorgarTodo(nodo: PermisoNodo): void {
+    idsDelSubarbol(nodo).forEach((id) => concesiones.add(id));
+}
 
-const estadoGlobal = computed<EstadoCheck>(() => {
-    const total = idsTodos.value.length;
-    const completos = idsTodos.value.filter(id => (valores[id] ?? 0) === TODAS).length;
-    return calcularEstado(completos, total);
-});
+function revocarTodo(nodo: PermisoNodo): void {
+    idsDelSubarbol(nodo).forEach((id) => concesiones.delete(id));
+}
 
-const seleccionarTodo = () => {
-    idsTodos.value.forEach(id => { valores[id] = TODAS; });
-};
-
-const limpiarTodo = () => {
-    Object.keys(valores).forEach(key => delete valores[Number(key)]);
-};
-
-const estadoColumna = (bit: number): EstadoCheck => {
-    const total = idsTodos.value.length;
-    const activos = idsTodos.value.filter(id => ((valores[id] ?? 0) & bit) === bit).length;
-    return calcularEstado(activos, total);
-};
-
-const alternarColumna = (bit: number, activo: boolean) => {
-    idsTodos.value.forEach(id => cambiar([id], bit, activo));
-};
-
-const alternarModulo = (ids: number[], activo: boolean) => {
-    ids.forEach(id => {
-        if (activo) {
-            valores[id] = TODAS;
-        } else {
-            delete valores[id];
-        }
-    });
-};
-
-const guardar = () => {
+function guardar(): void {
     procesando.value = true;
-    router.put(permisosRole.url(props.role.id), { permisos: valores }, {
-        preserveScroll: true,
-        onError: (errors) => {
-            toast.error('No se pudieron guardar los permisos. Verifica tus propios permisos e intenta de nuevo.');
-        },
-        onFinish: () => (procesando.value = false),
-    });
-};
-
+    router.put(
+        permisosRole.url(props.role.id),
+        { concesiones: Array.from(concesiones) },
+        { preserveScroll: true, onFinish: () => (procesando.value = false) },
+    );
+}
 </script>
 
 <template>
-
     <Head :title="`Rol: ${role.nombre}`" />
-    <PageLayout :title="role.nombre" :description="`${role.usuarios_count} usuarios con este rol`"
-        endpoint="seguridad.roles">
+
+    <PageLayout :title="role.nombre" :description="`${role.usuarios_count} usuarios con este rol`" endpoint="seguridad.roles">
         <template #actions>
-            <Button variant="outline" size="sm" @click="seleccionarTodo">
-                Seleccionar todo
-            </Button>
-            <Button variant="outline" size="sm" @click="limpiarTodo">
-                Limpiar todo
-            </Button>
-            <Button :disabled="procesando" @click="guardar">
-                Guardar permisos
-            </Button>
+            <Button :disabled="procesando" @click="guardar">Guardar permisos</Button>
         </template>
 
-        <div class="overflow-hidden rounded-xl border">
-            <div
-                class="grid grid-cols-[1fr_repeat(4,80px)_90px] gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
-                <div class="flex items-center gap-2">
-                    <Checkbox :model-value="estadoGlobal" aria-label="Seleccionar todos los permisos"
-                        @update:model-value="(v) => v === true ? seleccionarTodo() : limpiarTodo()">
-                        <template #default="{ state }">
-                            <Minus v-if="state === 'indeterminate'" class="size-3.5" />
-                            <Check v-else class="size-3.5" />
-                        </template>
-                    </Checkbox>
-                    <span>Módulo</span>
-                </div>
-                <div v-for="accion in ACCIONES" :key="accion.bit" class="flex flex-col items-center gap-1">
-                    <span>{{ accion.label }}</span>
-                    <Checkbox :model-value="estadoColumna(accion.bit)" :aria-label="`Alternar columna ${accion.label}`"
-                        @update:model-value="(v) => alternarColumna(accion.bit, v === true)">
-                        <template #default="{ state }">
-                            <Minus v-if="state === 'indeterminate'" class="size-3.5" />
-                            <Check v-else class="size-3.5" />
-                        </template>
-                    </Checkbox>
-                </div>
-                <span />
-            </div>
+        <div class="space-y-2">
+            <div v-for="nodo in permisosArbol" :key="nodo.id" class="rounded-xl border">
+                <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                    <button
+                        v-if="nodo.hijos.length"
+                        type="button"
+                        class="rounded p-0.5 hover:bg-accent"
+                        @click="alternarExpandido(nodo.id)"
+                    >
+                        <ChevronDown v-if="nodosExpandidos.has(nodo.id)" class="size-4" />
+                        <ChevronRight v-else class="size-4" />
+                    </button>
+                    <span v-else class="w-5" />
 
-            <PermisoTreeRow v-for="nodo in permisosArbol" :key="nodo.id" :nodo="nodo" :valores="valores"
-                @cambiar="cambiar" @quitar="quitar" @modulo="alternarModulo" />
+                    <span class="min-w-32 flex-1 font-medium">{{ nodo.nombre }}</span>
+
+                    <label
+                        v-for="operacion in nodo.operaciones"
+                        :key="operacion.clave"
+                        class="flex items-center gap-1.5 text-sm text-muted-foreground"
+                    >
+                        <Checkbox :model-value="estaConcedida(operacion)" @update:model-value="alternarOperacion(operacion)" />
+                        {{ operacion.nombre }}
+                    </label>
+
+                    <div v-if="nodo.operaciones.length || nodo.hijos.length" class="flex gap-2">
+                        <button type="button" class="text-xs text-muted-foreground underline hover:text-foreground" @click="otorgarTodo(nodo)">
+                            Todo
+                        </button>
+                        <button type="button" class="text-xs text-muted-foreground underline hover:text-foreground" @click="revocarTodo(nodo)">
+                            Ninguno
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="nodo.hijos.length && nodosExpandidos.has(nodo.id)" class="space-y-2 border-t bg-muted/20 p-3 pl-8">
+                    <div v-for="hijo in nodo.hijos" :key="hijo.id" class="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
+                        <span class="min-w-32 flex-1 text-sm font-medium">{{ hijo.nombre }}</span>
+                        <label
+                            v-for="operacion in hijo.operaciones"
+                            :key="operacion.clave"
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <Checkbox :model-value="estaConcedida(operacion)" @update:model-value="alternarOperacion(operacion)" />
+                            {{ operacion.nombre }}
+                        </label>
+                    </div>
+                </div>
+            </div>
         </div>
     </PageLayout>
 </template>

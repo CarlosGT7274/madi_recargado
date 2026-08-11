@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Concerns\HasBitmaskAuthorization;
+use App\Concerns\HasRbacAuthorization;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -10,16 +10,15 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasBitmaskAuthorization;
-
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    use HasRbacAuthorization;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'rol_id',
         'firma_url',
     ];
 
@@ -36,15 +35,20 @@ class User extends Authenticatable
         ];
     }
 
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'roles_usuarios', 'usuario_id', 'rol_id');
+    }
+
     public function plantasAsignadas(): BelongsToMany
     {
         return $this->belongsToMany(Planta::class, 'planta_usuario', 'usuario_id', 'planta_id')
-            ->withTimestamps('created_at', 'updated_at');
+            ->withTimestamps();
     }
 
     public function proyectosAsignados(): BelongsToMany
     {
         return $this->belongsToMany(Proyecto::class, 'proyecto_usuario', 'usuario_id', 'proyecto_id')
-            ->withTimestamps('created_at', 'updated_at');
+            ->withTimestamps();
     }
 }

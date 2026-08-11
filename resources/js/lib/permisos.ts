@@ -1,14 +1,25 @@
-export const ACCIONES = [
-    { bit: 1, label: 'Ver' },
-    { bit: 2, label: 'Crear' },
-    { bit: 4, label: 'Editar' },
-    { bit: 8, label: 'Eliminar' },
-] as const;
+export type OperacionClave = string;
 
-export function tieneBit(mascara: number, bit: number): boolean {
-    return (mascara & bit) === bit;
-}
+export const Accion = {
+    READ: 'ver',
+    CREATE: 'crear',
+    UPDATE: 'actualizar',
+    DELETE: 'eliminar',
+    ALL: 'administrar',
+} as const;
 
-export function alternarBit(mascara: number, bit: number, activo: boolean): number {
-    return activo ? mascara | bit : mascara & ~bit;
+export const OPERACION_LABELS: Record<string, string> = {
+    ver: 'Ver',
+    crear: 'Crear',
+    actualizar: 'Actualizar',
+    eliminar: 'Eliminar',
+    enviar: 'Enviar',
+    aprobar: 'Aprobar',
+    rechazar: 'Rechazar',
+    archivar: 'Archivar',
+    firmar: 'Firmar',
+};
+
+export function labelOperacion(clave: string): string {
+    return OPERACION_LABELS[clave] ?? clave.charAt(0).toUpperCase() + clave.slice(1);
 }

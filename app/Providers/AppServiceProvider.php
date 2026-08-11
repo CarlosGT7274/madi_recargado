@@ -76,8 +76,8 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureAuthorization(): void
     {
-        Gate::define('permiso', function (User $user, string $permisoNombre, int $accion): bool {
-            return $user->puede($permisoNombre, $accion);
+        Gate::define('permiso', function (User $user, string $endpoint, string $accion): bool {
+            return $user->puedePorEndpoint($endpoint, $accion);
         });
 
         Gate::define('controlTotal', function (User $user, string $endpoint): bool {
