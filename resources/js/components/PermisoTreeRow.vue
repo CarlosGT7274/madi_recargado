@@ -1,149 +1,140 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Check, ChevronDown, ChevronRight, Minus } from '@lucide/vue';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { PermisoNodo } from '@/types/roles';
+import type { Operacion, PermisoNodo } from '@/types/roles';
 
-const props = defineProps<{
-    nodo: PermisoNodo;
-    valores: Record<number, number>;
-    heredado?: number;
-    depth?: number;
-}>();
+const props = withDefaults(
+    defineProps<{
+        nodo: PermisoNodo;
+        valores: Record<number, number>;
+        operaciones: Operacion[];
+        profundidad?: number;
+    }>(),
+    { profundidad: 0 },
+);
 
 const emit = defineEmits<{
     cambiar: [ids: number[], bit: number, activo: boolean];
-    quitar: [permisoId: number];
+    modulo: [ids: number[], activo: boolean];
 }>();
 
 const abierto = ref(true);
-const depth = props.depth ?? 0;
-const propio = computed(() => props.valores[props.nodo.id]);
-const efectivo = computed(() => propio.value ?? props.heredado ?? 0);
+const tieneHijos = computed(() => props.nodo.hijos.length > 0);
 
-const ACCIONES = [
-    { bit: 1, label: 'Ver' },
-    { bit: 2, label: 'Crear' },
-    { bit: 4, label: 'Editar' },
-    { bit: 8, label: 'Eliminar' },
-] as const;
+type Estado = boolean | 'indeterminate';
 
-function tiene(bit: number) {
-    return (efectivo.value & bit) === bit;
+function subarbol(nodo: PermisoNodo): PermisoNodo[] {
+    return [nodo, ...nodo.hijos.flatMap(subarbol)];
 }
 
-function idsSubarbol(nodo: PermisoNodo): number[] {
-    return [nodo.id, ...nodo.hijos.flatMap(idsSubarbol)];
-}
-const propiosIds = computed(() => idsSubarbol(props.nodo));
-
-/**
- * Estado agregado de un bit para todo el subárbol de `nodo`, usado para
- * reflejar en un padre lo que ocurre en sus hijos aunque el padre no
- * tenga asignación propia explícita.
- */
-function estadoBit(nodo: PermisoNodo, bit: number, heredadoBit: boolean): 'on' | 'off' | 'mixed' {
-    const valor = props.valores[nodo.id];
-    const propioBit = valor !== undefined ? (valor & bit) === bit : undefined;
-
-    if (nodo.hijos.length === 0) {
-        return (propioBit ?? heredadoBit) ? 'on' : 'off';
-    }
-
-    if (propioBit !== undefined) {
-        return propioBit ? 'on' : 'off';
-    }
-
-    const estados = nodo.hijos.map((hijo) => estadoBit(hijo, bit, heredadoBit));
-    if (estados.every((e) => e === 'on')) return 'on';
-    if (estados.every((e) => e === 'off')) return 'off';
-    return 'mixed';
+function idsAplicables(bit: number): number[] {
+    return subarbol(props.nodo)
+        .filter((n) => (n.operacionesAplicables & bit) === bit)
+        .map((n) => n.id);
 }
 
-function estadoColumna(bit: number): boolean | 'indeterminate' {
-    if (!props.nodo.hijos.length) {
-        return tiene(bit);
-    }
-    const heredadoBit = ((props.heredado ?? 0) & bit) === bit;
-    const estado = estadoBit(props.nodo, bit, heredadoBit);
-    return estado === 'mixed' ? 'indeterminate' : estado === 'on';
+function aplica(bit: number): boolean {
+    return (props.nodo.operacionesAplicables & bit) === bit;
 }
 
-function alternarBit(bit: number, activo: boolean) {
-    emit('cambiar', propiosIds.value, bit, activo);
+function estadoBit(bit: number): Estado {
+    const ids = idsAplicables(bit);
+    if (!ids.length) return false;
+    const activos = ids.filter((id) => ((props.valores[id] ?? 0) & bit) === bit).length;
+    if (activos === 0) return false;
+    if (activos === ids.length) return true;
+    return 'indeterminate';
 }
 
-const estadoModulo = computed<boolean | 'indeterminate'>(() => {
-    const estados = ACCIONES.map(({ bit }) => estadoColumna(bit));
-    if (estados.every((e) => e === true)) return true;
-    if (estados.every((e) => e === false)) return false;
+function alternarBit(bit: number) {
+    const activar = estadoBit(bit) !== true;
+    emit('cambiar', idsAplicables(bit), bit, activar);
+}
+
+function paresAplicables(): { id: number; bit: number }[] {
+    return subarbol(props.nodo).flatMap((n) =>
+        props.operaciones.filter((op) => (n.operacionesAplicables & op.bit) === op.bit).map((op) => ({ id: n.id, bit: op.bit })),
+    );
+}
+
+const estadoTodo = computed<Estado>(() => {
+    const pares = paresAplicables();
+    if (!pares.length) return false;
+    const activos = pares.filter((p) => ((props.valores[p.id] ?? 0) & p.bit) === p.bit).length;
+    if (activos === 0) return false;
+    if (activos === pares.length) return true;
     return 'indeterminate';
 });
 
-function alternarModulo(activo: boolean) {
-    ACCIONES.forEach(({ bit }) => alternarBit(bit, activo));
+function alternarTodo() {
+    const activar = estadoTodo.value !== true;
+    const ids = Array.from(new Set(paresAplicables().map((p) => p.id)));
+    emit('modulo', ids, activar);
 }
 </script>
 
 <template>
-    <div>
+    <div class="border-t first:border-t-0">
         <div
-            class="grid grid-cols-[1fr_repeat(4,80px)_90px] items-center gap-2 border-t px-4 py-2"
-            :style="{ paddingLeft: `${1 + depth * 1.5}rem` }"
+            class="grid items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/40"
+            :style="{ gridTemplateColumns: `1fr repeat(${operaciones.length}, 64px) 56px` }"
         >
-            <div class="flex items-center gap-2">
-                <button v-if="nodo.hijos.length" type="button" class="text-muted-foreground" @click="abierto = !abierto">
+            <div class="flex items-center gap-1.5" :style="{ paddingLeft: `${profundidad * 20}px` }">
+                <button
+                    v-if="tieneHijos"
+                    type="button"
+                    class="rounded p-0.5 text-muted-foreground hover:bg-accent"
+                    @click="abierto = !abierto"
+                >
                     <ChevronDown v-if="abierto" class="size-4" />
                     <ChevronRight v-else class="size-4" />
                 </button>
-                <span v-else class="inline-block w-4" />
+                <span v-else class="w-5" />
+                <span :class="tieneHijos ? 'font-semibold' : 'font-medium'">{{ nodo.nombre }}</span>
+            </div>
 
+            <div v-for="op in operaciones" :key="op.id" class="flex justify-center">
                 <Checkbox
-                    v-if="nodo.hijos.length"
-                    :model-value="estadoModulo"
-                    :aria-label="`Seleccionar todo el módulo ${nodo.nombre}`"
-                    @update:model-value="(v) => alternarModulo(v === true)"
+                    v-if="aplica(op.bit)"
+                    :model-value="estadoBit(op.bit)"
+                    :aria-label="`${op.nombre} en ${nodo.nombre}`"
+                    @update:model-value="alternarBit(op.bit)"
                 >
                     <template #default="{ state }">
                         <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                         <Check v-else class="size-3.5" />
                     </template>
                 </Checkbox>
-
-                <div>
-                    <p class="text-sm font-medium">{{ nodo.nombre }}</p>
-                    <p v-if="nodo.endpoint" class="text-xs text-muted-foreground">/{{ nodo.endpoint }}</p>
-                </div>
+                <span
+                    v-else
+                    class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70"
+                    title="No aplica"
+                >
+                    N/A
+                </span>
             </div>
 
-            <div v-for="accion in ACCIONES" :key="accion.bit" class="flex justify-center">
-                <Checkbox
-                    :model-value="estadoColumna(accion.bit)"
-                    @update:model-value="(v) => alternarBit(accion.bit, v === true)"
-                >
-                    <template v-if="nodo.hijos.length" #default="{ state }">
+            <div class="flex justify-center">
+                <Checkbox :model-value="estadoTodo" aria-label="Todas las operaciones" @update:model-value="alternarTodo">
+                    <template #default="{ state }">
                         <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                         <Check v-else class="size-3.5" />
                     </template>
                 </Checkbox>
             </div>
-
-            <div class="flex justify-end">
-                <Button v-if="propio !== undefined" variant="outline" size="sm" @click="emit('quitar', nodo.id)">Quitar</Button>
-            </div>
         </div>
 
-        <div v-if="abierto">
+        <div v-if="tieneHijos && abierto" class="bg-muted/20">
             <PermisoTreeRow
                 v-for="hijo in nodo.hijos"
                 :key="hijo.id"
                 :nodo="hijo"
                 :valores="valores"
-                :heredado="efectivo"
-                :depth="depth + 1"
+                :operaciones="operaciones"
+                :profundidad="profundidad + 1"
                 @cambiar="(ids, bit, activo) => emit('cambiar', ids, bit, activo)"
-                @quitar="(id) => emit('quitar', id)"
+                @modulo="(ids, activo) => emit('modulo', ids, activo)"
             />
         </div>
     </div>

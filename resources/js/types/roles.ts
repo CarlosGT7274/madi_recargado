@@ -12,9 +12,18 @@ export type RoleResumen = {
     permisos: Record<number, number>;
 };
 
+export type Operacion = {
+    id: number;
+    clave: string;
+    nombre: string;
+    bit: number;
+    basica: boolean;
+};
+
 export type PermisoNodo = {
     id: number;
     nombre: string;
     endpoint: string | null;
+    operacionesAplicables: number;
     hijos: PermisoNodo[];
 };

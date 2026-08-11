@@ -38,29 +38,22 @@ class Permiso extends Model
         return $this->hasMany(self::class, 'padre_id');
     }
 
-    /** Catálogo: qué operaciones tienen sentido de negocio sobre este objeto. */
-    public function operacionesAplicables(): BelongsToMany
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'roles_permisos', 'permiso_id', 'rol_id')
+            ->withPivot('permisos');
+    }
+
+    /**
+     * Operaciones RBAC (ANSI/INCITS 359) aplicables directamente a este
+     * objeto. No incluye las heredadas por unión desde los hijos — eso
+     * se resuelve en arbol(), que arma la jerarquía completa.
+     */
+    public function operaciones(): BelongsToMany
     {
         return $this->belongsToMany(Operacion::class, 'permiso_operaciones', 'permiso_id', 'operacion_id');
     }
 
-    /**
-     * Declara qué operaciones aplican a este objeto. Idempotente — se
-     * puede volver a llamar en seeders sin duplicar filas.
-     *
-     * @param  array<int, string>  $claves
-     */
-    public function declararOperaciones(array $claves): void
-    {
-        $ids = Operacion::whereIn('clave', $claves)->pluck('id');
-        $this->operacionesAplicables()->syncWithoutDetaching($ids);
-    }
-
-    /**
-     * Une un prefijo heredado con un segmento propio, ignorando los vacíos.
-     * Regla única de composición de endpoints en todo el sistema:
-     * `seguridad` + `roles` => `seguridad.roles`.
-     */
     public static function componerEndpoint(?string $prefijo, ?string $segmento): ?string
     {
         $partes = array_filter([$prefijo, $segmento], fn (?string $v): bool => filled($v));
@@ -68,11 +61,6 @@ class Permiso extends Model
         return $partes === [] ? null : implode('.', $partes);
     }
 
-    /**
-     * Endpoint completo derivado de la jerarquía (padre_id). Cada registro
-     * solo almacena su propio segmento; el path completo se reconstruye
-     * recorriendo los padres. La BD es la única fuente de verdad.
-     */
     public function endpointCompleto(): ?string
     {
         $segmentos = [];
@@ -89,31 +77,48 @@ class Permiso extends Model
         return $segmentos === [] ? null : implode('.', $segmentos);
     }
 
+    /**
+     * Árbol completo para la UI de administración de roles. Cada nodo
+     * trae `operacionesAplicables`: la máscara de bits de las operaciones
+     * que tienen sentido para ESE objeto. En una categoría (con hijos),
+     * la máscara es la unión de sus propias operaciones con las de todo
+     * su subárbol — así un módulo padre puede actuar como "toggle masivo"
+     * de cualquier operación que aplique a alguno de sus hijos, sin
+     * fingir que la categoría en sí misma tiene esa operación.
+     */
     public static function arbol(): Collection
     {
-        return self::construirArbol(null);
+        return self::construirArbol(null)['nodos'];
     }
 
-    protected static function construirArbol(?int $padreId, ?string $prefijoPadre = null): Collection
+    /**
+     * @return array{nodos: Collection, aplicablesUnion: int}
+     */
+    protected static function construirArbol(?int $padreId, ?string $prefijoPadre = null): array
     {
-        return self::where('activo', true)
+        $nodos = self::with('operaciones')
+            ->where('activo', true)
             ->where('padre_id', $padreId)
             ->orderBy('nombre')
             ->get()
             ->map(function (self $p) use ($prefijoPadre) {
                 $endpointCompleto = self::componerEndpoint($prefijoPadre, $p->endpoint);
+                $subarbol = self::construirArbol($p->id, $endpointCompleto);
+                $propias = (int) $p->operaciones->sum('bit');
+                $aplicables = $propias | $subarbol['aplicablesUnion'];
 
                 return [
                     'id' => $p->id,
                     'nombre' => $p->nombre,
                     'endpoint' => $endpointCompleto,
-                    'hijos' => self::construirArbol($p->id, $endpointCompleto),
+                    'operacionesAplicables' => $aplicables,
+                    'hijos' => $subarbol['nodos'],
                 ];
             });
-    }
 
-    public function permisoOperaciones(): HasMany
-    {
-        return $this->hasMany(PermisoOperacion::class, 'permiso_id');
+        return [
+            'nodos' => $nodos,
+            'aplicablesUnion' => $nodos->reduce(fn (int $acc, array $n) => $acc | $n['operacionesAplicables'], 0),
+        ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Actions\Seguridad\Roles;
 
 use App\Exceptions\Seguridad\RolConUsuariosAsignadosException;
+use App\Models\Operacion;
 use App\Models\Permiso;
 use App\Models\Role;
 use Illuminate\Support\Collection;
@@ -21,15 +22,10 @@ class RolesAction
             ]);
     }
 
+    /** Obtener detalle de un rol */
     public function detail(Role $role): array
     {
         $role->loadCount('usuarios');
-        $role->load('permisoOperaciones.operacion');
-
-        $asignados = [];
-        foreach ($role->permisoOperaciones as $po) {
-            $asignados[$po->permiso_id][] = $po->operacion->clave;
-        }
 
         return [
             'role' => [
@@ -39,7 +35,8 @@ class RolesAction
                 'usuarios_count' => $role->usuarios_count,
             ],
             'permisosArbol' => Permiso::arbol(),
-            'permisosAsignados' => (object) $asignados,
+            'permisosAsignados' => (object) $role->mapaPermisos(),
+            'operaciones' => Operacion::orderBy('orden')->get(['id', 'clave', 'nombre', 'bit', 'basica']),
         ];
     }
 
@@ -57,22 +54,11 @@ class RolesAction
 
     public function syncPermissions(Role $role, array $permisos): void
     {
-        $role->permisoOperaciones()->detach();
-
-        foreach ($permisos as $permisoId => $operaciones) {
-            $permiso = Permiso::find($permisoId);
-            if (! $permiso) {
-                continue;
-            }
-
-            foreach ((array) $operaciones as $clave) {
-                try {
-                    $role->otorgarOperacion($permiso, $clave);
-                } catch (\InvalidArgumentException $e) {
-                    // Ignorar
-                }
-            }
+        $pivotData = [];
+        foreach ($permisos as $id => $mask) {
+            $pivotData[$id] = ['permisos' => $mask];
         }
+        $role->permisos()->sync($pivotData);
     }
 
     public function delete(Role $role): void

@@ -39,12 +39,12 @@ const form = useForm({
 const tiposProyecto = [
     {
         value: 'grande',
-        titulo: 'Proyecto estándar',
+        titulo: 'Proyecto grande',
         descripcion: 'Flujo completo con levantamiento, planeación y demás procesos.',
     },
     {
         value: 'chico',
-        titulo: 'Proyecto directo',
+        titulo: 'Proyecto Pequeñó',
         descripcion: 'Flujo simplificado para capturar actividades, cotización y orden de compra.',
     },
 ] as const;
