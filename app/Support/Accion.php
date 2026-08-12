@@ -3,12 +3,14 @@
 namespace App\Support;
 
 /**
- * Claves de operación base (RBAC0 / ANSI-INCITS 359). Ya no son bits —
- * son las mismas cuatro operaciones CRUD del catálogo `operaciones`,
- * expuestas aquí como constantes para no repetir strings mágicos en
- * rutas y Form Requests. Accion::ALL NO es una operación real: es un
- * atajo que significa "las cuatro operaciones CRUD base sobre este
- * objeto", resuelto en HasRbacAuthorization::puedePorEndpoint().
+ * Claves de operación base (RBAC0 / ANSI-INCITS 359). Deben coincidir
+ * 1:1 con `operaciones.clave` en el catálogo (ver seeder de
+ * RolesPermisosSeeder / migración seed_operaciones_catalogo) — de lo
+ * contrario VerificarPermiso::handle() y HasRbacAuthorization::tieneOperacion()
+ * nunca encuentran la operación y deniegan todo con 403 aunque el rol
+ * tenga el permiso. Accion::ALL NO es una operación real: es un atajo
+ * que significa "las cuatro operaciones CRUD base sobre este objeto",
+ * resuelto en HasRbacAuthorization::puedePorEndpoint().
  */
 final class Accion
 {
@@ -16,7 +18,7 @@ final class Accion
 
     public const CREATE = 'crear';
 
-    public const UPDATE = 'actualizar';
+    public const UPDATE = 'editar';
 
     public const DELETE = 'eliminar';
 

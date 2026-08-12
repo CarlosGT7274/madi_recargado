@@ -77,9 +77,18 @@ const estadoGlobal = computed<EstadoCheck>(() => {
     return calcularEstado(activos, pares.length);
 });
 
+/**
+ * Un permiso "desmarcado" debe guardar 0 EXPLÍCITO, no borrarse. Borrar
+ * la fila es indistinguible de "nunca se tocó" para Role::permisosPara(),
+ * que en ese caso trepa al padre y hereda sus bits — eso convertía un
+ * "niego este permiso" en "vuelve a heredar del padre". Guardar 0
+ * explícito bloquea esa herencia correctamente.
+ */
 function aplicarATodos(activo: boolean) {
     if (!activo) {
-        Object.keys(valores).forEach((k) => delete valores[Number(k)]);
+        nodosTodos.value.forEach((n) => {
+            valores[n.id] = 0;
+        });
         return;
     }
 
@@ -105,25 +114,21 @@ function estadoColumna(bit: number): EstadoCheck {
 function alternarColumna(bit: number, activo: boolean) {
     idsAplicables(bit).forEach((id) => {
         const actual = valores[id] ?? 0;
-        const nuevo = activo ? actual | bit : actual & ~bit;
-        if (nuevo === 0) delete valores[id];
-        else valores[id] = nuevo;
+        valores[id] = activo ? actual | bit : actual & ~bit;
     });
 }
 
 function cambiar(ids: number[], bit: number, activo: boolean) {
     ids.forEach((id) => {
         const actual = valores[id] ?? 0;
-        const nuevo = activo ? actual | bit : actual & ~bit;
-        if (nuevo === 0) delete valores[id];
-        else valores[id] = nuevo;
+        valores[id] = activo ? actual | bit : actual & ~bit;
     });
 }
 
 function alternarModulo(ids: number[], activo: boolean) {
     ids.forEach((id) => {
         if (!activo) {
-            delete valores[id];
+            valores[id] = 0;
             return;
         }
         const nodo = nodosTodos.value.find((n) => n.id === id);
@@ -144,9 +149,11 @@ const guardar = () => {
 </script>
 
 <template>
+
     <Head :title="`Rol: ${role.nombre}`" />
 
-    <PageLayout :title="role.nombre" :description="`${role.usuarios_count} usuarios con este rol`" endpoint="seguridad.roles">
+    <PageLayout :title="role.nombre" :description="`${role.usuarios_count} usuarios con este rol`"
+        endpoint="seguridad.roles">
         <template #actions>
             <Button variant="outline" size="sm" @click="seleccionarTodo">Seleccionar todo</Button>
             <Button variant="outline" size="sm" @click="limpiarTodo">Limpiar todo</Button>
@@ -154,29 +161,26 @@ const guardar = () => {
         </template>
 
         <div class="mb-4 flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-            <span class="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+            <span
+                class="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                 {{ role.nombre.charAt(0) }}
             </span>
             <div class="flex-1">
                 <p class="font-semibold">{{ role.nombre }}</p>
                 <p class="text-xs text-muted-foreground">{{ role.usuarios_count }} usuarios asignados</p>
             </div>
-            <span :class="role.activo ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'" class="text-xs font-medium">
+            <span :class="role.activo ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'"
+                class="text-xs font-medium">
                 {{ role.activo ? 'Activo' : 'Inactivo' }}
             </span>
         </div>
 
         <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div
-                class="grid items-end gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground"
-                :style="{ gridTemplateColumns: `1fr repeat(${operaciones.length}, 64px) 56px` }"
-            >
+            <div class="grid items-end gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground"
+                :style="{ gridTemplateColumns: `1fr repeat(${operaciones.length}, 64px) 56px` }">
                 <div class="flex items-center gap-2 pb-1">
-                    <Checkbox
-                        :model-value="estadoGlobal"
-                        aria-label="Seleccionar todos los permisos"
-                        @update:model-value="(v) => (v === true ? seleccionarTodo() : limpiarTodo())"
-                    >
+                    <Checkbox :model-value="estadoGlobal" aria-label="Seleccionar todos los permisos"
+                        @update:model-value="(v) => (v === true ? seleccionarTodo() : limpiarTodo())">
                         <template #default="{ state }">
                             <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                             <Check v-else class="size-3.5" />
@@ -188,11 +192,8 @@ const guardar = () => {
                 <div v-for="op in operaciones" :key="op.id" class="flex flex-col items-center gap-1">
                     <component :is="icono(op.clave)" class="size-3.5" :class="op.basica ? '' : 'text-primary'" />
                     <span :class="op.basica ? '' : 'text-primary'">{{ op.nombre }}</span>
-                    <Checkbox
-                        :model-value="estadoColumna(op.bit)"
-                        :aria-label="`Alternar columna ${op.nombre}`"
-                        @update:model-value="(v) => alternarColumna(op.bit, v === true)"
-                    >
+                    <Checkbox :model-value="estadoColumna(op.bit)" :aria-label="`Alternar columna ${op.nombre}`"
+                        @update:model-value="(v) => alternarColumna(op.bit, v === true)">
                         <template #default="{ state }">
                             <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                             <Check v-else class="size-3.5" />
@@ -203,15 +204,8 @@ const guardar = () => {
                 <span class="pb-1 text-center">Todo</span>
             </div>
 
-            <PermisoTreeRow
-                v-for="nodo in permisosArbol"
-                :key="nodo.id"
-                :nodo="nodo"
-                :valores="valores"
-                :operaciones="operaciones"
-                @cambiar="cambiar"
-                @modulo="alternarModulo"
-            />
+            <PermisoTreeRow v-for="nodo in permisosArbol" :key="nodo.id" :nodo="nodo" :valores="valores"
+                :operaciones="operaciones" @cambiar="cambiar" @modulo="alternarModulo" />
         </div>
 
         <p class="mt-3 text-xs text-muted-foreground">
