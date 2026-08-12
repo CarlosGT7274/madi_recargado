@@ -22,6 +22,8 @@ import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/Proye
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PageLayout from '@/components/PageLayout.vue';
 import GaleriaImagenes from '@/components/GaleriaImagenes.vue';
+import { usePermissions } from '@/composables/usePermissions';
+import PermissionButton from '@/components/PermissionButton.vue';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -70,6 +72,7 @@ const modo = ref<'view' | 'edit'>('view');
 const form = useForm<LevantamientoFormData>({ ...props.levantamiento });
 const createCotizacionDialogOpen = ref(false);
 const archivoCotizacionInput = ref<HTMLInputElement | null>(null);
+const { Accion, hasPermission } = usePermissions();
 
 const rutaCotizaciones = computed(() => ({
     planta: props.planta.id,
@@ -121,10 +124,10 @@ function formatoMoneda(valor: number | null): string {
     <Head :title="`Levantamiento ${levantamiento.folio}`" />
 
     <PageLayout :title="levantamiento.folio" :description="levantamiento.nombre ?? undefined"
-        endpoint="ingenierias.plantas.levantamientos" :with-edit="modo === 'view'" with-delete @edit="modo = 'edit'"
+        endpoint="ingenierias.plantas.proyectos.levantamientos" :with-edit="modo === 'view'" with-delete @edit="modo = 'edit'"
         @delete="eliminar">
         <template #breadcrumbs>
-            <Link :href="ProyectoController.show([planta.id, proyecto.id])"
+            <Link :href="ProyectoController.show([planta.id, proyecto.id]).url"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft class="size-4" />
             </Link>
@@ -183,16 +186,16 @@ function formatoMoneda(valor: number | null): string {
                     Cotizaciones
                 </div>
                 <div class="flex items-center gap-2">
-                    <a :href="CotizacionController.plantilla(rutaCotizaciones).url">
+                    <a v-if="hasPermission('ingenierias.plantas.proyectos.levantamientos.cotizaciones', Accion.CREATE)" :href="CotizacionController.plantilla(rutaCotizaciones).url">
                         <Button size="sm" variant="outline">
                             <Download class="mr-2 size-4" />
                             Plantilla
                         </Button>
                     </a>
-                    <Button size="sm" @click="createCotizacionDialogOpen = true">
+                    <PermissionButton endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones" :accion="Accion.CREATE" size="sm" @click="createCotizacionDialogOpen = true">
                         <Plus class="mr-2 size-4" />
                         Subir cotización
-                    </Button>
+                    </PermissionButton>
                 </div>
             </div>
 
@@ -207,7 +210,7 @@ function formatoMoneda(valor: number | null): string {
                         proyecto: proyecto.id,
                         levantamiento: levantamiento.id,
                         obra: grupo.obra,
-                    })" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
+                    }).url" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
                         :class="grupo.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'bg-card'">
                         <div class="flex items-start justify-between gap-2">
                             <p class="truncate font-semibold">{{ grupo.obra }}</p>

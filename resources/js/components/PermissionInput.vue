@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 const props = withDefaults(
     defineProps<{
         endpoint: string;
-        accion: number;
+        accion: string;
         modelValue: string | number;
         type?: string;
         step?: string;

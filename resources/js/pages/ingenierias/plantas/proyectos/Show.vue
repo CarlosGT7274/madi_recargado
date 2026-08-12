@@ -33,6 +33,8 @@ import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/Proye
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
 import PlantaController from '@/actions/App/Http/Controllers/Ingenierias/PlantaController';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
+import { usePermissions } from '@/composables/usePermissions';
+import PermissionButton from '@/components/PermissionButton.vue';
 import PageLayout from '@/components/PageLayout.vue';
 import InputError from '@/components/InputError.vue';
 import ActividadesArbol, { type ActividadNodo } from '@/components/ActividadesArbol.vue';
@@ -98,6 +100,8 @@ const props = defineProps<{
     obras?: ObraAgrupada[];
     actividades?: ActividadNodo[];
 }>();
+
+const { Accion, hasPermission } = usePermissions();
 
 const editDialogOpen = ref(false);
 
@@ -254,7 +258,7 @@ function formatoMoneda(valor: number | null): string {
         @delete="eliminarProyecto">
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form v-bind="ProyectoController.update.form([planta.id, proyecto.id])"
+                <Form :action="ProyectoController.update([planta.id, proyecto.id]).url" :method="ProyectoController.update([planta.id, proyecto.id]).method"
                     :options="{ preserveScroll: true }" @success="editDialogOpen = false"
                     v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
@@ -309,24 +313,22 @@ function formatoMoneda(valor: number | null): string {
                         </div>
                     </div>
 
-                    <Link v-if="proyecto.tipo === 'grande'"
-                        :href="LevantamientoController.create({ planta: planta.id, proyecto: proyecto.id })">
-                        <Button>
-                            <Plus class="size-4" />
-                            Nuevo Levantamiento
-                        </Button>
-                    </Link>
+                    <PermissionButton v-if="proyecto.tipo === 'grande'" endpoint="ingenierias.plantas.proyectos.levantamientos" :accion="Accion.CREATE"
+                        :href="LevantamientoController.create({ planta: planta.id, proyecto: proyecto.id }).url">
+                        <Plus class="size-4" />
+                        Nuevo Levantamiento
+                    </PermissionButton>
 
                     <div v-else class="flex flex-col items-end gap-2">
                         <div class="flex items-center gap-2">
-                            <a :href="CotizacionController.plantillaProyecto([planta.id, proyecto.id]).url">
+                            <a v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)" :href="CotizacionController.plantillaProyecto([planta.id, proyecto.id]).url">
                                 <Button variant="outline">
                                     <Download class="size-4" />
                                     Descargar Plantilla
                                 </Button>
                             </a>
 
-                            <label>
+                            <label v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)">
                                 <Button as="span" class="cursor-pointer">
                                     <Upload class="size-4" />
                                     Subir cotización
@@ -335,7 +337,7 @@ function formatoMoneda(valor: number | null): string {
                                     @change="subirCotizacionExcel" />
                             </label>
 
-                            <Collapsible v-model:open="captureManualOpen">
+                            <Collapsible v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)" v-model:open="captureManualOpen">
                                 <CollapsibleTrigger as-child>
                                     <Button variant="outline">
                                         <ChevronDown class="size-4 transition-transform"
@@ -496,7 +498,7 @@ function formatoMoneda(valor: number | null): string {
                                 planta: planta.id,
                                 proyecto: proyecto.id,
                                 obra: grupo.obra,
-                            })" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
+                            }).url" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
                                 :class="grupo.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'bg-card'">
                                 <div class="flex items-start justify-between gap-2">
                                     <p class="truncate font-semibold">{{ grupo.obra }}</p>

@@ -26,6 +26,7 @@ import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoC
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import PermissionInput from '@/components/PermissionInput.vue';
+import PermissionButton from '@/components/PermissionButton.vue';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/composables/usePermissions';
 import {
@@ -246,7 +247,7 @@ function estatusBadgeClass(estatus: string): string {
 
     <Head title="Explosión de Insumos" />
 
-    <PageLayout title="" description="">
+    <PageLayout title="" description="" endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones.insumos">
         <template #breadcrumbs>
             <Link :href="CotizacionController.show(rutaInsumos).url"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -343,10 +344,10 @@ function estatusBadgeClass(estatus: string): string {
                         </Button>
                     </a>
 
-                    <Button variant="secondary" size="sm" @click="importDialogOpen = true">
+                    <PermissionButton :endpoint="endpointInsumos" :accion="Accion.CREATE" variant="secondary" size="sm" @click="importDialogOpen = true">
                         <Upload class="mr-2 size-4" />
                         Subir Excel
-                    </Button>
+                    </PermissionButton>
 
                     <a :href="InsumoController.pdf(rutaInsumos).url" target="_blank">
                         <Button variant="secondary" size="sm">

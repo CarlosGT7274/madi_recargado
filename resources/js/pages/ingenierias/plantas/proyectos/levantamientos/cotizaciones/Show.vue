@@ -110,7 +110,6 @@ const props = defineProps<{
     cotizacion: CotizacionDetalle;
     partidas: PartidaRaiz[];
     numeroPartidas: number;
-    puedeAprobarOc: boolean;
 }>();
 
 const { hasPermission, Accion } = usePermissions();
@@ -199,10 +198,10 @@ function formatoMoneda(valor: number | null | undefined): string {
 
     <Head :title="`Cotización ${cotizacion.folio}`" />
 
-    <PageLayout title="" description="">
+    <PageLayout title="" description="" endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones">
         <template #breadcrumbs>
             <Link
-                :href="LevantamientoController.show({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id })"
+                :href="LevantamientoController.show({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }).url"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowRight class="size-4 rotate-180" />
             </Link>
@@ -253,7 +252,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                     </div>
                 </div>
 
-                <div v-if="puedeAprobarOc" class="mt-4 border-t border-amber-200 pt-4 dark:border-amber-900">
+                <div v-if="hasPermission(endpoint, 'aprobar')" class="mt-4 border-t border-amber-200 pt-4 dark:border-amber-900">
                     <p class="mb-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400">
                         Acciones de administrador
                     </p>
@@ -419,7 +418,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                     </div>
 
                     <Link
-                        :href="InsumoController.index({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id })">
+                        :href="InsumoController.index({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id }).url">
                         <Button class="w-full"
                             :class="cotizacion.tiene_insumos ? 'bg-emerald-600 text-white hover:bg-emerald-700' : ''"
                             :variant="cotizacion.tiene_insumos ? 'default' : 'outline'">
@@ -448,7 +447,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                         <div class="rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20">
                             <p class="font-medium text-emerald-700 dark:text-emerald-400">✓ Fase completada</p>
                         </div>
-                        <Link class="mt-3 block" :href="CotizacionController.ordenCompra(rutaOc)">
+                        <Link class="mt-3 block" :href="CotizacionController.ordenCompra(rutaOc).url">
                             <Button class="w-full bg-emerald-600 text-white hover:bg-emerald-700">Ver Orden de
                                 Compra</Button>
                         </Link>

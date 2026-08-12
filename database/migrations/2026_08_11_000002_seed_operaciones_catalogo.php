@@ -31,12 +31,19 @@ return new class extends Migration
         $aprobar = Operacion::where('clave', 'aprobar')->first();
         $supervisar = Operacion::where('clave', 'supervisar')->first();
 
+        if ($aprobar !== null) {
+            $permisos = Permiso::all();
+            foreach ($permisos as $permiso) {
+                $permiso->operaciones()->syncWithoutDetaching([$aprobar->id]);
+            }
+        }
+
         $planeacion = Permiso::whereHas('padre', fn ($q) => $q->where('endpoint', 'ingenierias'))
             ->where('endpoint', 'planeacion')
             ->first();
 
-        if ($planeacion !== null && $aprobar !== null && $supervisar !== null) {
-            $planeacion->operaciones()->syncWithoutDetaching([$aprobar->id, $supervisar->id]);
+        if ($planeacion !== null && $supervisar !== null) {
+            $planeacion->operaciones()->syncWithoutDetaching([$supervisar->id]);
         }
     }
 

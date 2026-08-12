@@ -164,16 +164,18 @@ trait HasRbacAuthorization
         $actual = null;
 
         foreach (explode('.', $endpoint) as $segmento) {
-            $actual = Permiso::query()
+            $hijo = Permiso::query()
                 ->where('padre_id', $padreId)
                 ->where('endpoint', $segmento)
                 ->where('activo', true)
                 ->first();
 
-            if ($actual === null) {
-                return $cache[$endpoint] = null;
+            // Si no existe el segmento hijo en la BD, heredamos el permiso del padre más cercano.
+            if ($hijo === null) {
+                return $cache[$endpoint] = $actual;
             }
 
+            $actual = $hijo;
             $padreId = $actual->id;
         }
 

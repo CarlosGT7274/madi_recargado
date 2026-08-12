@@ -70,13 +70,18 @@ class RolesPermisosSeeder extends Seeder
             ['padre_id' => $ingenierias->id, 'endpoint' => 'planeacion', 'activo' => true]
         );
 
-        // Aprobar/Supervisar solo aplican como objeto en Planeación — el
-        // resto de módulos se queda en N/A para esas dos operaciones.
+        // Aprobar aplica a todos, Supervisar solo aplica como objeto en Planeación.
         $aprobar = Operacion::where('clave', 'aprobar')->first();
         $supervisar = Operacion::where('clave', 'supervisar')->first();
 
-        if ($aprobar && $supervisar) {
-            $planeacion->operaciones()->syncWithoutDetaching([$aprobar->id, $supervisar->id]);
+        if ($aprobar) {
+            foreach ([$sistema, $inventario, $seguridad, $roles, $usuarios, $ingenierias, $plantas, $planeacion] as $permiso) {
+                $permiso->operaciones()->syncWithoutDetaching([$aprobar->id]);
+            }
+        }
+
+        if ($supervisar) {
+            $planeacion->operaciones()->syncWithoutDetaching([$supervisar->id]);
         }
 
         // Super Administrador: TODO en todo, sin excepción. Es la raíz de

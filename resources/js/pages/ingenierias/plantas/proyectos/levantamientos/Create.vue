@@ -119,9 +119,9 @@ function subirPlantilla(): void {
 
     <Head title="Nuevo Levantamiento" />
 
-    <PageLayout title="Nuevo Levantamiento" description="Captura manual o sube tu plantilla en bulto">
+    <PageLayout title="Nuevo Levantamiento" description="Captura manual o sube tu plantilla en bulto" endpoint="ingenierias.plantas.proyectos.levantamientos">
         <template #breadcrumbs>
-            <Link :href="ProyectoController.show([planta.id, proyecto.id])"
+            <Link :href="ProyectoController.show([planta.id, proyecto.id]).url"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft class="size-4" />
             </Link>

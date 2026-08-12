@@ -60,9 +60,19 @@ class Role extends Model
         return 0;
     }
 
-    public function tienePermiso(Permiso $permiso, int $accion): bool
+    public function tienePermiso(Permiso $permiso, string $accion): bool
     {
-        return ($this->permisosPara($permiso) & $accion) === $accion;
+        if ($accion === Accion::ALL) {
+            foreach (Accion::crud() as $clave) {
+                if (! $this->tieneOperacion($permiso, $clave)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return $this->tieneOperacion($permiso, $accion);
     }
 
     /**
@@ -161,10 +171,29 @@ class Role extends Model
         }
     }
 
-    public function otorgar(Permiso $permiso, int $permisos): void
+    public function otorgar(Permiso $permiso, int|string|array $operaciones): void
     {
+        $bits = 0;
+
+        if (is_int($operaciones)) {
+            $bits = $operaciones;
+        } else {
+            $claves = is_array($operaciones) ? $operaciones : [$operaciones];
+
+            if (in_array(Accion::ALL, $claves, true)) {
+                $claves = array_unique(array_merge($claves, Accion::crud()));
+                $claves = array_diff($claves, [Accion::ALL]);
+            }
+
+            $bits = Operacion::whereIn('clave', $claves)->where('activo', true)->sum('bit');
+        }
+
+        // Recuperar permisos actuales para no sobrescribir, sino acumular
+        $actuales = $this->permisosPara($permiso);
+        $nuevosBits = $actuales | $bits;
+
         $this->permisos()->syncWithoutDetaching([
-            $permiso->id => ['permisos' => $permisos],
+            $permiso->id => ['permisos' => $nuevosBits],
         ]);
 
         $this->permisosMapa = null;

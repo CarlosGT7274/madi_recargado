@@ -121,9 +121,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/solicitar-revision', [CotizacionController::class, 'solicitarRevisionCompra'])
                 ->middleware('permiso:'.Accion::CREATE)->name('solicitar-revision');
             Route::post('/aprobar', [CotizacionController::class, 'aprobarCompra'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('aprobar');
+                ->middleware('permiso:aprobar')->name('aprobar');
             Route::post('/rechazar', [CotizacionController::class, 'rechazarCompra'])
-                ->middleware('permiso:'.Accion::UPDATE)->name('rechazar');
+                ->middleware('permiso:aprobar')->name('rechazar');
         });
 
     // ---- Proyecto directo: cotización + OC + actividades, sin Levantamiento ----

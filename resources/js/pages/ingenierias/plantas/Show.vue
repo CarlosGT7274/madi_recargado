@@ -148,7 +148,7 @@ function contarPorTipo(tipo: FiltroTipo): number {
         <!-- Dialog: editar planta -->
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form v-bind="PlantaController.update.form(planta.id)" :options="{ preserveScroll: true }"
+                <Form :action="PlantaController.update(planta.id).url" :method="PlantaController.update(planta.id).method" :options="{ preserveScroll: true }"
                     @success="editDialogOpen = false" v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Editar planta</DialogTitle>

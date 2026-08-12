@@ -16,9 +16,8 @@ beforeEach(function () {
     ]);
     $role->otorgar($permiso, Accion::ALL);
 
-    $this->user = User::factory()->create([
-        'rol_id' => $role->id,
-    ]);
+    $this->user = User::factory()->create();
+    $this->user->roles()->attach($role->id);
 });
 
 test('users with permission can view levantamientos list', function () {

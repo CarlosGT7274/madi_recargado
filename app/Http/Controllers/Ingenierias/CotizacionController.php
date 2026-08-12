@@ -92,7 +92,6 @@ class CotizacionController extends Controller
             'cotizacion' => $action->detail($cotizacion),
             'partidas' => $partidas,
             'numeroPartidas' => collect($partidas)->sum(fn (array $raiz) => count($raiz['hijas'])),
-            'puedeAprobarOc' => request()->user()?->puedePorEndpoint('ingenierias', Accion::ALL) ?? false,
         ]);
     }
 

@@ -9,7 +9,7 @@ defineOptions({ inheritAttrs: false });
 
 type Props = {
     endpoint: string;
-    accion: number;
+    accion: string;
     href?: NonNullable<InertiaLinkProps['href']>;
     variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'destructive' | 'link';
     size?: 'default' | 'sm' | 'lg' | 'icon';

@@ -19,16 +19,18 @@ beforeEach(function () {
         'endpoint' => 'ingenierias.planeacion',
         'activo' => true,
     ]);
-    $roleSupervisor->otorgar($permiso, Accion::ALL);
+    $roleSupervisor->otorgar($permiso, [Accion::ALL, 'aprobar', 'supervisar']);
 
-    $this->supervisor = User::factory()->create(['rol_id' => $roleSupervisor->id]);
+    $this->supervisor = User::factory()->create();
+    $this->supervisor->roles()->attach($roleSupervisor->id);
     $this->supervisor->plantasAsignadas()->attach($this->planta->id);
 
     // User with create/read/update (cannot approve because it lacks DELETE so it does not sum to 15 / ALL)
     $roleResidente = Role::factory()->create();
-    $roleResidente->otorgar($permiso, Accion::CREATE | Accion::READ | Accion::UPDATE);
+    $roleResidente->otorgar($permiso, [Accion::CREATE, Accion::READ, Accion::UPDATE]);
 
-    $this->residente = User::factory()->create(['rol_id' => $roleResidente->id]);
+    $this->residente = User::factory()->create();
+    $this->residente->roles()->attach($roleResidente->id);
     $this->residente->proyectosAsignados()->attach($this->proyecto->id);
 });
 

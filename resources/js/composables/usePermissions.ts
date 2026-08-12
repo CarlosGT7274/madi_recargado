@@ -12,7 +12,15 @@ export function usePermissions() {
     const permisos = computed<Record<string, OperacionClave[]>>(() => page.props.permisos ?? {});
 
     function hasPermission(endpoint: string, operacion: OperacionClave): boolean {
-        return permisos.value[endpoint]?.includes(operacion) ?? false;
+        const parts = endpoint.split('.');
+        while (parts.length > 0) {
+            const currentEndpoint = parts.join('.');
+            if (permisos.value[currentEndpoint]) {
+                return permisos.value[currentEndpoint].includes(operacion);
+            }
+            parts.pop();
+        }
+        return false;
     }
 
     return { hasPermission, permisos, Accion };

@@ -3,7 +3,7 @@ export type OperacionClave = string;
 export const Accion = {
     READ: 'ver',
     CREATE: 'crear',
-    UPDATE: 'actualizar',
+    UPDATE: 'editar',
     DELETE: 'eliminar',
     ALL: 'administrar',
 } as const;
@@ -11,7 +11,7 @@ export const Accion = {
 export const OPERACION_LABELS: Record<string, string> = {
     ver: 'Ver',
     crear: 'Crear',
-    actualizar: 'Actualizar',
+    editar: 'Editar',
     eliminar: 'Eliminar',
     enviar: 'Enviar',
     aprobar: 'Aprobar',

@@ -73,7 +73,7 @@ const estatusLabel: Record<string, string> = {
         with-create @create="dialogOpen = true">
         <Dialog v-model:open="dialogOpen">
             <DialogContent>
-                <Form v-bind="PlantaController.store.form()" reset-on-success :options="{ preserveScroll: true }"
+                <Form :action="PlantaController.store().url" :method="PlantaController.store().method" reset-on-success :options="{ preserveScroll: true }"
                     @success="dialogOpen = false" v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Nueva planta</DialogTitle>

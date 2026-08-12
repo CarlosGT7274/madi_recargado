@@ -88,7 +88,7 @@ function detalleHref(versionId: number): string {
 
     <Head :title="`${grupo.obra} — Cotizaciones`" />
 
-    <PageLayout title="" description="">
+    <PageLayout title="" description="" endpoint="ingenierias.plantas.proyectos.cotizaciones">
         <ObraCompletadaBanner v-if="grupo.completada" :monto-total="grupo.montoCompletado" />
 
         <ObraStatsHeader :obra="grupo.obra" :completada="grupo.completada" :total-versiones="grupo.totalVersiones"

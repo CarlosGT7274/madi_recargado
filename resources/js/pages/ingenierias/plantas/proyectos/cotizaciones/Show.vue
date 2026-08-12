@@ -126,9 +126,9 @@ function formatoMoneda(valor: number | null | undefined): string {
 
     <Head :title="`Cotización ${cotizacion.folio}`" />
 
-    <PageLayout title="" description="">
+    <PageLayout title="" description="" endpoint="ingenierias.plantas.proyectos.cotizaciones">
         <template #breadcrumbs>
-            <Link :href="ProyectoController.show([planta.id, proyecto.id])"
+            <Link :href="ProyectoController.show([planta.id, proyecto.id]).url"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowRight class="size-4 rotate-180" />
             </Link>
