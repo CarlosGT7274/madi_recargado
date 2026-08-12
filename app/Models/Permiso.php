@@ -45,9 +45,10 @@ class Permiso extends Model
     }
 
     /**
-     * Operaciones RBAC (ANSI/INCITS 359) aplicables directamente a este
-     * objeto. No incluye las heredadas por unión desde los hijos — eso
-     * se resuelve en arbol(), que arma la jerarquía completa.
+     * Operaciones de NEGOCIO (no básicas) declaradas explícitamente para
+     * este objeto vía permiso_operaciones. Las básicas (Ver/Crear/Editar/
+     * Eliminar) no viven aquí — aplican a todo objeto por default, ver
+     * construirArbol().
      */
     public function operaciones(): BelongsToMany
     {
@@ -88,23 +89,29 @@ class Permiso extends Model
      */
     public static function arbol(): Collection
     {
-        return self::construirArbol(null)['nodos'];
+        $basicas = Operacion::where('basica', true)->where('activo', true)->sum('bit');
+
+        return self::construirArbol((int) $basicas, null)['nodos'];
     }
 
     /**
      * @return array{nodos: Collection, aplicablesUnion: int}
      */
-    protected static function construirArbol(?int $padreId, ?string $prefijoPadre = null): array
+    protected static function construirArbol(int $basicas, ?int $padreId, ?string $prefijoPadre = null): array
     {
         $nodos = self::with('operaciones')
             ->where('activo', true)
             ->where('padre_id', $padreId)
             ->orderBy('nombre')
             ->get()
-            ->map(function (self $p) use ($prefijoPadre) {
+            ->map(function (self $p) use ($basicas, $prefijoPadre) {
                 $endpointCompleto = self::componerEndpoint($prefijoPadre, $p->endpoint);
-                $subarbol = self::construirArbol($p->id, $endpointCompleto);
-                $propias = (int) $p->operaciones->sum('bit');
+                $subarbol = self::construirArbol($basicas, $p->id, $endpointCompleto);
+
+                // Básicas aplican a todo objeto por default; operaciones de
+                // negocio (aprobar, supervisar, ...) solo si están declaradas
+                // explícitamente en permiso_operaciones para este permiso.
+                $propias = $basicas | (int) $p->operaciones->sum('bit');
                 $aplicables = $propias | $subarbol['aplicablesUnion'];
 
                 return [

@@ -1,5 +1,7 @@
 <?php
 
+// database/migrations/2026_08_11_000002_seed_operaciones_catalogo.php
+
 use App\Models\Operacion;
 use App\Models\Permiso;
 use Illuminate\Database\Migrations\Migration;

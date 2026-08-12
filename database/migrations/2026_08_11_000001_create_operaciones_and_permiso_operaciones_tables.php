@@ -1,5 +1,7 @@
 <?php
 
+// database/migrations/2026_08_11_000001_create_operaciones_and_permiso_operaciones_tables.php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
