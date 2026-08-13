@@ -24,6 +24,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('planeaciones.index');
             Route::post('/planeaciones', [PlaneacionController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('planeaciones.store');
+
+            // Selects dependientes de Create.vue: planta/proyecto -> cotizaciones aprobadas -> partidas.
+            Route::get('/cotizaciones-aprobadas', [PlaneacionController::class, 'cotizacionesAprobadas'])
+                ->middleware('permiso:'.Accion::READ)->name('cotizaciones-aprobadas');
+            Route::get('/cotizaciones/{cotizacion}/partidas', [PlaneacionController::class, 'partidasDeCotizacion'])
+                ->middleware('permiso:'.Accion::READ)->name('cotizaciones.partidas');
         });
 
     Route::name('ingenierias.planeacion.')

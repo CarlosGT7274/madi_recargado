@@ -122,4 +122,23 @@ class PartidasAction
             ])->all(),
         ])->all();
     }
+
+    /**
+     * Partidas hoja de una cotización, aplanadas y con la categoría padre
+     * como contexto — mismo criterio que ActividadController::filasPlanas()
+     * usa para poblar el calendario de Planeación. Estas son las
+     * "actividades disponibles" una vez que se elige una cotización
+     * aprobada en el flujo de creación de Planeación.
+     */
+    public function disponibles(Cotizacion $cotizacion): Collection
+    {
+        return collect($this->arbol($cotizacion))
+            ->flatMap(fn (array $raiz) => collect($raiz['hijas'])->map(fn (array $h) => [
+                'id' => $h['id'],
+                'descripcion' => "{$raiz['descripcion']} · {$h['descripcion']}",
+                'unidad' => $h['unidad'],
+                'cantidad' => $h['cantidad'],
+            ]))
+            ->values();
+    }
 }

@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\Ingenierias\Planeacion;
 
 use App\Actions\Ingenierias\Actividades\ActividadesAction;
+use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
+use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Actions\Ingenierias\Planeacion\PlaneacionAsignacionesAction;
 use App\Actions\Ingenierias\Planeacion\PlaneacionesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Planeacion\RechazarPlaneacionRequest;
 use App\Http\Requests\Ingenierias\Planeacion\StorePlaneacionRequest;
+use App\Models\Cotizacion;
 use App\Models\Empleado;
 use App\Models\Planeacion;
 use App\Models\Planta;
 use App\Models\Proyecto;
 use App\Support\Accion;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -51,10 +55,16 @@ class PlaneacionController extends Controller
         $usuario = $request->user();
         $puedeSupervisar = $action->puedeSupervisar($usuario);
 
+        /**
+         * Supervisar es un superset: el supervisor puede crear planeaciones
+         * igual que un empleado normal, pero además ve TODO, sin depender de
+         * asignaciones explícitas (planta_usuario/proyecto_usuario) — esas
+         * tablas pivote son para acotar al empleado común, no al supervisor.
+         */
         $plantas = $puedeSupervisar
-            ? $usuario->plantasAsignadas()
-                ->with('proyectos:id,planta_id,nombre,folio,tipo')
-                ->get(['plantas.id', 'plantas.nombre', 'plantas.folio'])
+            ? Planta::with('proyectos:id,planta_id,nombre,folio,tipo')
+                ->orderBy('nombre')
+                ->get(['id', 'nombre', 'folio'])
                 ->map(fn (Planta $p) => $this->plantaOpcion($p))
                 ->values()
             : $usuario->proyectosAsignados()
@@ -170,5 +180,17 @@ class PlaneacionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Planeación eliminada.']);
 
         return redirect()->route('ingenierias.planeacion.index');
+    }
+
+    /** Selects dependientes de Create.vue — paso 3: cotizaciones aprobadas del proyecto elegido. */
+    public function cotizacionesAprobadas(Planta $planta, Proyecto $proyecto, CotizacionesAction $action): JsonResponse
+    {
+        return response()->json($action->listAprobadasProyecto($proyecto));
+    }
+
+    /** Selects dependientes de Create.vue — paso 4: partidas de la cotización aprobada elegida. */
+    public function partidasDeCotizacion(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, PartidasAction $action): JsonResponse
+    {
+        return response()->json($action->disponibles($cotizacion));
     }
 }

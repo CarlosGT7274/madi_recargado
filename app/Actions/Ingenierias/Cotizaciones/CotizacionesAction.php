@@ -99,6 +99,30 @@ class CotizacionesAction
     }
 
     /**
+     * Cotizaciones aprobadas (Cotizacion::estaCompletada()) de un proyecto,
+     * sin importar si vienen del flujo grande (con Levantamiento) o del
+     * flujo chico (Proyecto directo) — proyecto_id está denormalizado en
+     * ambos casos, así que proyecto->cotizaciones() ya las cubre todas.
+     * Fuente para el selector de "Cotización aprobada" en Planeación.
+     */
+    public function listAprobadasProyecto(Proyecto $proyecto): Collection
+    {
+        return $proyecto->cotizaciones()
+            ->with('archivos', 'insumos')
+            ->latest('id')
+            ->get()
+            ->filter(fn (Cotizacion $c) => $c->estaCompletada())
+            ->map(fn (Cotizacion $c) => [
+                'id' => $c->id,
+                'folio' => $c->folio,
+                'obra' => $c->obra,
+                'fecha' => $c->fecha?->format('d/m/Y'),
+                'total' => (float) $c->total,
+            ])
+            ->values();
+    }
+
+    /**
      * Traduce el label sintético SIN_OBRA de vuelta a un WHERE NULL real.
      * Único punto donde se compara `obra` contra un valor que viene de la
      * URL — todo lo demás pasa por aquí para no repetir el mismo bug.
