@@ -35,6 +35,7 @@ interface PlaneacionResumen {
 }
 
 const props = defineProps<{
+    puedeAprobar: boolean;
     planeaciones?: PlaneacionResumen[];
 }>();
 
@@ -255,7 +256,7 @@ const estadoBadgeClass: Record<EstadoPlaneacion, string> = {
                             </p>
                             <p class="text-xs text-muted-foreground">Residente: {{ p.residente ?? '—' }}</p>
 
-                            <div v-if="p.estado === 'enviada'" class="mt-3 flex gap-2">
+                            <div v-if="props.puedeAprobar && p.estado === 'enviada'" class="mt-3 flex gap-2">
                                 <Button size="sm" class="flex-1 bg-emerald-600 text-white hover:bg-emerald-700" @click="aprobar(p.id)">
                                     <CheckCircle2 class="mr-1.5 size-3.5" />
                                     Aprobar

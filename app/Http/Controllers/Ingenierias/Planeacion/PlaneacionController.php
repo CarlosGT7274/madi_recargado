@@ -24,20 +24,29 @@ class PlaneacionController extends Controller
     {
         $usuario = $request->user();
 
-        return Inertia::render('ingenierias/planeacion/Index', [
+        // La PERSPECTIVA la decide la operación RBAC `supervisar`, no el rol
+        // ni `aprobar`. Con `supervisar` → vista global del supervisor
+        // (Planificador); sin ella → vista restringida a lo propio.
+        if ($action->puedeSupervisar($usuario)) {
+            return Inertia::render('ingenierias/planeacion/Planificador', [
+                'puedeAprobar' => $action->puedeAprobar($usuario),
+                'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
+            ]);
+        }
+
+        return Inertia::render('ingenierias/planeacion/MisPlaneaciones', [
             'puedeCrear' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::CREATE),
             'puedeEliminar' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::DELETE),
-            'puedeGestionar' => $action->puedeAprobar($usuario),
-            'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
+            'planeaciones' => Inertia::defer(fn () => $action->listPropias($usuario)),
         ]);
     }
 
     public function create(Request $request, PlaneacionesAction $action): Response
     {
         $usuario = $request->user();
-        $puedeAprobar = $action->puedeAprobar($usuario);
+        $puedeSupervisar = $action->puedeSupervisar($usuario);
 
-        $plantas = $puedeAprobar
+        $plantas = $puedeSupervisar
             ? $usuario->plantasAsignadas()
                 ->with('proyectos:id,planta_id,nombre,folio,tipo')
                 ->get(['plantas.id', 'plantas.nombre', 'plantas.folio'])

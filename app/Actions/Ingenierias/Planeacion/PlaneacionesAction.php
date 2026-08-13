@@ -18,10 +18,21 @@ class PlaneacionesAction
     ) {}
 
     /**
-     * Sin lógica propia: reutiliza el mecanismo central de permisos que ya
-     * usa el resto del sistema (ver CotizacionController::show, que hace
-     * lo mismo para 'ingenierias'). Si el usuario tiene el bit ALL sobre
-     * el endpoint 'planeacion', es supervisor/ingeniero; si no, residente.
+     * Determina si el usuario accede a la PERSPECTIVA GLOBAL de Planeación
+     * (todas las planeaciones de sus plantas asignadas) en vez de la vista
+     * restringida a lo suyo. Se apoya en la operación RBAC `supervisar`,
+     * independiente de `aprobar`: se puede supervisar sin poder aprobar y
+     * viceversa. No se decide por nombre de rol.
+     */
+    public function puedeSupervisar(User $usuario): bool
+    {
+        return $usuario->puedePorEndpoint('ingenierias.planeacion', 'supervisar');
+    }
+
+    /**
+     * Controla ÚNICAMENTE la capacidad de aprobar/rechazar planeaciones.
+     * Es un permiso independiente de `supervisar`: reutiliza el mecanismo
+     * central de permisos que ya usa el resto del sistema.
      */
     public function puedeAprobar(User $usuario): bool
     {
@@ -40,7 +51,7 @@ class PlaneacionesAction
     {
         $query = $proyecto->planeaciones()->with('usuario', 'aprobador');
 
-        if (! $this->puedeAprobar($usuario)) {
+        if (! $this->puedeSupervisar($usuario)) {
             $query->where('usuario_id', $usuario->id);
         }
 
@@ -96,13 +107,14 @@ class PlaneacionesAction
     }
 
     /**
-     * Fuente ÚNICA de datos para la vista general de Planeación. El scope
-     * (propias vs. las de tus plantas asignadas) depende del permiso ALL,
-     * pero el resultado alimenta la MISMA pantalla — no una pantalla aparte.
+     * Fuente de datos de la PERSPECTIVA GLOBAL del supervisor: todas las
+     * planeaciones de las plantas asignadas al usuario. El scope depende de
+     * la operación `supervisar`; sin ella el usuario cae en la vista propia
+     * (listPropias) desde el controlador.
      */
     public function listVistaGeneral(User $usuario): Collection
     {
-        $query = $this->puedeAprobar($usuario)
+        $query = $this->puedeSupervisar($usuario)
             ? Planeacion::whereIn('planta_id', $usuario->plantasAsignadas()->pluck('plantas.id'))
             : Planeacion::where('usuario_id', $usuario->id);
 
