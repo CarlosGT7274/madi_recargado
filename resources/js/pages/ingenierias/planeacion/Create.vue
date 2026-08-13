@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Box, Boxes, CalendarDays, CheckCircle2, FileText, Layers } from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
+import { ArrowLeft, Box, Boxes, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, FileText, Layers } from '@lucide/vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import PlaneacionController from '@/actions/App/Http/Controllers/Ingenierias/Planeacion/PlaneacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import {
@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { diasDeSemana, isoWeekInfo, lunesDeSemanaIso } from '@/lib/isoWeek';
 
 interface ProyectoOpcion {
     id: number;
@@ -54,81 +55,76 @@ defineOptions({
     },
 });
 
-// ---------- Paso 1: Semana ----------
-// Mismo cálculo ISO-8601 que ya usaba Create.vue: rango razonable de
-// semanas (8 atrás, 16 adelante) alrededor de la semana actual.
+// ---------- Paso 1: Semana (calendario navegable, no dropdown) ----------
 
-interface SemanaOpcion {
-    key: string;
-    semana: number;
-    anio: number;
-    lunes: Date;
-    domingo: Date;
-    label: string;
-}
+const diasSemanaLabel = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const nombresMeses = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 
-function lunesDeSemanaIso(anio: number, semana: number): Date {
-    const cuatroEnero = new Date(anio, 0, 4);
-    const diaSemanaCuatroEnero = (cuatroEnero.getDay() + 6) % 7;
-    const lunesSemanaUno = new Date(cuatroEnero);
-    lunesSemanaUno.setDate(cuatroEnero.getDate() - diaSemanaCuatroEnero);
+/** Semana ISO actualmente elegida — todo lo demás (label, chips, grid) se deriva de esto. */
+const semanaSeleccionada = ref<{ anio: number; semana: number }>(isoWeekInfo(new Date()));
 
-    const resultado = new Date(lunesSemanaUno);
-    resultado.setDate(lunesSemanaUno.getDate() + (semana - 1) * 7);
-    return resultado;
-}
+/** Mes que muestra el mini-calendario; arranca en el mes de la semana seleccionada. */
+const mesCalendario = ref(lunesDeSemanaIso(semanaSeleccionada.value.anio, semanaSeleccionada.value.semana));
 
-function isoWeekInfo(fecha: Date): { semana: number; anio: number } {
-    const copia = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
-    const diaSemana = (copia.getUTCDay() + 6) % 7;
-    copia.setUTCDate(copia.getUTCDate() - diaSemana + 3);
-    const primerJueves = new Date(Date.UTC(copia.getUTCFullYear(), 0, 4));
-    const semana = 1 + Math.round(((copia.getTime() - primerJueves.getTime()) / 86400000 - 3 + ((primerJueves.getUTCDay() + 6) % 7)) / 7);
-    return { semana, anio: copia.getUTCFullYear() };
-}
+const diasDeLaSemanaSeleccionada = computed(() =>
+    diasDeSemana(semanaSeleccionada.value.anio, semanaSeleccionada.value.semana),
+);
 
 function formatoFecha(fecha: Date): string {
     return `${fecha.getDate()}/${fecha.getMonth() + 1}/${fecha.getFullYear()}`;
 }
 
-const semanasOpciones = computed<SemanaOpcion[]>(() => {
-    const hoy = isoWeekInfo(new Date());
-    const opciones: SemanaOpcion[] = [];
+function seleccionarSemanaDeFecha(fecha: Date): void {
+    semanaSeleccionada.value = isoWeekInfo(fecha);
+}
 
-    for (let offset = -8; offset <= 16; offset++) {
-        const lunes = lunesDeSemanaIso(hoy.anio, hoy.semana + offset);
-        const domingo = new Date(lunes);
-        domingo.setDate(lunes.getDate() + 6);
-        const { semana, anio } = isoWeekInfo(lunes);
+function cambiarMesCalendario(delta: number): void {
+    mesCalendario.value = new Date(mesCalendario.value.getFullYear(), mesCalendario.value.getMonth() + delta, 1);
+}
 
-        opciones.push({
-            key: `${anio}-${semana}`,
-            semana,
-            anio,
-            lunes,
-            domingo,
-            label: `Semana ${semana} — ${anio}`,
-        });
-    }
+function cambiarSemana(delta: number): void {
+    const nuevoLunes = new Date(diasDeLaSemanaSeleccionada.value[0]);
+    nuevoLunes.setDate(nuevoLunes.getDate() + delta * 7);
+    seleccionarSemanaDeFecha(nuevoLunes);
+    mesCalendario.value = new Date(nuevoLunes.getFullYear(), nuevoLunes.getMonth(), 1);
+}
 
-    return opciones;
+function irASemanaActual(): void {
+    seleccionarSemanaDeFecha(new Date());
+    mesCalendario.value = new Date();
+}
+
+interface CeldaCalendario {
+    fecha: Date | null;
+}
+
+const celdasCalendario = computed<CeldaCalendario[]>(() => {
+    const anio = mesCalendario.value.getFullYear();
+    const mes = mesCalendario.value.getMonth();
+    const primerDia = new Date(anio, mes, 1);
+    const inicioOffset = (primerDia.getDay() + 6) % 7;
+    const totalDias = new Date(anio, mes + 1, 0).getDate();
+
+    const celdas: CeldaCalendario[] = [];
+    for (let i = 0; i < inicioOffset; i++) celdas.push({ fecha: null });
+    for (let d = 1; d <= totalDias; d++) celdas.push({ fecha: new Date(anio, mes, d) });
+    return celdas;
 });
 
-const semanaSeleccionadaKey = ref<string>('');
+function perteneceASemanaSeleccionada(fecha: Date | null): boolean {
+    if (!fecha) return false;
+    const info = isoWeekInfo(fecha);
+    return info.anio === semanaSeleccionada.value.anio && info.semana === semanaSeleccionada.value.semana;
+}
 
-const semanaActual = computed<SemanaOpcion | null>(
-    () => semanasOpciones.value.find((s) => s.key === semanaSeleccionadaKey.value) ?? null,
-);
-
-watch(
-    semanasOpciones,
-    (opciones) => {
-        if (!semanaSeleccionadaKey.value && opciones.length) {
-            semanaSeleccionadaKey.value = opciones[8]?.key ?? opciones[0].key;
-        }
-    },
-    { immediate: true },
-);
+function esHoy(fecha: Date | null): boolean {
+    if (!fecha) return false;
+    const hoy = new Date();
+    return fecha.getFullYear() === hoy.getFullYear() && fecha.getMonth() === hoy.getMonth() && fecha.getDate() === hoy.getDate();
+}
 
 // ---------- Paso 2: Planta / Proyecto ----------
 
@@ -194,6 +190,29 @@ watch(cotizacionId, async (nuevoId) => {
     }
 });
 
+// ---------- Preselección desde query string (viene del "+" en Planificador) ----------
+
+onMounted(() => {
+    const query = new URLSearchParams(window.location.search);
+    const anio = Number(query.get('anio'));
+    const semana = Number(query.get('semana'));
+
+    if (anio && semana) {
+        semanaSeleccionada.value = { anio, semana };
+        mesCalendario.value = lunesDeSemanaIso(anio, semana);
+    }
+
+    const plantaQuery = Number(query.get('planta'));
+    if (plantaQuery && props.plantas.some((p) => p.id === plantaQuery)) {
+        plantaId.value = plantaQuery;
+
+        const proyectoQuery = Number(query.get('proyecto'));
+        if (proyectoQuery && proyectosDePlanta.value.some((p) => p.id === proyectoQuery)) {
+            proyectoId.value = proyectoQuery;
+        }
+    }
+});
+
 // ---------- Helpers de UI ----------
 
 function formatoMoneda(valor: number): string {
@@ -225,27 +244,88 @@ const pasoPartidasHabilitado = computed(() => cotizacionId.value !== null);
         <div class="mx-auto max-w-3xl space-y-4">
             <!-- Paso 1: Semana -->
             <div class="rounded-2xl border bg-card p-5 shadow-sm">
-                <div class="mb-3 flex items-center gap-2">
-                    <span
-                        class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
-                    <CalendarDays class="size-4 text-muted-foreground" />
-                    <p class="text-sm font-semibold">Semana de trabajo</p>
+                <div class="mb-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span
+                            class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
+                        <CalendarDays class="size-4 text-muted-foreground" />
+                        <p class="text-sm font-semibold">Semana de trabajo</p>
+                    </div>
+                    <button type="button" class="text-xs text-primary hover:underline" @click="irASemanaActual">
+                        Semana actual
+                    </button>
                 </div>
 
-                <Select v-model="semanaSeleccionadaKey">
-                    <SelectTrigger class="w-full sm:w-80">
-                        <SelectValue placeholder="Selecciona una semana" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="s in semanasOpciones" :key="s.key" :value="s.key">
-                            {{ s.label }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+                <div class="grid gap-4 sm:grid-cols-[220px_1fr]">
+                    <!-- Mini-calendario mensual: clic en cualquier día selecciona su semana completa -->
+                    <div>
+                        <div class="mb-2 flex items-center justify-between">
+                            <button type="button" class="rounded-md p-1 hover:bg-accent"
+                                @click="cambiarMesCalendario(-1)">
+                                <ChevronLeft class="size-4" />
+                            </button>
+                            <p class="text-xs font-medium capitalize">
+                                {{ nombresMeses[mesCalendario.getMonth()] }} {{ mesCalendario.getFullYear() }}
+                            </p>
+                            <button type="button" class="rounded-md p-1 hover:bg-accent"
+                                @click="cambiarMesCalendario(1)">
+                                <ChevronRight class="size-4" />
+                            </button>
+                        </div>
 
-                <p v-if="semanaActual" class="mt-2 text-xs text-muted-foreground">
-                    {{ formatoFecha(semanaActual.lunes) }} — {{ formatoFecha(semanaActual.domingo) }}
-                </p>
+                        <div class="grid grid-cols-7 gap-0.5 text-center text-[10px] text-muted-foreground">
+                            <span v-for="d in diasSemanaLabel" :key="d">{{ d[0] }}</span>
+                        </div>
+
+                        <div class="mt-0.5 grid grid-cols-7 gap-0.5">
+                            <button v-for="(celda, idx) in celdasCalendario" :key="idx" type="button"
+                                :disabled="!celda.fecha"
+                                class="relative flex aspect-square items-center justify-center rounded text-xs transition-colors disabled:cursor-default"
+                                :class="[
+                                    !celda.fecha ? 'invisible' : '',
+                                    celda.fecha && !perteneceASemanaSeleccionada(celda.fecha) ? 'hover:bg-accent' : '',
+                                    perteneceASemanaSeleccionada(celda.fecha) ? 'bg-primary/15' : '',
+                                ]" @click="celda.fecha && seleccionarSemanaDeFecha(celda.fecha)">
+                                {{ celda.fecha?.getDate() }}
+                                <span v-if="esHoy(celda.fecha)"
+                                    class="absolute inset-x-1.5 bottom-0.5 h-0.5 rounded-full bg-primary" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Semana elegida: rango + los 7 días que la componen -->
+                    <div class="flex flex-col justify-center gap-3 rounded-xl border bg-muted/30 p-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1">
+                                <button type="button" class="rounded-md p-1 hover:bg-accent" @click="cambiarSemana(-1)"
+                                    title="Semana anterior">
+                                    <ChevronLeft class="size-3.5" />
+                                </button>
+                                <p class="text-sm font-semibold">
+                                    Semana {{ semanaSeleccionada.semana }} — {{ semanaSeleccionada.anio }}
+                                </p>
+                                <button type="button" class="rounded-md p-1 hover:bg-accent" @click="cambiarSemana(1)"
+                                    title="Semana siguiente">
+                                    <ChevronRight class="size-3.5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-muted-foreground">
+                            {{ formatoFecha(diasDeLaSemanaSeleccionada[0]) }} —
+                            {{ formatoFecha(diasDeLaSemanaSeleccionada[6]) }}
+                        </p>
+
+                        <div class="grid grid-cols-7 gap-1">
+                            <div v-for="(dia, i) in diasDeLaSemanaSeleccionada" :key="i"
+                                class="flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-center"
+                                :class="esHoy(dia) ? 'bg-primary text-primary-foreground' : 'bg-background'">
+                                <span class="text-[9px] uppercase opacity-70">{{ diasSemanaLabel[i] }}</span>
+                                <span class="text-sm font-semibold">{{ dia.getDate() }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Paso 2: Planta / Proyecto -->
@@ -316,10 +396,10 @@ const pasoPartidasHabilitado = computed(() => cotizacionId.value !== null);
                     @update:model-value="(v) => (cotizacionId = v ? Number(v) : null)">
                     <SelectTrigger class="w-full sm:w-96">
                         <SelectValue :placeholder="!pasoCotizacionHabilitado
-                                ? 'Primero selecciona un proyecto'
-                                : cargandoCotizaciones
-                                    ? 'Cargando cotizaciones…'
-                                    : 'Selecciona una cotización aprobada'
+                            ? 'Primero selecciona un proyecto'
+                            : cargandoCotizaciones
+                                ? 'Cargando cotizaciones…'
+                                : 'Selecciona una cotización aprobada'
                             " />
                     </SelectTrigger>
                     <SelectContent>

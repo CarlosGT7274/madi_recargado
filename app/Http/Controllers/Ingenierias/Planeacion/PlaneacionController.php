@@ -38,6 +38,7 @@ class PlaneacionController extends Controller
         if ($action->puedeSupervisar($usuario)) {
             return Inertia::render('ingenierias/planeacion/Planificador', [
                 'puedeAprobar' => $action->puedeAprobar($usuario),
+                'puedeCrear' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::CREATE),
                 'filtros' => Inertia::defer(fn () => $action->filtrosDisponibles($usuario)),
                 'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
             ]);

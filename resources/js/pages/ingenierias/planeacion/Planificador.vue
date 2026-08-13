@@ -9,6 +9,7 @@ import {
     ChevronRight,
     Clock,
     FolderOpen,
+    Plus,
     Send,
     Users,
     X,
@@ -26,6 +27,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { isoWeekInfo, toIso } from '@/lib/isoWeek';
 
 type EstadoPlaneacion = 'borrador' | 'enviada' | 'aprobada' | 'rechazada';
 
@@ -99,6 +101,8 @@ const props = defineProps<{
      * poder aprobar.
      */
     puedeAprobar: boolean;
+    /** Igual de independiente: un supervisor puede no tener permiso de crear. */
+    puedeCrear: boolean;
     filtros?: FiltroOpciones;
     planeaciones?: PlaneacionResumen[];
 }>();
@@ -127,10 +131,6 @@ const nombresMeses = [
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
-function toIso(fecha: Date): string {
-    return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-}
 
 interface CeldaMes {
     fecha: Date | null;
@@ -400,6 +400,27 @@ function rangoLabel(): string {
     return `${rangoInicio.value} — ${rangoFin.value}`;
 }
 
+// ---------- Crear planeación: header y por-día, con la semana preseleccionada ----------
+
+/** Semana ISO (anio/semana) que le corresponde a un ISO date string. */
+function queryDeSemana(iso: string): { anio: number; semana: number } {
+    const { anio, semana } = isoWeekInfo(new Date(`${iso}T00:00:00`));
+    return { anio, semana };
+}
+
+/**
+ * Botón del header: usa el primer día del rango seleccionado si hay uno,
+ * si no la semana de hoy. Create.vue lee `anio`/`semana` de la query string
+ * para preseleccionar el paso 1 de su propio calendario.
+ */
+const hrefNuevaPlaneacion = computed(() =>
+    PlaneacionController.create({ query: queryDeSemana(rangoInicio.value ?? toIso(new Date())) }),
+);
+
+function hrefNuevaPlaneacionParaDia(iso: string) {
+    return PlaneacionController.create({ query: queryDeSemana(iso) });
+}
+
 // ---------- Acciones ----------
 
 function aprobar(id: number): void {
@@ -423,6 +444,15 @@ function reportarNomina(id: number): void {
 
     <PageLayout title="Programación"
         description="Overview anual de planeaciones: selecciona un rango para ver el detalle">
+        <template #actions>
+            <Link v-if="props.puedeCrear" :href="hrefNuevaPlaneacion">
+                <Button>
+                    <Plus class="mr-2 size-4" />
+                    Nueva Planeación
+                </Button>
+            </Link>
+        </template>
+
         <Deferred :data="['planeaciones', 'filtros']">
             <template #fallback>
                 <div class="h-96 animate-pulse rounded-2xl border bg-card/50" />
@@ -519,25 +549,28 @@ function reportarNomina(id: number): void {
                             </div>
 
                             <div class="mt-0.5 grid grid-cols-7 gap-0.5">
-                                <button v-for="(celda, idx) in mes.celdas" :key="idx" type="button"
-                                    :disabled="!celda.fecha"
-                                    class="relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded text-[11px] transition-colors disabled:cursor-default"
-                                    :class="[
-                                        !celda.fecha ? 'invisible' : '',
-                                        celda.fecha && !diaEnRango(celda.iso) ? intensidadClase(celda.iso) || 'hover:bg-accent' : '',
-                                        diaEnRango(celda.iso) && !esExtremoRango(celda.iso) ? 'bg-primary/20' : '',
-                                        esExtremoRango(celda.iso) ? 'bg-primary text-primary-foreground' : '',
-                                    ]" @click="celda.iso && seleccionarDia(celda.iso)">
-                                    {{ celda.fecha?.getDate() }}
+                                <div v-for="(celda, idx) in mes.celdas" :key="idx" class="group relative aspect-square"
+                                    :class="!celda.fecha ? 'invisible' : ''">
+                                    <button type="button" :disabled="!celda.fecha"
+                                        class="flex size-full flex-col items-center justify-center rounded text-[11px] transition-colors disabled:cursor-default"
+                                        :class="[
+                                            celda.fecha && !diaEnRango(celda.iso) ? intensidadClase(celda.iso) || 'hover:bg-accent' : '',
+                                            diaEnRango(celda.iso) && !esExtremoRango(celda.iso) ? 'bg-primary/20' : '',
+                                            esExtremoRango(celda.iso) ? 'bg-primary text-primary-foreground' : '',
+                                        ]" @click="celda.iso && seleccionarDia(celda.iso)">
+                                        {{ celda.fecha?.getDate() }}
+                                        <AlertTriangle v-if="tieneIncidencia(celda.iso)"
+                                            class="absolute right-0 top-0 size-2.5 text-amber-500" />
+                                    </button>
 
-                                    <span v-if="celda.iso" class="flex items-center gap-0.5">
-                                        <span v-for="(estado, i2) in estadosDelDia(celda.iso).slice(0, 3)" :key="i2"
-                                            class="size-1 rounded-full" :class="puntoClase[estado]" />
-                                    </span>
-
-                                    <AlertTriangle v-if="tieneIncidencia(celda.iso)"
-                                        class="absolute right-0 top-0 size-2.5 text-amber-500" />
-                                </button>
+                                    <!-- Preselecciona la semana de este día al crear -->
+                                    <Link v-if="props.puedeCrear && celda.iso"
+                                        :href="hrefNuevaPlaneacionParaDia(celda.iso)"
+                                        class="absolute -right-1 -top-1 hidden size-4 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm group-hover:flex"
+                                        title="Nueva planeación para esta semana" @click.stop>
+                                        <Plus class="size-2.5" />
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -559,10 +592,18 @@ function reportarNomina(id: number): void {
                             <div class="rounded-2xl border bg-card p-4 shadow-sm">
                                 <div class="mb-3 flex items-center justify-between gap-2">
                                     <p class="text-sm font-semibold">{{ rangoLabel() }}</p>
-                                    <button type="button" class="text-xs text-muted-foreground hover:underline"
-                                        @click="limpiarSeleccion">
-                                        Limpiar
-                                    </button>
+                                    <div class="flex items-center gap-2">
+                                        <Link v-if="props.puedeCrear" :href="hrefNuevaPlaneacion">
+                                            <Button variant="outline" size="sm" class="h-7 text-xs">
+                                                <Plus class="mr-1 size-3" />
+                                                Nueva
+                                            </Button>
+                                        </Link>
+                                        <button type="button" class="text-xs text-muted-foreground hover:underline"
+                                            @click="limpiarSeleccion">
+                                            Limpiar
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-2 text-center">
