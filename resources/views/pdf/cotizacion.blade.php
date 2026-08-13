@@ -18,7 +18,6 @@
             color: #1f2937;
         }
 
-        /* ===== Header fijo ===== */
         header {
             position: fixed;
             top: -110px;
@@ -63,6 +62,12 @@
             margin: 0 0 2px 0;
         }
 
+        .header-center .direccion-empresa {
+            font-size: 8px;
+            color: #6b7280;
+            margin: 0 0 2px 0;
+        }
+
         .header-center .titulo-doc {
             font-size: 12px;
             font-weight: bold;
@@ -82,7 +87,6 @@
             margin-top: 6px;
         }
 
-        /* ===== Footer fijo ===== */
         footer {
             position: fixed;
             bottom: -60px;
@@ -122,7 +126,6 @@
             text-align: right;
         }
 
-        /* ===== Contenido ===== */
         h2.seccion {
             font-size: 12px;
             font-weight: bold;
@@ -180,6 +183,20 @@
             text-align: right;
         }
 
+        .nota-texto {
+            border: 1px solid #d1d5db;
+            padding: 8px;
+            white-space: pre-line;
+            margin-bottom: 10px;
+        }
+
+        .importe-letra {
+            font-size: 10px;
+            font-style: italic;
+            color: #374151;
+            margin: 0 0 6px 0;
+        }
+
         table.totales {
             width: 60%;
             margin-left: 40%;
@@ -222,6 +239,7 @@
             </td>
             <td class="header-center">
                 <p class="titulo-empresa">MADI</p>
+                <p class="direccion-empresa">{{ $direccionMadi }}</p>
                 <p class="titulo-doc">Cotización</p>
                 <p class="folio-doc">Folio: {{ $cotizacion->folio }}</p>
             </td>
@@ -250,8 +268,8 @@
     <h2 class="seccion">Información General</h2>
     <table class="datos">
         <tr>
-            <td class="label">Folio</td>
-            <td>{{ $cotizacion->folio }}</td>
+            <td class="label">Para</td>
+            <td>{{ $cotizacion->para ?? '—' }}</td>
             <td class="label">Fecha</td>
             <td>{{ optional($cotizacion->fecha)->format('d/m/Y') ?? '—' }}</td>
         </tr>
@@ -269,7 +287,9 @@
         </tr>
         <tr>
             <td class="label">Proveedor</td>
-            <td colspan="3">{{ $cotizacion->proveedor ?? '—' }}</td>
+            <td>{{ $cotizacion->proveedor ?? '—' }}</td>
+            <td class="label">Correo Vendedor</td>
+            <td>{{ $cotizacion->correo_vendedor ?? '—' }}</td>
         </tr>
     </table>
 
@@ -301,19 +321,43 @@
         <p>Aún no hay partidas registradas.</p>
     @endforelse
 
+    <h2 class="seccion">Condiciones Comerciales</h2>
+    <table class="datos">
+        <tr>
+            <td class="label">Tiempo de Entrega</td>
+            <td>{{ $cotizacion->tiempo_entrega ?? '—' }}</td>
+            <td class="label">Días de Crédito</td>
+            <td>{{ $cotizacion->dias_credito ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Vigencia Cotización</td>
+            <td>{{ $cotizacion->vigencia_cotizacion ?? '—' }}</td>
+            <td class="label">Moneda</td>
+            <td>{{ $cotizacion->moneda ?? 'PESOS MXN' }}</td>
+        </tr>
+    </table>
+
+    @if($cotizacion->notas)
+        <h2 class="seccion">Notas</h2>
+        <div class="nota-texto">{{ $cotizacion->notas }}</div>
+    @endif
+
     <h2 class="seccion">Totales</h2>
+
+    <p class="importe-letra">Importe con letra: {{ $importeLetra }}</p>
+
     <table class="totales">
         <tr>
             <td class="label">Subtotal</td>
-            <td class="valor">${{ number_format((float) $cotizacion->subtotal, 2) }}</td>
+            <td class="valor">${{ number_format($subtotal, 2) }}</td>
         </tr>
         <tr>
-            <td class="label">IVA</td>
-            <td class="valor">${{ number_format((float) $cotizacion->iva, 2) }}</td>
+            <td class="label">I.V.A. {{ rtrim(rtrim(number_format($ivaPorcentaje, 1), '0'), '.') }}%</td>
+            <td class="valor">${{ number_format($iva, 2) }}</td>
         </tr>
         <tr class="total">
             <td class="label" style="color:#ffffff; background:transparent;">Total</td>
-            <td class="valor">${{ number_format((float) $cotizacion->total, 2) }}</td>
+            <td class="valor">${{ number_format($total, 2) }}</td>
         </tr>
     </table>
 </main>

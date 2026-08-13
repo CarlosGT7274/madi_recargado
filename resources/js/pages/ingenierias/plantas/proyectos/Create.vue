@@ -35,13 +35,13 @@ const props = defineProps<{
 const tiposProyecto = [
     {
         value: 'grande',
-        titulo: 'Proyecto grande',
-        descripcion: 'Flujo completo con levantamiento, planeación y demás procesos.',
+        titulo: 'Proyectos mayores',
+        descripcion: 'Flujo completo con levantamiento, planeación y demás procesos para proyectos mayores a $50000.',
     },
     {
         value: 'chico',
-        titulo: 'Proyecto Pequeñó',
-        descripcion: 'Flujo simplificado para capturar actividades, cotización y orden de compra.',
+        titulo: 'Proyectos menores',
+        descripcion: 'Flujo simplificado para capturar actividades, cotización y orden de compra para proyectos menores a $50000',
     },
 ] as const;
 
@@ -70,12 +70,13 @@ const tiposProyecto = [
                 </div>
 
                 <div class="p-6">
-                    <Form :action="ProyectoController.store(planta.id).url" :method="ProyectoController.store(planta.id).method" 
-                        v-slot="{ errors, processing }" class="space-y-6">
+                    <Form :action="ProyectoController.store(planta.id).url"
+                        :method="ProyectoController.store(planta.id).method" v-slot="{ errors, processing }"
+                        class="space-y-6">
                         <div class="space-y-2">
                             <Label for="nombre">Nombre del proyecto <span class="text-red-500">*</span></Label>
-                            <Input id="nombre" name="nombre" 
-                                placeholder="Ej. Instalación de tableros de control" required />
+                            <Input id="nombre" name="nombre" placeholder="Ej. Instalación de tableros de control"
+                                required />
                             <InputError :message="errors.nombre" />
                         </div>
 
@@ -85,8 +86,8 @@ const tiposProyecto = [
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <label v-for="opcion in tiposProyecto" :key="opcion.value"
                                     class="relative flex cursor-pointer flex-col gap-2 rounded-2xl border p-4 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 hover:bg-accent/50">
-                                    <input type="radio" name="tipo" :value="opcion.value" :checked="opcion.value === 'grande'"
-                                        class="peer sr-only" required />
+                                    <input type="radio" name="tipo" :value="opcion.value"
+                                        :checked="opcion.value === 'grande'" class="peer sr-only" required />
                                     <div class="flex items-center justify-between">
                                         <span class="font-semibold">{{ opcion.titulo }}</span>
                                         <span
