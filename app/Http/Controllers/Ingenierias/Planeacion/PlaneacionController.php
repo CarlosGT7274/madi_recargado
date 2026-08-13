@@ -24,13 +24,6 @@ use Inertia\Response;
 
 class PlaneacionController extends Controller
 {
-    /**
-     * La perspectiva (qué componente Vue recibe el usuario) la decide
-     * exclusivamente `puedeSupervisar()`. `puedeAprobar()` es una
-     * operación aparte que solo se usa para mostrar/ocultar el botón de
-     * aprobar-rechazar dentro de la vista de Planificador — nunca para
-     * elegir qué vista se renderiza.
-     */
     public function index(Request $request, PlaneacionesAction $action): Response
     {
         $usuario = $request->user();
@@ -56,12 +49,6 @@ class PlaneacionController extends Controller
         $usuario = $request->user();
         $puedeSupervisar = $action->puedeSupervisar($usuario);
 
-        /**
-         * Supervisar es un superset: el supervisor puede crear planeaciones
-         * igual que un empleado normal, pero además ve TODO, sin depender de
-         * asignaciones explícitas (planta_usuario/proyecto_usuario) — esas
-         * tablas pivote son para acotar al empleado común, no al supervisor.
-         */
         $plantas = $puedeSupervisar
             ? Planta::with('proyectos:id,planta_id,nombre,folio,tipo')
                 ->orderBy('nombre')
@@ -116,11 +103,26 @@ class PlaneacionController extends Controller
         ]);
     }
 
+    /**
+     * Guarda la Planeación (con su cronograma de asignaciones, si lo trae)
+     * y, cuando el front manda `enviar_aprobacion=true` (botón "Guardar y
+     * enviar a aprobación" de Create.vue), encadena PlaneacionesAction::enviar()
+     * en la misma request — que ya deja el estado en 'enviada' y notifica
+     * a los ingenieros de la planta vía el sistema de notificaciones
+     * (broadcast NotificacionCreada) existente. No se inventa ningún
+     * mecanismo nuevo de notificación aquí.
+     */
     public function store(StorePlaneacionRequest $request, Planta $planta, Proyecto $proyecto, PlaneacionesAction $action): RedirectResponse
     {
         $planeacion = $action->create($proyecto, $request->validated());
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Planeación creada.']);
+        if ($request->boolean('enviar_aprobacion')) {
+            $planeacion = $action->enviar($planeacion);
+
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Planeación guardada y enviada a aprobación.']);
+        } else {
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Planeación guardada como borrador.']);
+        }
 
         return redirect()->route('ingenierias.planeacion.show', $planeacion->id);
     }
@@ -183,13 +185,11 @@ class PlaneacionController extends Controller
         return redirect()->route('ingenierias.planeacion.index');
     }
 
-    /** Selects dependientes de Create.vue — paso 3: cotizaciones aprobadas del proyecto elegido. */
     public function cotizacionesAprobadas(Planta $planta, Proyecto $proyecto, CotizacionesAction $action): JsonResponse
     {
         return response()->json($action->listAprobadasProyecto($proyecto));
     }
 
-    /** Selects dependientes de Create.vue — paso 4: partidas de la cotización aprobada elegida. */
     public function partidasDeCotizacion(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, PartidasAction $action): JsonResponse
     {
         return response()->json($action->disponibles($cotizacion));

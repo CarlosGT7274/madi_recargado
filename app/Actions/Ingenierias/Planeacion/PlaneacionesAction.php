@@ -18,22 +18,11 @@ class PlaneacionesAction
         private readonly NotificacionesAction $notificaciones,
     ) {}
 
-    /**
-     * Controla si el usuario ve la perspectiva GLOBAL (todas las
-     * planeaciones de sus plantas asignadas) o la RESTRINGIDA (solo las
-     * suyas). Independiente de `puedeAprobar()` — un usuario puede tener
-     * `supervisar` sin `aprobar`, y viceversa.
-     */
     public function puedeSupervisar(User $usuario): bool
     {
         return $usuario->puedePorEndpoint('ingenierias.planeacion', 'supervisar');
     }
 
-    /**
-     * Controla ÚNICAMENTE el botón de aprobar/rechazar. No decide qué
-     * vista recibe el usuario — eso es responsabilidad de
-     * `puedeSupervisar()`.
-     */
     public function puedeAprobar(User $usuario): bool
     {
         return $usuario->puedePorEndpoint('ingenierias.planeacion', 'aprobar');
@@ -67,7 +56,6 @@ class PlaneacionesAction
 
         if ($desde && $hasta) {
             $query->where(function ($q) use ($desde, $hasta) {
-                // Approximate filtering based on anio and semana for the date range
                 $q->whereBetween('anio', [$desde->year, $hasta->year]);
             });
         }
@@ -102,11 +90,6 @@ class PlaneacionesAction
             'fechaEnvio' => $p->fecha_envio?->format('d/m/Y H:i'),
             'fechaAprobacion' => $p->fecha_aprobacion?->format('d/m/Y H:i'),
             'comentariosAprobacion' => $p->comentarios_aprobacion,
-            // Solo vienen poblados cuando el query los agregó explícitamente
-            // (withSum/withCount/eager-load de asignaciones en
-            // listVistaGeneral) — los demás listados no pagan ese costo si
-            // no lo necesitan; acceder a un atributo/relación no cargada
-            // aquí simplemente cae en null/colección vacía.
             'horasProgramadas' => $p->horas_programadas !== null ? (float) $p->horas_programadas : 0.0,
             'incidenciasCount' => $p->incidencias_count ?? 0,
             'empleados' => $p->relationLoaded('asignaciones')
@@ -120,16 +103,6 @@ class PlaneacionesAction
         ];
     }
 
-    /**
-     * Fuente ÚNICA de datos para la vista general de Planeación. El scope
-     * (propias vs. las de tus plantas asignadas) depende de
-     * `puedeSupervisar()`. Sirve tanto a MisPlaneaciones.vue como al
-     * overview anual de Planificador.vue — este último necesita las horas
-     * programadas, incidencias, empleados y partidas por planeación para
-     * construir el calendario y el drill-down sin pedir nada más al
-     * servidor, así que se cargan siempre aquí (el costo es acotado al
-     * scope de plantas asignadas, igual que el resto de los campos).
-     */
     public function listVistaGeneral(User $usuario): Collection
     {
         $query = $this->puedeSupervisar($usuario)
@@ -152,14 +125,6 @@ class PlaneacionesAction
             ->map(fn (Planeacion $p) => $this->resumen($p));
     }
 
-    /**
-     * Opciones para los filtros de la vista de Supervisor (planta,
-     * proyecto, residente). Mismo scope de plantas asignadas que
-     * `listVistaGeneral()` — un filtro nunca debe ofrecer algo que el
-     * usuario no podría ver de todos modos.
-     *
-     * @return array{plantas: Collection, proyectos: Collection, residentes: Collection}
-     */
     public function filtrosDisponibles(User $usuario): array
     {
         $plantaIds = $usuario->plantasAsignadas()->pluck('plantas.id');
@@ -217,6 +182,14 @@ class PlaneacionesAction
         ];
     }
 
+    /**
+     * Crea la Planeación en 'borrador' y, si el cronograma armado en
+     * Create.vue trae asignaciones (empleado x partida x día x horas),
+     * las persiste de una vez como PlaneacionAsignacion. Antes de este
+     * fix, 'asignaciones' venía en $data pero Planeacion no lo tiene en
+     * $fillable, así que Eloquent lo ignoraba y el cronograma capturado
+     * nunca se guardaba.
+     */
     public function create(Proyecto $proyecto, array $data): Planeacion
     {
         $existente = $proyecto->planeaciones()
@@ -230,12 +203,27 @@ class PlaneacionesAction
             ]);
         }
 
-        return $proyecto->planeaciones()->create([
+        $asignaciones = $data['asignaciones'] ?? [];
+        unset($data['asignaciones']);
+
+        $planeacion = $proyecto->planeaciones()->create([
             ...$data,
             'planta_id' => $proyecto->planta_id,
             'usuario_id' => Auth::id(),
             'estado' => 'borrador',
         ]);
+
+        foreach ($asignaciones as $asignacion) {
+            $planeacion->asignaciones()->create([
+                'partida_id' => $asignacion['partida_id'],
+                'empleado_id' => $asignacion['empleado_id'],
+                'dia_semana' => $asignacion['dia_semana'],
+                'horas_trabajadas' => $asignacion['horas_trabajadas'],
+                'estado' => 'asignado',
+            ]);
+        }
+
+        return $planeacion;
     }
 
     public function enviar(Planeacion $planeacion): Planeacion

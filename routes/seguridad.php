@@ -34,5 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::UPDATE)->name('update');
             Route::delete('/{usuario}', [UsuarioController::class, 'destroy'])
                 ->middleware('permiso:'.Accion::DELETE)->name('destroy');
+            Route::delete('usuarios/empleados/{empleado}', [UsuarioController::class, 'destroyEmpleado'])
+                ->middleware('permiso:'.Accion::DELETE)->name('usuarios.empleados.destroy');
         });
 });

@@ -21,6 +21,7 @@ class StorePlaneacionRequest extends FormRequest
             'asignaciones.*.partida_id' => ['required', 'integer', 'exists:partidas,id'],
             'asignaciones.*.empleado_id' => ['required', 'integer', 'exists:empleados,id'],
             'asignaciones.*.dia_semana' => ['required', Rule::in(['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'])],
+            'asignaciones.*.horas_trabajadas' => ['required', 'numeric', 'min:0.5', 'max:24'],
         ];
     }
 }
