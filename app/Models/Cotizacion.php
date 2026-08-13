@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasArchivos;
+use App\Support\NumeroALetras;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -16,24 +17,25 @@ class Cotizacion extends Model
 
     const UPDATED_AT = 'fecha_modificacion';
 
+    /** Fija en código, igual que la dirección de MADI: no se captura ni se parsea por cotización. */
+    public const MONEDA_FIJA = 'PESOS MXN';
+
+    public const IVA_PORCENTAJE = 0.16;
+
     protected $fillable = [
         'levantamiento_id',
         'proyecto_id',
         'folio',
         'fecha',
-        'para',
         'cliente',
         'direccion',
         'obra',
         'vendedor',
         'proveedor',
-        'correo_vendedor',
         'subtotal',
         'iva',
         'total',
         'costo_hora_total',
-        'importe_letra',
-        'moneda',
         'tiempo_entrega',
         'dias_credito',
         'vigencia_cotizacion',
@@ -112,15 +114,26 @@ class Cotizacion extends Model
         return $this->tieneInsumos() && $this->tieneAutorizacion();
     }
 
-    /**
-     * El PDF que el cliente entrega para autorizar el trabajo (vive en
-     * `archivos`, polimórfico) o la aprobación administrativa sin PDF
-     * (estatus_compra). Reemplaza a la vieja tieneOrdenAprobada() que
-     * dependía de la tabla compras_ordenes, ya eliminada.
-     */
     public function tieneAutorizacion(): bool
     {
         return $this->archivos()->where('tipo_archivo', 'pdf')->exists()
             || $this->estatus_compra === 'aprobado';
+    }
+
+    /** IVA fijo al 16%, calculado — nunca capturado a mano ni leído de una columna. */
+    public function ivaCalculado(): float
+    {
+        return round((float) $this->subtotal * self::IVA_PORCENTAJE, 2);
+    }
+
+    public function totalConIva(): float
+    {
+        return (float) $this->subtotal + $this->ivaCalculado();
+    }
+
+    /** Derivado del total, nunca capturado a mano (ni en Excel ni en el formulario manual). */
+    public function importeLetra(): string
+    {
+        return NumeroALetras::convertir($this->totalConIva(), self::MONEDA_FIJA);
     }
 }

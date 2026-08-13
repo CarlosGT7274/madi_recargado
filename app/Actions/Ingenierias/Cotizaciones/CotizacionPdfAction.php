@@ -4,7 +4,6 @@ namespace App\Actions\Ingenierias\Cotizaciones;
 
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Models\Cotizacion;
-use App\Support\NumeroALetras;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfInstance;
 
@@ -17,13 +16,6 @@ class CotizacionPdfAction
      */
     private const DIRECCION_MADI = 'Valle de Zitácuaro 14 B, Cofradía San Miguel II, Cuautitlán Izcalli, Edo de Méx C.P. 54760';
 
-    /**
-     * IVA fijo en 16%, calculado aquí en vez de leído de la columna
-     * `iva` de la cotización — esa columna se quedaba en 0 en el flujo
-     * de importación por Excel y nunca se llenaba correctamente.
-     */
-    private const IVA_PORCENTAJE = 0.16;
-
     public function __construct(
         private readonly PartidasAction $partidasAction,
     ) {}
@@ -32,25 +24,18 @@ class CotizacionPdfAction
     {
         $partidas = $this->partidasAction->arbol($cotizacion);
 
-        $subtotal = (float) $cotizacion->subtotal;
-        $iva = round($subtotal * self::IVA_PORCENTAJE, 2);
-        $total = $subtotal + $iva;
-
-        // Derivado del total, nunca capturado a mano (ni en Excel ni en
-        // el formulario manual).
-        $importeLetra = NumeroALetras::convertir($total, $cotizacion->moneda ?? 'PESOS');
-
         $logoIzquierdo = $this->logoComoBase64(public_path('apple-touch-icon.png'));
         $logoDerecho = $this->logoComoBase64(public_path('iso-certified.png'));
 
         $pdf = Pdf::loadView('pdf.cotizacion', [
             'cotizacion' => $cotizacion,
             'partidas' => $partidas,
-            'subtotal' => $subtotal,
-            'iva' => $iva,
-            'ivaPorcentaje' => self::IVA_PORCENTAJE * 100,
-            'total' => $total,
-            'importeLetra' => $importeLetra,
+            'subtotal' => (float) $cotizacion->subtotal,
+            'iva' => $cotizacion->ivaCalculado(),
+            'ivaPorcentaje' => Cotizacion::IVA_PORCENTAJE * 100,
+            'total' => $cotizacion->totalConIva(),
+            'importeLetra' => $cotizacion->importeLetra(),
+            'moneda' => Cotizacion::MONEDA_FIJA,
             'direccionMadi' => self::DIRECCION_MADI,
             'logoIzquierdo' => $logoIzquierdo,
             'logoDerecho' => $logoDerecho,

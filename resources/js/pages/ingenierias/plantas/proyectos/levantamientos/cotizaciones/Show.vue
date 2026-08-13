@@ -84,6 +84,12 @@ interface CotizacionDetalle {
     completada: boolean;
     estatusCompra: string;
     pdfAutorizacion: string | null;
+    moneda: string;
+    importeLetra: string;
+    tiempo_entrega: string | null;
+    dias_credito: string | null;
+    vigencia_cotizacion: string | null;
+    notas: string | null;
 }
 
 interface PartidaHija {
@@ -252,7 +258,8 @@ function formatoMoneda(valor: number | null | undefined): string {
                     </div>
                 </div>
 
-                <div v-if="hasPermission(endpoint, 'aprobar')" class="mt-4 border-t border-amber-200 pt-4 dark:border-amber-900">
+                <div v-if="hasPermission(endpoint, 'aprobar')"
+                    class="mt-4 border-t border-amber-200 pt-4 dark:border-amber-900">
                     <p class="mb-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400">
                         Acciones de administrador
                     </p>
@@ -370,6 +377,39 @@ function formatoMoneda(valor: number | null | undefined): string {
                         <p class="font-medium">{{ cotizacion.creado ?? '—' }}</p>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
+            <p class="mb-4 text-lg font-semibold">Condiciones Comerciales</p>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <p class="text-xs text-muted-foreground">Moneda</p>
+                    <p class="font-medium">{{ cotizacion.moneda }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-muted-foreground">Tiempo de Entrega</p>
+                    <p class="font-medium">{{ cotizacion.tiempo_entrega ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-muted-foreground">Días de Crédito</p>
+                    <p class="font-medium">{{ cotizacion.dias_credito ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-muted-foreground">Vigencia de Cotización</p>
+                    <p class="font-medium">{{ cotizacion.vigencia_cotizacion ?? '—' }}</p>
+                </div>
+            </div>
+
+            <div class="mt-4 border-t pt-4">
+                <p class="text-xs text-muted-foreground">Importe con Letra</p>
+                <p class="font-medium capitalize">{{ cotizacion.importeLetra }}</p>
+            </div>
+
+            <div v-if="cotizacion.notas" class="mt-4 border-t pt-4">
+                <p class="text-xs text-muted-foreground">Notas</p>
+                <p class="whitespace-pre-line text-sm">{{ cotizacion.notas }}</p>
             </div>
         </div>
 

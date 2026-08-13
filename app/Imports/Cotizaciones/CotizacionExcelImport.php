@@ -32,26 +32,23 @@ class CotizacionExcelImport implements ToCollection
         $inicioTabla = $this->localizarEncabezadoTabla($filas);
         $header = $this->leerEncabezado($filas, $inicioTabla);
         $condicionesEntrega = $this->leerCondicionesEntrega($filas);
+        $finTabla = $inicioTabla !== null
+    ? $this->localizarFinTabla($filas, $inicioTabla)
+    : $filas->count();
 
         $datosBase = [
             'fecha' => $this->parsearFecha($header['fecha']) ?? now()->toDateString(),
-            'para' => $header['para'] ?: null,
             'cliente' => $header['cliente'] ?: null,
             'direccion' => $header['direccion'] ?: null,
             'proveedor' => $header['proveedor'] ?: null,
             'vendedor' => $header['vendedor'] ?: null,
-            'correo_vendedor' => $header['correo_vendedor'] ?: null,
             'obra' => $header['obra'] ?: null,
         ];
 
-        // Solo se agregan si se encontraron en el Excel — así, si la
-        // plantilla no trae "Moneda", por ejemplo, se respeta el default
-        // de la columna ('PESOS MXN') en vez de forzar un null.
         $datosPie = array_filter([
             'tiempo_entrega' => $condicionesEntrega['tiempo_entrega'],
             'dias_credito' => $condicionesEntrega['dias_credito'],
             'vigencia_cotizacion' => $condicionesEntrega['vigencia_cotizacion'],
-            'moneda' => $this->leerMoneda($filas),
             'notas' => $this->leerNotas($filas),
         ], fn (?string $valor) => $valor !== null);
 
@@ -69,7 +66,7 @@ class CotizacionExcelImport implements ToCollection
 
         $padresPorNumero = [];
 
-        for ($i = $inicioTabla + 1; $i < $filas->count(); $i++) {
+        for ($i = $inicioTabla + 1; $i < $finTabla; $i++) {
             $fila = $filas[$i];
             $no = trim((string) ($fila[0] ?? ''));
             $descripcion = trim((string) ($fila[1] ?? ''));
@@ -141,12 +138,10 @@ class CotizacionExcelImport implements ToCollection
     private function leerEncabezado(Collection $filas, ?int $inicioTabla): array
     {
         $mapa = [
-            'para' => null, 'cliente' => null, 'fecha' => null, 'direccion' => null,
-            'proveedor' => null, 'vendedor' => null, 'correo_vendedor' => null, 'obra' => null,
+            'cliente' => null, 'fecha' => null, 'direccion' => null,
+            'proveedor' => null, 'vendedor' => null, 'obra' => null,
         ];
 
-        // Si no encontramos la tabla, revisamos igual todo el archivo por
-        // seguridad (mejor leer de más que quedarnos sin nada).
         $limite = $inicioTabla ?? $filas->count();
 
         for ($i = 0; $i < $limite; $i++) {
@@ -159,16 +154,10 @@ class CotizacionExcelImport implements ToCollection
             }
 
             match (true) {
-                // "correo" antes que "cliente"/"proveedor" no aplica aquí,
-                // pero sí importa el orden entre etiquetas parecidas: se
-                // revisa "correo vendedor"/"correo del vendedor" antes que
-                // nada más ambiguo.
-                str_starts_with($etiqueta, 'para') => $mapa['para'] = $valor,
                 str_starts_with($etiqueta, 'fecha') => $mapa['fecha'] = $valor,
                 str_starts_with($etiqueta, 'cliente') => $mapa['cliente'] = $valor,
                 str_starts_with($etiqueta, 'direcci') => $mapa['direccion'] = $valor,
                 str_starts_with($etiqueta, 'proveedor') => $mapa['proveedor'] = $valor,
-                str_contains($etiqueta, 'correo') => $mapa['correo_vendedor'] = $valor,
                 str_starts_with($etiqueta, 'vendedor') => $mapa['vendedor'] = $valor,
                 str_starts_with($etiqueta, 'obra') => $mapa['obra'] = $valor,
                 default => null,
@@ -266,20 +255,6 @@ class CotizacionExcelImport implements ToCollection
         return null;
     }
 
-    /** "Moneda: PESOS MXN" — etiqueta y valor en la misma fila. */
-    private function leerMoneda(Collection $filas): ?string
-    {
-        foreach ($filas as $fila) {
-            foreach ($fila as $col => $valor) {
-                if (str_starts_with($this->normalizarTexto((string) $valor), 'moneda')) {
-                    return $this->primerValorEnRango($fila, $col + 1, PHP_INT_MAX);
-                }
-            }
-        }
-
-        return null;
-    }
-
     /**
      * Busca la celda "NOTA:" o "NOTAS:" (CON dos puntos) — a propósito no
      * matchea "NOTA" a secas, porque ese texto también se usa dentro de
@@ -346,6 +321,39 @@ class CotizacionExcelImport implements ToCollection
         }
 
         return null;
+    }
+
+    /**
+     * Encuentra dónde termina la tabla de partidas: la primera fila después
+     * del encabezado "No." que coincide con el header de condiciones
+     * comerciales ("Tiempo de Entrega"/"Días de Crédito"/"Vigencia...") o
+     * con la etiqueta "NOTA:"/"NOTAS:". Sin este límite, el loop de partidas
+     * seguía leyendo hasta el final del archivo y confundía esas secciones
+     * con partidas nuevas (números 0 y 7 inventados a partir de "Tiempo de
+     * Entrega" y "07 días...").
+     */
+    private function localizarFinTabla(Collection $filas, int $inicioTabla): int
+    {
+        for ($i = $inicioTabla + 1; $i < $filas->count(); $i++) {
+            $fila = $filas[$i];
+
+            $etiquetasCondiciones = $this->columnasConEtiquetas($fila, [
+                'tiempo_entrega' => 'tiempo de entrega',
+                'dias_credito' => 'dias de credito',
+                'vigencia_cotizacion' => 'vigencia cotizacion',
+            ]);
+
+            if (count($etiquetasCondiciones) >= 2) {
+                return $i;
+            }
+
+            $primeraCelda = $this->normalizarTexto((string) ($fila[0] ?? ''));
+            if ($primeraCelda === 'nota:' || $primeraCelda === 'notas:') {
+                return $i;
+            }
+        }
+
+        return $filas->count();
     }
 
     public function cotizacion(): ?Cotizacion

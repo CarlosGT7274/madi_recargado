@@ -12,28 +12,42 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class PartidaPlantillaExport implements FromArray, WithEvents
 {
+    private const COLOR_TITULO_FONDO = 'FF1F2937';
+
+    private const COLOR_TITULO_TEXTO = 'FFFFFFFF';
+
+    private const COLOR_SECCION = 'FFEDEDED';
+
+    private const COLOR_CAPTURA = 'FFFFF9C4';
+
+    private const COLOR_INSTRUCCIONES = 'FFF7F7F7';
+
+    private const COLOR_BORDE = 'FFD0D0D0';
+
     /** @var array<int, array<int, mixed>> */
     private array $filas = [];
 
-    /** @var array<int, int> */
+    /** Filas con texto en negrita (títulos de sección). */
     private array $filasNegritas = [];
 
-    /** @var array<int, int> */
-    private array $filasEncabezadoDatos = [];
+    /** Filas cuya celda B es de captura manual — se resaltan en amarillo. */
+    private array $filasCaptura = [];
 
-    private int $filaInicioTabla = 0;
-
-    private int $filaFinTabla = 0;
+    private int $filaTitulo = 0;
 
     private int $filaInicioInstrucciones = 0;
 
     private int $filaFinInstrucciones = 0;
 
+    private int $filaSeccionDatos = 0;
+
+    private int $filaInicioTabla = 0;
+
+    private int $filaFinTabla = 0;
+
     private int $filaCondicionesHeader = 0;
 
     private int $filaCondicionesValores = 0;
-
-    private int $filaMoneda = 0;
 
     private int $filaNota = 0;
 
@@ -48,10 +62,9 @@ class PartidaPlantillaExport implements FromArray, WithEvents
     }
 
     /**
-     * Fila "vacía" real: un array con celdas null, NO un array vacío
-     * `[]`. Maatwebsite Excel colapsa/ignora las filas totalmente
-     * vacías al exportar con FromArray, lo que desalineaba todos los
-     * índices de fila calculados con count() — este helper es el fix.
+     * Fila "vacía" real: array con celdas null, NO un array vacío `[]`.
+     * Maatwebsite Excel colapsa las filas totalmente vacías con
+     * FromArray, lo que desalinea los índices calculados con count().
      *
      * @return array<int, null>
      */
@@ -62,40 +75,39 @@ class PartidaPlantillaExport implements FromArray, WithEvents
 
     private function construirFilas(): void
     {
+        // --- Título ---
+        $this->filaTitulo = count($this->filas) + 1;
+        $this->filas[] = ['PLANTILLA DE COTIZACIÓN', null, null, null, null];
+        $this->filas[] = $this->filaBlanco();
+
+        // --- Instrucciones ---
         $this->filaInicioInstrucciones = count($this->filas) + 1;
-        $this->filas[] = ['Cómo llenar esta plantilla:'];
-        $this->filas[] = ['- Cada sección (1, 2, 3...) va en su propia fila, solo con No. y Concepto.'];
-        $this->filas[] = ['- Cada partida hija va como "No.Hija" (ej. 1.1, 1.2) con Unidad, Cantidad y Precio Unitario.'];
-        $this->filas[] = ['- Al final llena Tiempo de Entrega, Moneda y Notas. El Importe con Letra se calcula solo.'];
-        $this->filas[] = ['- No borres ni muevas las columnas. Borra las filas de ejemplo antes de llenar tus datos.'];
+        $this->filas[] = ['Instrucciones'];
+        $this->filas[] = ['1. Llena los datos amarillos de "Datos del Cliente y del Proyecto".'];
+        $this->filas[] = ['2. En la tabla: cada sección va con un número solo (1, 2, 3...). Cada partida va como "No.Hija" (1.1, 1.2...) con Unidad, Cantidad y Precio Unitario.'];
+        $this->filas[] = ['3. Al final llena Tiempo de Entrega, Días de Crédito, Vigencia y Notas.'];
+        $this->filas[] = ['4. Borra las filas de ejemplo antes de llenar tus datos. No borres ni muevas columnas.'];
         $this->filaFinInstrucciones = count($this->filas);
         $this->filas[] = $this->filaBlanco();
 
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Para:', $this->cotizacion?->para ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Cliente:', $this->cotizacion?->cliente ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Fecha:', optional($this->cotizacion?->fecha)->format('d/m/Y') ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Dirección:', $this->cotizacion?->direccion ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Vendedor:', $this->cotizacion?->vendedor ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Correo Vendedor:', $this->cotizacion?->correo_vendedor ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Proveedor:', $this->cotizacion?->proveedor ?? ''];
-        $this->filasEncabezadoDatos[] = count($this->filas) + 1;
-        $this->filas[] = ['Obra:', $this->cotizacion?->obra ?? ''];
+        // --- Datos del Cliente y del Proyecto ---
+        $this->filaSeccionDatos = count($this->filas) + 1;
+        $this->filas[] = ['Datos del Cliente y del Proyecto', null, null, null, null];
+        $this->filasNegritas[] = $this->filaSeccionDatos;
+
+        $this->agregarCampoCaptura('Fecha:', optional($this->cotizacion?->fecha)->format('d/m/Y') ?? '');
+        $this->agregarCampoCaptura('Cliente:', $this->cotizacion?->cliente ?? '');
+        $this->agregarCampoCaptura('Dirección:', $this->cotizacion?->direccion ?? '');
+        $this->agregarCampoCaptura('Obra:', $this->cotizacion?->obra ?? '');
+        $this->agregarCampoCaptura('Vendedor:', $this->cotizacion?->vendedor ?? '');
+        $this->agregarCampoCaptura('Proveedor:', $this->cotizacion?->proveedor ?? '');
         $this->filas[] = $this->filaBlanco();
 
-        $this->filasNegritas = [...$this->filasEncabezadoDatos];
-
+        // --- Tabla de partidas: un solo encabezado, categorías y subcategorías ---
         $this->filas[] = ['No.', 'Concepto', 'Unidad', 'Cantidad', 'Precio Unitario'];
         $this->filasNegritas[] = count($this->filas);
         $this->filaInicioTabla = count($this->filas);
 
-        // Si ya hay partidas reales (cotización existente), se listan tal cual.
         if (! empty($this->partidasArbol)) {
             foreach ($this->partidasArbol as $padre) {
                 $this->filas[] = [$padre['no'], $padre['descripcion'], null, null, null];
@@ -112,8 +124,6 @@ class PartidaPlantillaExport implements FromArray, WithEvents
                 }
             }
         } else {
-            // Plantilla genérica (sin cotización): se rellena con datos de
-            // ejemplo para que quede claro cómo debe llenarse el archivo.
             $this->agregarSeccionEjemplo('1', 'PRELIMINARES', [
                 ['1.1', 'Trazo y nivelación', 'm2', 100, 45.50],
                 ['1.2', 'Excavación a mano', 'm3', 20, 320.00],
@@ -132,9 +142,7 @@ class PartidaPlantillaExport implements FromArray, WithEvents
         $this->filaFinTabla = count($this->filas);
         $this->filas[] = $this->filaBlanco();
 
-        // --- Condiciones comerciales: Tiempo de Entrega | Días de Crédito | Vigencia Cotización ---
-        // Encabezados en columnas A, C, E (B y D quedan como separador),
-        // así el parser ubica cada etiqueta y lee su valor justo debajo.
+        // --- Condiciones comerciales ---
         $this->filaCondicionesHeader = count($this->filas) + 1;
         $this->filas[] = ['Tiempo de Entrega', null, 'Días de Crédito', null, 'Vigencia Cotización'];
         $this->filasNegritas[] = $this->filaCondicionesHeader;
@@ -149,16 +157,16 @@ class PartidaPlantillaExport implements FromArray, WithEvents
         ];
         $this->filas[] = $this->filaBlanco();
 
-        // --- Moneda ---
-        $this->filaMoneda = count($this->filas) + 1;
-        $this->filas[] = ['Moneda:', $this->cotizacion?->moneda ?? 'PESOS MXN'];
-        $this->filasNegritas[] = $this->filaMoneda;
-        $this->filas[] = $this->filaBlanco();
-
-        // --- Notas: espacio para llenar a mano ---
+        // --- Notas ---
         $this->filaNota = count($this->filas) + 1;
         $this->filas[] = ['NOTA:', $this->cotizacion?->notas ?? ''];
         $this->filasNegritas[] = $this->filaNota;
+    }
+
+    private function agregarCampoCaptura(string $etiqueta, string $valor): void
+    {
+        $this->filasCaptura[] = count($this->filas) + 1;
+        $this->filas[] = [$etiqueta, $valor];
     }
 
     /**
@@ -188,6 +196,15 @@ class PartidaPlantillaExport implements FromArray, WithEvents
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
 
+                // Título
+                $sheet->mergeCellsByColumnAndRow(1, $this->filaTitulo, 5, $this->filaTitulo);
+                $sheet->getStyle("A{$this->filaTitulo}")->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 14, 'color' => ['argb' => self::COLOR_TITULO_TEXTO]],
+                    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => self::COLOR_TITULO_FONDO]],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                ]);
+                $sheet->getRowDimension($this->filaTitulo)->setRowHeight(28);
+
                 foreach ($this->filasNegritas as $fila) {
                     $sheet->getStyle("A{$fila}:E{$fila}")->getFont()->setBold(true);
                 }
@@ -196,91 +213,64 @@ class PartidaPlantillaExport implements FromArray, WithEvents
                     $sheet->getColumnDimension($columna)->setAutoSize(true);
                 }
 
-                // Recuadro de instrucciones: texto en cursiva/gris, sin
-                // bordes duros, solo un fondo muy tenue para distinguirlo.
+                // Instrucciones: cursiva/gris, fondo tenue, sin bordes duros
                 $rangoInstrucciones = "A{$this->filaInicioInstrucciones}:A{$this->filaFinInstrucciones}";
                 $sheet->getStyle($rangoInstrucciones)->getFont()->setItalic(true)->getColor()->setARGB('FF595959');
                 $sheet->getStyle("A{$this->filaInicioInstrucciones}")->getFont()->setItalic(false)->setBold(true);
                 $sheet->getStyle($rangoInstrucciones)->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFF7F7F7');
-                $sheet->mergeCellsByColumnAndRow(1, $this->filaInicioInstrucciones, 5, $this->filaInicioInstrucciones);
-                for ($f = $this->filaInicioInstrucciones + 1; $f <= $this->filaFinInstrucciones; $f++) {
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_INSTRUCCIONES);
+                for ($f = $this->filaInicioInstrucciones; $f <= $this->filaFinInstrucciones; $f++) {
                     $sheet->mergeCellsByColumnAndRow(1, $f, 5, $f);
                 }
 
-                // Datos de encabezado (Para, Cliente, Fecha...): la
-                // celda B es donde se llena — resaltada tenue para que
-                // se note que es de captura.
-                foreach ($this->filasEncabezadoDatos as $fila) {
+                // Sección "Datos del Cliente y del Proyecto"
+                $sheet->mergeCellsByColumnAndRow(1, $this->filaSeccionDatos, 5, $this->filaSeccionDatos);
+                $sheet->getStyle("A{$this->filaSeccionDatos}:E{$this->filaSeccionDatos}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_SECCION);
+
+                foreach ($this->filasCaptura as $fila) {
                     $sheet->getStyle("B{$fila}")->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setARGB('FFFFF9C4');
+                        ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_CAPTURA);
                 }
 
-                // Encabezado de tabla (No. | Concepto | Unidad | Cantidad | Precio Unitario)
+                // Encabezado de tabla de partidas
                 $filaHeader = $this->filaInicioTabla;
                 $sheet->getStyle("A{$filaHeader}:E{$filaHeader}")->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFEDEDED');
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_SECCION);
 
-                // Bordes finos y minimalistas: solo líneas delgadas entre
-                // celdas, sin marco grueso.
-                if ($this->filaFinTabla >= $this->filaInicioTabla) {
-                    $rangoTabla = "A{$filaHeader}:E{$this->filaFinTabla}";
-
-                    $sheet->getStyle($rangoTabla)->applyFromArray([
+                if ($this->filaFinTabla >= $filaHeader) {
+                    $sheet->getStyle("A{$filaHeader}:E{$this->filaFinTabla}")->applyFromArray([
                         'borders' => [
-                            'allBorders' => [
-                                'borderStyle' => Border::BORDER_THIN,
-                                'color' => ['argb' => 'FFD0D0D0'],
-                            ],
+                            'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => self::COLOR_BORDE]],
                         ],
                     ]);
                 }
 
-                // Alinear cantidad y precio a la derecha dentro de la tabla
                 $sheet->getStyle("D{$filaHeader}:E{$this->filaFinTabla}")
                     ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-                // Condiciones comerciales: encabezado con fondo tenue,
-                // fila de valores resaltada como celda de captura.
+                // Condiciones comerciales
                 $sheet->getStyle("A{$this->filaCondicionesHeader}:E{$this->filaCondicionesHeader}")->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFEDEDED');
-                $sheet->getStyle("A{$this->filaCondicionesHeader}:E{$this->filaCondicionesValores}")
-                    ->applyFromArray([
-                        'borders' => [
-                            'allBorders' => [
-                                'borderStyle' => Border::BORDER_THIN,
-                                'color' => ['argb' => 'FFD0D0D0'],
-                            ],
-                        ],
-                    ]);
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_SECCION);
+                $sheet->getStyle("A{$this->filaCondicionesHeader}:E{$this->filaCondicionesValores}")->applyFromArray([
+                    'borders' => [
+                        'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => self::COLOR_BORDE]],
+                    ],
+                ]);
                 $sheet->getStyle("A{$this->filaCondicionesValores}:E{$this->filaCondicionesValores}")
-                    ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFF9C4');
+                    ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_CAPTURA);
                 $sheet->getStyle("A{$this->filaCondicionesValores}:E{$this->filaCondicionesValores}")
                     ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
 
-                // Moneda: celda de captura resaltada.
-                $sheet->getStyle("B{$this->filaMoneda}")->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFFFF9C4');
-
-                // Notas: fila completa combinada B:E, resaltada, con
-                // wrap y altura extra para texto largo.
+                // Notas: fila combinada B:E, resaltada, con wrap
                 $sheet->mergeCellsByColumnAndRow(2, $this->filaNota, 5, $this->filaNota);
                 $sheet->getStyle("A{$this->filaNota}:E{$this->filaNota}")->applyFromArray([
                     'borders' => [
-                        'allBorders' => [
-                            'borderStyle' => Border::BORDER_THIN,
-                            'color' => ['argb' => 'FFD0D0D0'],
-                        ],
+                        'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => self::COLOR_BORDE]],
                     ],
                 ]);
                 $sheet->getStyle("B{$this->filaNota}:E{$this->filaNota}")->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFFFF9C4');
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::COLOR_CAPTURA);
                 $sheet->getRowDimension($this->filaNota)->setRowHeight(40);
                 $sheet->getStyle("B{$this->filaNota}")->getAlignment()
                     ->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
