@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Carbon;
 
 class Planeacion extends Model
@@ -68,6 +69,23 @@ class Planeacion extends Model
     public function asignaciones(): HasMany
     {
         return $this->hasMany(PlaneacionAsignacion::class, 'planeacion_id');
+    }
+
+    /**
+     * Incidencias de TODAS las asignaciones de esta planeación, sin pasar
+     * por una tabla intermedia propia — se apoya en la FK ya existente
+     * `planeacion_asignaciones.planeacion_id` y `planeacion_incidencias.asignacion_id`.
+     * Habilita `withCount('incidencias')` para el overview del Supervisor
+     * sin tener que cargar cada asignación con sus incidencias una por una.
+     */
+    public function incidencias(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            PlaneacionIncidencia::class,
+            PlaneacionAsignacion::class,
+            'planeacion_id',
+            'asignacion_id',
+        );
     }
 
     public function fechaInicio(): Carbon

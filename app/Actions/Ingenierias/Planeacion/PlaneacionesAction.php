@@ -4,6 +4,7 @@ namespace App\Actions\Ingenierias\Planeacion;
 
 use App\Actions\Notificaciones\NotificacionesAction;
 use App\Models\Planeacion;
+use App\Models\Planta;
 use App\Models\Proyecto;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -18,10 +19,20 @@ class PlaneacionesAction
     ) {}
 
     /**
-     * Sin lógica propia: reutiliza el mecanismo central de permisos que ya
-     * usa el resto del sistema (ver CotizacionController::show, que hace
-     * lo mismo para 'ingenierias'). Si el usuario tiene el bit ALL sobre
-     * el endpoint 'planeacion', es supervisor/ingeniero; si no, residente.
+     * Controla si el usuario ve la perspectiva GLOBAL (todas las
+     * planeaciones de sus plantas asignadas) o la RESTRINGIDA (solo las
+     * suyas). Independiente de `puedeAprobar()` — un usuario puede tener
+     * `supervisar` sin `aprobar`, y viceversa.
+     */
+    public function puedeSupervisar(User $usuario): bool
+    {
+        return $usuario->puedePorEndpoint('ingenierias.planeacion', 'supervisar');
+    }
+
+    /**
+     * Controla ÚNICAMENTE el botón de aprobar/rechazar. No decide qué
+     * vista recibe el usuario — eso es responsabilidad de
+     * `puedeSupervisar()`.
      */
     public function puedeAprobar(User $usuario): bool
     {
@@ -40,7 +51,7 @@ class PlaneacionesAction
     {
         $query = $proyecto->planeaciones()->with('usuario', 'aprobador');
 
-        if (! $this->puedeAprobar($usuario)) {
+        if (! $this->puedeSupervisar($usuario)) {
             $query->where('usuario_id', $usuario->id);
         }
 
@@ -84,32 +95,96 @@ class PlaneacionesAction
                 'nombre' => $p->planta->nombre,
             ] : null,
             'residente' => $p->usuario?->name,
+            'residenteId' => $p->usuario_id,
             'aprobador' => $p->aprobador?->name,
-            // Necesarios para pintar el rango en el calendario anual — antes
-            // el frontend los usaba sin que existieran en este arreglo.
             'fechaInicio' => $p->fechaInicio()->format('Y-m-d'),
             'fechaFin' => $p->fechaFin()->format('Y-m-d'),
             'fechaEnvio' => $p->fecha_envio?->format('d/m/Y H:i'),
             'fechaAprobacion' => $p->fecha_aprobacion?->format('d/m/Y H:i'),
             'comentariosAprobacion' => $p->comentarios_aprobacion,
+            // Solo vienen poblados cuando el query los agregó explícitamente
+            // (withSum/withCount/eager-load de asignaciones en
+            // listVistaGeneral) — los demás listados no pagan ese costo si
+            // no lo necesitan; acceder a un atributo/relación no cargada
+            // aquí simplemente cae en null/colección vacía.
+            'horasProgramadas' => $p->horas_programadas !== null ? (float) $p->horas_programadas : 0.0,
+            'incidenciasCount' => $p->incidencias_count ?? 0,
+            'empleados' => $p->relationLoaded('asignaciones')
+                ? $p->asignaciones->pluck('empleado')->filter()->unique('id')
+                    ->map(fn ($e) => ['id' => $e->id, 'nombre' => $e->nombre])->values()->all()
+                : [],
+            'partidas' => $p->relationLoaded('asignaciones')
+                ? $p->asignaciones->pluck('partida')->filter()->unique('id')
+                    ->map(fn ($pa) => ['id' => $pa->id, 'descripcion' => $pa->descripcion])->values()->all()
+                : [],
         ];
     }
 
     /**
      * Fuente ÚNICA de datos para la vista general de Planeación. El scope
-     * (propias vs. las de tus plantas asignadas) depende del permiso ALL,
-     * pero el resultado alimenta la MISMA pantalla — no una pantalla aparte.
+     * (propias vs. las de tus plantas asignadas) depende de
+     * `puedeSupervisar()`. Sirve tanto a MisPlaneaciones.vue como al
+     * overview anual de Planificador.vue — este último necesita las horas
+     * programadas, incidencias, empleados y partidas por planeación para
+     * construir el calendario y el drill-down sin pedir nada más al
+     * servidor, así que se cargan siempre aquí (el costo es acotado al
+     * scope de plantas asignadas, igual que el resto de los campos).
      */
     public function listVistaGeneral(User $usuario): Collection
     {
-        $query = $this->puedeAprobar($usuario)
+        $query = $this->puedeSupervisar($usuario)
             ? Planeacion::whereIn('planta_id', $usuario->plantasAsignadas()->pluck('plantas.id'))
             : Planeacion::where('usuario_id', $usuario->id);
 
-        return $query->with('proyecto', 'planta', 'usuario', 'aprobador')
+        return $query
+            ->with([
+                'proyecto',
+                'planta',
+                'usuario',
+                'aprobador',
+                'asignaciones.empleado:id,nombre',
+                'asignaciones.partida:id,descripcion',
+            ])
+            ->withSum('asignaciones as horas_programadas', 'horas_trabajadas')
+            ->withCount('incidencias')
             ->latest('anio')->latest('semana')
             ->get()
             ->map(fn (Planeacion $p) => $this->resumen($p));
+    }
+
+    /**
+     * Opciones para los filtros de la vista de Supervisor (planta,
+     * proyecto, residente). Mismo scope de plantas asignadas que
+     * `listVistaGeneral()` — un filtro nunca debe ofrecer algo que el
+     * usuario no podría ver de todos modos.
+     *
+     * @return array{plantas: Collection, proyectos: Collection, residentes: Collection}
+     */
+    public function filtrosDisponibles(User $usuario): array
+    {
+        $plantaIds = $usuario->plantasAsignadas()->pluck('plantas.id');
+
+        $plantas = Planta::whereIn('id', $plantaIds)->orderBy('nombre')->get(['id', 'nombre']);
+
+        $proyectos = Proyecto::whereIn('planta_id', $plantaIds)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'planta_id']);
+
+        $residentes = Planeacion::whereIn('planta_id', $plantaIds)
+            ->with('usuario:id,name')
+            ->get()
+            ->pluck('usuario')
+            ->filter()
+            ->unique('id')
+            ->sortBy('name')
+            ->map(fn (User $u) => ['id' => $u->id, 'nombre' => $u->name])
+            ->values();
+
+        return [
+            'plantas' => $plantas,
+            'proyectos' => $proyectos,
+            'residentes' => $residentes,
+        ];
     }
 
     public function detail(Planeacion $planeacion): array

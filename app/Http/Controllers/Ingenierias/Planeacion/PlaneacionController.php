@@ -20,14 +20,28 @@ use Inertia\Response;
 
 class PlaneacionController extends Controller
 {
+    /**
+     * La perspectiva (qué componente Vue recibe el usuario) la decide
+     * exclusivamente `puedeSupervisar()`. `puedeAprobar()` es una
+     * operación aparte que solo se usa para mostrar/ocultar el botón de
+     * aprobar-rechazar dentro de la vista de Planificador — nunca para
+     * elegir qué vista se renderiza.
+     */
     public function index(Request $request, PlaneacionesAction $action): Response
     {
         $usuario = $request->user();
 
-        return Inertia::render('ingenierias/planeacion/Index', [
+        if ($action->puedeSupervisar($usuario)) {
+            return Inertia::render('ingenierias/planeacion/Planificador', [
+                'puedeAprobar' => $action->puedeAprobar($usuario),
+                'filtros' => Inertia::defer(fn () => $action->filtrosDisponibles($usuario)),
+                'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
+            ]);
+        }
+
+        return Inertia::render('ingenierias/planeacion/MisPlaneaciones', [
             'puedeCrear' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::CREATE),
             'puedeEliminar' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::DELETE),
-            'puedeGestionar' => $action->puedeAprobar($usuario),
             'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
         ]);
     }
@@ -35,9 +49,9 @@ class PlaneacionController extends Controller
     public function create(Request $request, PlaneacionesAction $action): Response
     {
         $usuario = $request->user();
-        $puedeAprobar = $action->puedeAprobar($usuario);
+        $puedeSupervisar = $action->puedeSupervisar($usuario);
 
-        $plantas = $puedeAprobar
+        $plantas = $puedeSupervisar
             ? $usuario->plantasAsignadas()
                 ->with('proyectos:id,planta_id,nombre,folio,tipo')
                 ->get(['plantas.id', 'plantas.nombre', 'plantas.folio'])

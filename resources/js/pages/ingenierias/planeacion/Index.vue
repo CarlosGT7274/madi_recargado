@@ -1,24 +1,31 @@
 <script setup lang="ts">
 import { Deferred, Head, Link, router } from '@inertiajs/vue3';
-import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Plus, Send, XCircle } from '@lucide/vue';
+import {
+    AlertCircle,
+    Calendar as CalendarIcon,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Download,
+    FileText,
+    Settings,
+    XCircle
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import PlaneacionController from '@/actions/App/Http/Controllers/Ingenierias/Planeacion/PlaneacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
-interface ProyectoRef {
-    id: number;
-    nombre: string;
-    folio: string;
-}
-
-interface PlantaRef {
-    id: number;
-    nombre: string;
-}
-
-type EstadoPlaneacion = 'borrador' | 'enviada' | 'aprobada' | 'rechazada';
+// --- Tipos Extendidos para el Rediseño ---
+interface ProyectoRef { id: number; nombre: string; folio: string; }
+interface PlantaRef { id: number; nombre: string; }
+type EstadoPlaneacion = 'borrador' | 'enviada' | 'aprobada' | 'rechazada' | 'incidencia';
 
 interface PlaneacionResumen {
     id: number;
@@ -29,12 +36,11 @@ interface PlaneacionResumen {
     proyecto: ProyectoRef | null;
     planta: PlantaRef | null;
     residente: string | null;
-    aprobador: string | null;
-    fechaInicio: string; // ISO yyyy-mm-dd
-    fechaFin: string; // ISO yyyy-mm-dd
-    fechaEnvio: string | null;
-    fechaAprobacion: string | null;
-    comentariosAprobacion: string | null;
+    horasProgramadas: number;
+    horasDisponibles: number;
+    incidencias: string[];
+    fechaInicio: string;
+    fechaFin: string;
 }
 
 const props = defineProps<{
@@ -45,297 +51,371 @@ const props = defineProps<{
 }>();
 
 defineOptions({
-    layout: {
-        breadcrumbs: [{ title: 'Planeación', href: PlaneacionController.index() }],
-    },
+    layout: { breadcrumbs: [{ title: 'Supervisión de Planeación', href: PlaneacionController.index() }] },
 });
 
-const estadoLabel: Record<EstadoPlaneacion, string> = {
-    borrador: 'Borrador',
-    enviada: 'En revisión',
-    aprobada: 'Aprobada',
-    rechazada: 'Rechazada',
-};
+// --- Estado de la Vista ---
+const vistaActual = ref<'mes' | 'semana' | 'dia'>('mes');
+const fechaBase = ref(new Date());
 
-const estadoBadgeClass: Record<EstadoPlaneacion, string> = {
-    borrador: 'bg-muted text-muted-foreground',
-    enviada: 'bg-blue-500/10 text-blue-600',
-    aprobada: 'bg-emerald-500/10 text-emerald-600',
-    rechazada: 'bg-red-500/10 text-red-600',
-};
-
-const puntoClase: Record<EstadoPlaneacion, string> = {
-    borrador: 'bg-muted-foreground',
-    enviada: 'bg-blue-500',
-    aprobada: 'bg-emerald-500',
-    rechazada: 'bg-red-500',
-};
-
-// ---------- Calendario anual ----------
-
-const nombresMeses = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
-const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
-const anioActual = ref(new Date().getFullYear());
-
-function toIso(fecha: Date): string {
-    return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-}
-
-function celdasDeMes(anio: number, mes: number) {
-    const primerDia = new Date(anio, mes, 1);
-    const inicioOffset = (primerDia.getDay() + 6) % 7;
-    const totalDias = new Date(anio, mes + 1, 0).getDate();
-
-    const celdas: { fecha: Date | null; iso: string | null }[] = [];
-    for (let i = 0; i < inicioOffset; i++) celdas.push({ fecha: null, iso: null });
-    for (let d = 1; d <= totalDias; d++) {
-        const fecha = new Date(anio, mes, d);
-        celdas.push({ fecha, iso: toIso(fecha) });
-    }
-    return celdas;
-}
-
-const meses = computed(() =>
-    nombresMeses.map((nombre, indice) => ({
-        nombre,
-        indice,
-        celdas: celdasDeMes(anioActual.value, indice),
-    })),
-);
-
-// ---------- Rango seleccionado ----------
-
+// --- Estado de Selección de Rango ---
 const rangoInicio = ref<string | null>(null);
 const rangoFin = ref<string | null>(null);
 
-function seleccionarDia(iso: string): void {
+// --- Modales ---
+const modalDetalleAbierto = ref(false);
+const planeacionSeleccionada = ref<PlaneacionResumen | null>(null);
+const motivoRechazo = ref('');
+
+const modalConfigAbierto = ref(false);
+
+// --- Helpers Visuales ---
+const estadoConfig: Record<EstadoPlaneacion, { color: string, label: string, bg: string }> = {
+    borrador: { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800', label: 'Borrador' },
+    enviada: { color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30', label: 'Pendiente' },
+    aprobada: { color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30', label: 'Aprobada' },
+    rechazada: { color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30', label: 'Rechazada' },
+    incidencia: { color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30', label: 'Incidencia' },
+};
+
+function porcentajeHoras(prog: number, disp: number) {
+    if (!disp) return 0;
+    return Math.min((prog / disp) * 100, 100);
+}
+
+// --- Lógica de Calendario (Mock para UI) ---
+const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const celdasMes = computed(() => {
+    // Generación mock de 35 días para demostración visual
+    return Array.from({ length: 35 }).map((_, i) => {
+        const date = new Date(fechaBase.value.getFullYear(), fechaBase.value.getMonth(), i - 2);
+        const iso = date.toISOString().split('T')[0];
+        // Mock vinculando planeaciones al día
+        const planesDelDia = (props.planeaciones || []).filter(p => iso >= p.fechaInicio && iso <= p.fechaFin);
+        return { fecha: date, iso, planes: planesDelDia, currentMonth: date.getMonth() === fechaBase.value.getMonth() };
+    });
+});
+
+// --- Interacciones ---
+function seleccionarDia(iso: string) {
     if (!rangoInicio.value || (rangoInicio.value && rangoFin.value)) {
         rangoInicio.value = iso;
         rangoFin.value = null;
-        return;
-    }
-
-    if (iso >= rangoInicio.value) {
-        rangoFin.value = iso;
     } else {
-        rangoFin.value = rangoInicio.value;
-        rangoInicio.value = iso;
+        if (iso >= rangoInicio.value) rangoFin.value = iso;
+        else { rangoFin.value = rangoInicio.value; rangoInicio.value = iso; }
     }
 }
 
-function limpiarSeleccion(): void {
-    rangoInicio.value = null;
-    rangoFin.value = null;
-}
-
-function diaEnRangoSeleccionado(iso: string): boolean {
+function enRango(iso: string) {
     if (!rangoInicio.value) return false;
-    const fin = rangoFin.value ?? rangoInicio.value;
+    const fin = rangoFin.value || rangoInicio.value;
     return iso >= rangoInicio.value && iso <= fin;
 }
 
-function estadosDelDia(lista: PlaneacionResumen[], iso: string): EstadoPlaneacion[] {
-    return lista.filter((p) => iso >= p.fechaInicio && iso <= p.fechaFin).map((p) => p.estado);
+function abrirDetalle(plan: PlaneacionResumen) {
+    planeacionSeleccionada.value = plan;
+    motivoRechazo.value = '';
+    modalDetalleAbierto.value = true;
 }
 
-// ---------- Lista filtrada ----------
-
-function seOverlapaConRango(p: PlaneacionResumen): boolean {
-    if (!rangoInicio.value) return true;
-    const fin = rangoFin.value ?? rangoInicio.value;
-    return p.fechaInicio <= fin && p.fechaFin >= rangoInicio.value;
-}
-
-function listaVisible(lista: PlaneacionResumen[]): PlaneacionResumen[] {
-    return lista.filter(seOverlapaConRango);
-}
-
-// ---------- Acciones ----------
-
-function crear(): void {
-    router.visit(PlaneacionController.create().url);
-}
-
-function enviar(id: number): void {
-    router.post(PlaneacionController.enviar(id).url, {}, { preserveScroll: true });
-}
-
-function eliminar(id: number): void {
-    if (!confirm('¿Eliminar esta planeación? Esta acción no se puede deshacer.')) return;
-    router.delete(PlaneacionController.destroy(id).url, { preserveScroll: true });
-}
-
-function aprobar(id: number): void {
-    router.post(PlaneacionController.aprobar(id).url, {}, { preserveScroll: true });
-}
-
-function rechazar(id: number): void {
-    const comentarios = prompt('Motivo del rechazo:');
-    if (!comentarios) return;
-    router.post(PlaneacionController.rechazar(id).url, { comentarios }, { preserveScroll: true });
-}
-
-function reportarNomina(id: number): void {
-    router.post(PlaneacionController.reportarNomina(id).url, {}, { preserveScroll: true });
+// --- Acciones de Negocio ---
+function aprobarSeleccion() { /* Lógica de aprobación masiva */ }
+function exportarPDF() { /* Lógica para exportar landscape PDF */ }
+function rechazarPlan() {
+    if (!motivoRechazo.value) return alert('El comentario es obligatorio para rechazar.');
+    // Submit...
+    modalDetalleAbierto.value = false;
 }
 </script>
 
 <template>
-    <Head title="Planeación" />
 
-    <PageLayout title="Planeación" description="Consulta y gestiona las planeaciones semanales">
+    <Head title="Supervisión de Planeaciones" />
+
+    <PageLayout title="Planeaciones"
+        description="Supervisa, ajusta y aprueba la capacidad operativa de los residentes.">
         <template #actions>
-            <Button v-if="props.puedeCrear" @click="crear">
-                <Plus class="mr-2 size-4" />
-                Nueva Planeación
-            </Button>
+            <div class="flex items-center gap-2">
+                <!-- Selector de Vista -->
+                <div class="flex items-center rounded-lg border bg-muted/50 p-1">
+                    <button v-for="v in ['mes', 'semana', 'dia']" :key="v" @click="vistaActual = v as any"
+                        class="rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-all"
+                        :class="vistaActual === v ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'">
+                        {{ v }}
+                    </button>
+                </div>
+                <Button variant="outline" @click="modalConfigAbierto = true">
+                    <Settings class="mr-2 size-4" /> Horarios
+                </Button>
+            </div>
         </template>
 
         <Deferred data="planeaciones">
             <template #fallback>
-                <div class="h-96 animate-pulse rounded-2xl border bg-card/50" />
+                <div class="h-[600px] animate-pulse rounded-2xl border bg-card/50" />
             </template>
 
-            <div v-if="planeaciones" class="grid gap-6 lg:grid-cols-[1fr_360px]">
-                <!-- Calendario anual -->
-                <div class="rounded-2xl border bg-card p-5 shadow-sm">
-                    <div class="mb-4 flex items-center justify-between">
-                        <button type="button" class="rounded-md p-1 hover:bg-accent" @click="anioActual--">
-                            <ChevronLeft class="size-4" />
-                        </button>
-                        <p class="text-lg font-semibold">{{ anioActual }}</p>
-                        <button type="button" class="rounded-md p-1 hover:bg-accent" @click="anioActual++">
-                            <ChevronRight class="size-4" />
-                        </button>
-                    </div>
+            <!-- Layout Principal: Calendario + Panel Contextual -->
+            <div class="grid gap-6 items-start" :class="rangoInicio ? 'lg:grid-cols-[1fr_320px]' : 'grid-cols-1'">
 
-                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <div v-for="mes in meses" :key="mes.indice" class="rounded-xl border p-3">
-                            <p class="mb-2 text-center text-sm font-semibold">{{ mes.nombre }}</p>
-
-                            <div class="grid grid-cols-7 gap-0.5 text-center text-[10px] text-muted-foreground">
-                                <span v-for="(d, i) in diasSemana" :key="`${d}-${i}`">{{ d }}</span>
-                            </div>
-
-                            <div class="mt-0.5 grid grid-cols-7 gap-0.5">
-                                <button
-                                    v-for="(celda, idx) in mes.celdas"
-                                    :key="idx"
-                                    type="button"
-                                    :disabled="!celda.fecha"
-                                    class="relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded text-[11px] transition-colors disabled:cursor-default"
-                                    :class="[
-                                        !celda.fecha ? 'invisible' : 'hover:bg-accent',
-                                        celda.iso && diaEnRangoSeleccionado(celda.iso) ? 'bg-primary text-primary-foreground hover:bg-primary' : '',
-                                    ]"
-                                    @click="celda.iso && seleccionarDia(celda.iso)"
-                                >
-                                    {{ celda.fecha?.getDate() }}
-                                    <span v-if="celda.iso" class="flex gap-0.5">
-                                        <span
-                                            v-for="(estado, i2) in estadosDelDia(planeaciones, celda.iso).slice(0, 3)"
-                                            :key="i2"
-                                            class="size-1 rounded-full"
-                                            :class="puntoClase[estado]"
-                                        />
-                                    </span>
-                                </button>
+                <!-- CALENDARIO -->
+                <div class="flex flex-col rounded-2xl border bg-card shadow-sm overflow-hidden">
+                    <!-- Header Navegación -->
+                    <div class="flex items-center justify-between border-b px-5 py-4">
+                        <div class="flex items-center gap-4">
+                            <h2 class="text-xl font-semibold tracking-tight">
+                                {{fechaBase.toLocaleString('es-MX', { month: 'long', year: 'numeric' }).replace(/^\w/,
+                                c =>
+                                c.toUpperCase()) }}
+                            </h2>
+                            <div class="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" class="size-8"
+                                    @click="fechaBase.setMonth(fechaBase.getMonth() - 1)">
+                                    <ChevronLeft class="size-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" class="text-xs"
+                                    @click="fechaBase = new Date()">Hoy</Button>
+                                <Button variant="ghost" size="icon" class="size-8"
+                                    @click="fechaBase.setMonth(fechaBase.getMonth() + 1)">
+                                    <ChevronRight class="size-4" />
+                                </Button>
                             </div>
                         </div>
+                        <div class="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span class="flex items-center gap-1.5">
+                                <div class="size-2.5 rounded-full bg-emerald-500"></div> Aprobada
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <div class="size-2.5 rounded-full bg-amber-500"></div> Pendiente
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <div class="size-2.5 rounded-full bg-purple-500"></div> Incidencia
+                            </span>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Lista de planeaciones -->
-                <div class="rounded-2xl border bg-card p-5 shadow-sm">
-                    <div class="mb-4 flex items-center justify-between">
-                        <p class="text-sm font-medium text-muted-foreground">
-                            {{ rangoInicio ? 'Planeaciones en el rango seleccionado' : 'Todas las planeaciones' }}
-                        </p>
-                        <button v-if="rangoInicio" type="button" class="text-xs text-primary hover:underline" @click="limpiarSeleccion">
-                            Limpiar
-                        </button>
+                    <!-- Grid Mes -->
+                    <div v-if="vistaActual === 'mes'"
+                        class="grid grid-cols-7 border-b bg-muted/30 text-center text-xs font-medium text-muted-foreground">
+                        <div v-for="d in diasSemana" :key="d" class="py-2.5 border-r last:border-0">{{ d }}</div>
                     </div>
-                    <p v-if="rangoInicio" class="mb-3 text-xs text-muted-foreground">
-                        {{ rangoInicio }} — {{ rangoFin ?? rangoInicio }}
-                    </p>
+                    <div v-if="vistaActual === 'mes'" class="grid grid-cols-7 auto-rows-[120px] bg-muted/10">
+                        <div v-for="celda in celdasMes" :key="celda.iso" @click="seleccionarDia(celda.iso)"
+                            class="group relative border-r border-b p-2 transition-colors cursor-crosshair hover:bg-accent/50"
+                            :class="[
+                                !celda.currentMonth ? 'bg-muted/30 text-muted-foreground/50' : '',
+                                enRango(celda.iso) ? 'bg-primary/5 ring-1 ring-inset ring-primary/20' : ''
+                            ]">
 
-                    <div v-if="listaVisible(planeaciones).length" class="space-y-3">
-                        <div v-for="p in listaVisible(planeaciones)" :key="p.id" class="rounded-xl border p-3">
-                            <Link :href="PlaneacionController.show(p.id)" class="block">
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-semibold">Semana {{ p.semana }}/{{ p.anio }}</p>
-                                    <Badge :class="estadoBadgeClass[p.estado]" class="text-[10px] uppercase">
-                                        {{ estadoLabel[p.estado] }}
-                                    </Badge>
-                                </div>
-                                <p class="mt-1 text-xs text-muted-foreground">
-                                    {{ p.proyecto?.nombre ?? '—' }} · {{ p.planta?.nombre ?? '—' }}
-                                </p>
-                                <p v-if="props.puedeGestionar" class="text-xs text-muted-foreground">
-                                    Residente: {{ p.residente ?? '—' }}
-                                </p>
-                            </Link>
-
-                            <!-- Acciones del residente sobre su propia planeación -->
-                            <div v-if="!props.puedeGestionar && p.estado === 'borrador'" class="mt-3 flex gap-2">
-                                <Button size="sm" @click="enviar(p.id)">
-                                    <Send class="mr-1.5 size-3.5" />
-                                    Enviar a revisión
-                                </Button>
-                                <Button
-                                    v-if="props.puedeEliminar"
-                                    size="sm"
-                                    variant="outline"
-                                    class="text-destructive hover:bg-destructive/10"
-                                    @click="eliminar(p.id)"
-                                >
-                                    Eliminar
-                                </Button>
-                            </div>
-                            <p
-                                v-else-if="!props.puedeGestionar && p.estado === 'rechazada' && p.comentariosAprobacion"
-                                class="mt-2 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-400"
-                            >
-                                Motivo: {{ p.comentariosAprobacion }}
+                            <p class="text-xs font-medium mb-1"
+                                :class="celda.iso === new Date().toISOString().split('T')[0] ? 'flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground' : ''">
+                                {{ celda.fecha.getDate() }}
                             </p>
 
-                            <!-- Acciones del que puede gestionar -->
-                            <div v-if="props.puedeGestionar && p.estado === 'enviada'" class="mt-3 flex gap-2">
-                                <Button size="sm" class="flex-1 bg-emerald-600 text-white hover:bg-emerald-700" @click="aprobar(p.id)">
-                                    <CheckCircle2 class="mr-1.5 size-3.5" />
-                                    Aprobar
-                                </Button>
-                                <Button size="sm" variant="outline" class="flex-1 border-red-300 text-red-600 hover:bg-red-50" @click="rechazar(p.id)">
-                                    <XCircle class="mr-1.5 size-3.5" />
-                                    Rechazar
-                                </Button>
+                            <!-- Mini-tarjetas de Planeación -->
+                            <div class="flex flex-col gap-1 overflow-y-auto max-h-[80px] scrollbar-hide">
+                                <div v-for="plan in celda.planes.slice(0, 3)" :key="plan.id"
+                                    @click.stop="abrirDetalle(plan)"
+                                    class="flex flex-col gap-0.5 rounded px-1.5 py-1 text-[10px] leading-tight border transition-colors hover:border-primary/50 cursor-pointer"
+                                    :class="estadoConfig[plan.estado].bg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-semibold truncate">{{ plan.residente?.split(' ')[0] }}</span>
+                                        <div class="size-1.5 rounded-full"
+                                            :class="estadoConfig[plan.estado].color.replace('text-', 'bg-')"></div>
+                                    </div>
+                                    <div class="w-full bg-background/50 rounded-full h-1 mt-0.5">
+                                        <div class="h-full rounded-full bg-primary"
+                                            :style="`width: ${porcentajeHoras(plan.horasProgramadas, plan.horasDisponibles)}%`">
+                                        </div>
+                                    </div>
+                                </div>
+                                <span v-if="celda.planes.length > 3"
+                                    class="text-[10px] text-muted-foreground text-center">
+                                    +{{ celda.planes.length - 3 }} más
+                                </span>
                             </div>
-                            <Button
-                                v-else-if="props.puedeGestionar && p.estado === 'aprobada' && !p.reportadaNomina"
-                                size="sm"
-                                variant="outline"
-                                class="mt-3 w-full"
-                                @click="reportarNomina(p.id)"
-                            >
-                                <Send class="mr-1.5 size-3.5" />
-                                Reportar a nómina
-                            </Button>
                         </div>
                     </div>
-
-                    <div v-else class="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
-                        <ClipboardList class="size-8" />
-                        <p>{{ rangoInicio ? 'Sin planeaciones en ese rango' : 'No hay planeaciones' }}</p>
-                        <Link v-if="props.puedeCrear" :href="PlaneacionController.create()">
-                            <Button size="sm" class="mt-1">Crear Planeación</Button>
-                        </Link>
-                    </div>
                 </div>
+
+                <!-- PANEL CONTEXTUAL (Aparece al seleccionar rango) -->
+                <transition enter-active-class="transition ease-out duration-200"
+                    enter-from-class="opacity-0 translate-x-4" enter-to-class="opacity-100 translate-x-0"
+                    leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-x-0"
+                    leave-to-class="opacity-0 translate-x-4">
+                    <div v-if="rangoInicio" class="flex flex-col gap-4 sticky top-6">
+                        <div class="rounded-2xl border bg-card p-5 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold flex items-center gap-2">
+                                    <CalendarIcon class="size-4 text-primary" />
+                                    Resumen
+                                </h3>
+                                <Button variant="ghost" size="icon" class="size-6 text-muted-foreground"
+                                    @click="rangoInicio = null; rangoFin = null">
+                                    <XCircle class="size-4" />
+                                </Button>
+                            </div>
+
+                            <p class="text-xs text-muted-foreground mb-4 border-b pb-4">
+                                Rango: <strong class="text-foreground">{{ rangoInicio }}</strong> al <strong
+                                    class="text-foreground">{{ rangoFin || rangoInicio }}</strong>
+                            </p>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="text-xs font-medium text-muted-foreground mb-1">Total Horas Programadas
+                                    </p>
+                                    <p class="text-2xl font-bold tracking-tight">342<span
+                                            class="text-sm font-normal text-muted-foreground">/400 disp.</span></p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="rounded-lg border bg-amber-50/50 p-2 dark:bg-amber-950/20">
+                                        <p class="text-xs text-amber-700 dark:text-amber-400">Pendientes</p>
+                                        <p class="text-lg font-semibold text-amber-700 dark:text-amber-400">12</p>
+                                    </div>
+                                    <div class="rounded-lg border bg-purple-50/50 p-2 dark:bg-purple-950/20">
+                                        <p class="text-xs text-purple-700 dark:text-purple-400">Incidencias</p>
+                                        <p class="text-lg font-semibold text-purple-700 dark:text-purple-400">3</p>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-t space-y-2">
+                                    <Button v-if="props.puedeGestionar"
+                                        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        @click="aprobarSeleccion">
+                                        <CheckCircle2 class="mr-2 size-4" /> Aprobar Pendientes
+                                    </Button>
+                                    <Button variant="outline" class="w-full" @click="exportarPDF">
+                                        <Download class="mr-2 size-4" /> Exportar PDF
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </transition>
             </div>
         </Deferred>
     </PageLayout>
+
+    <!-- MODAL: Detalle de Planeación -->
+    <Dialog v-model:open="modalDetalleAbierto">
+        <DialogContent class="sm:max-w-xl">
+            <DialogHeader>
+                <div class="flex items-center justify-between pr-6">
+                    <DialogTitle>Detalle de Planeación</DialogTitle>
+                    <Badge v-if="planeacionSeleccionada"
+                        :class="estadoConfig[planeacionSeleccionada.estado].bg + ' ' + estadoConfig[planeacionSeleccionada.estado].color">
+                        {{ estadoConfig[planeacionSeleccionada.estado].label }}
+                    </Badge>
+                </div>
+                <DialogDescription v-if="planeacionSeleccionada">
+                    {{ planeacionSeleccionada.fechaInicio }} • {{ planeacionSeleccionada.residente }}
+                </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="planeacionSeleccionada" class="space-y-6 py-2">
+                <!-- Info Contextual -->
+                <div class="grid grid-cols-2 gap-4 rounded-xl border bg-muted/30 p-4">
+                    <div>
+                        <p class="text-xs font-medium text-muted-foreground">Planta / Proyecto</p>
+                        <p class="text-sm font-medium mt-0.5">{{ planeacionSeleccionada.planta?.nombre }}</p>
+                        <Link v-if="planeacionSeleccionada.proyecto"
+                            :href="`/proyectos/${planeacionSeleccionada.proyecto.id}`"
+                            class="text-xs text-primary hover:underline flex items-center mt-1">
+                            <FileText class="mr-1 size-3" /> {{ planeacionSeleccionada.proyecto.folio }}
+                        </Link>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-muted-foreground">Desempeño de Horas</p>
+                        <div class="mt-1 flex items-end gap-1">
+                            <p class="text-xl font-bold">{{ planeacionSeleccionada.horasProgramadas }}</p>
+                            <p class="text-sm text-muted-foreground mb-0.5">/ {{ planeacionSeleccionada.horasDisponibles
+                                }}h
+                            </p>
+                        </div>
+                        <div class="w-full bg-secondary h-1.5 mt-1 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary"
+                                :style="`width: ${porcentajeHoras(planeacionSeleccionada.horasProgramadas, planeacionSeleccionada.horasDisponibles)}%`">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de Actividades (Mock) -->
+                <div>
+                    <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Clock class="size-4 text-muted-foreground" /> Actividades Planeadas
+                    </h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-start border-b pb-2 text-sm">
+                            <div>
+                                <p class="font-medium">Mantenimiento Preventivo Tableros</p>
+                                <p class="text-xs text-muted-foreground">Real vs Planeado detecta desviación de +2h.</p>
+                            </div>
+                            <span class="font-mono text-muted-foreground">4.5h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Incidencias -->
+                <div v-if="planeacionSeleccionada.incidencias?.length"
+                    class="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/20">
+                    <h4 class="text-xs font-semibold text-red-800 dark:text-red-400 flex items-center mb-1">
+                        <AlertCircle class="mr-1.5 size-3.5" /> Incidencias Reportadas
+                    </h4>
+                    <ul class="list-disc pl-5 text-xs text-red-700 dark:text-red-300">
+                        <li v-for="inc in planeacionSeleccionada.incidencias" :key="inc">{{ inc }}</li>
+                    </ul>
+                </div>
+
+                <!-- Comentarios (Rechazo) -->
+                <div v-if="props.puedeGestionar && planeacionSeleccionada.estado === 'enviada'" class="space-y-2">
+                    <Label>Comentario (Obligatorio para rechazar)</Label>
+                    <Textarea v-model="motivoRechazo" placeholder="Motivo de desviación o rechazo..." rows="2" />
+                </div>
+            </div>
+
+            <DialogFooter v-if="props.puedeGestionar && planeacionSeleccionada?.estado === 'enviada'">
+                <Button variant="outline" class="border-red-200 text-red-600 hover:bg-red-50" @click="rechazarPlan">
+                    Rechazar
+                </Button>
+                <Button class="bg-emerald-600 text-white hover:bg-emerald-700" @click="modalDetalleAbierto = false">
+                    Aprobar Planeación
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- MODAL: Configuración de Horarios -->
+    <Dialog v-model:open="modalConfigAbierto">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Horarios de Disponibilidad</DialogTitle>
+                <DialogDescription>Configura la entrada, salida y días laborales por Residente.</DialogDescription>
+            </DialogHeader>
+            <div class="space-y-4 py-4">
+                <!-- Mock de un selector de residente y su horario -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <Label>Hora de Entrada</Label>
+                        <Input type="time" value="08:00" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label>Hora de Salida</Label>
+                        <Input type="time" value="18:00" />
+                    </div>
+                </div>
+                <p class="text-[11px] text-amber-600 flex items-center bg-amber-50 p-2 rounded border border-amber-100">
+                    <AlertCircle class="size-3 mr-1" />
+                    Cambiar el horario afectará las métricas de carga en planeaciones futuras.
+                </p>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" @click="modalConfigAbierto = false">Cancelar</Button>
+                <Button @click="modalConfigAbierto = false">Guardar Horario</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>
