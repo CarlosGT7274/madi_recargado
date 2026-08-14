@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
+/**
+ * IVA fijo del sistema (ver Cotizacion::IVA_PORCENTAJE). Se muestra solo
+ * como referencia — el backend siempre lo calcula al 16% sobre el
+ * subtotal (Cotizacion::ivaCalculado()), así que no se captura ni se
+ * envía en el formulario.
+ */
+const IVA_PORCENTAJE = 16;
+
 interface PartidaManual {
     descripcion: string;
     unidad: string;
@@ -27,7 +35,9 @@ interface CotizacionManualFormData {
     obra: string;
     vendedor: string;
     proveedor: string;
-    iva: number;
+    tiempo_entrega: string;
+    dias_credito: string;
+    vigencia_cotizacion: string;
     notas: string;
     categorias: CategoriaManual[];
     [key: string]: string | number | CategoriaManual[];
@@ -57,7 +67,9 @@ const form = useForm<CotizacionManualFormData>({
     obra: '',
     vendedor: '',
     proveedor: '',
-    iva: 0,
+    tiempo_entrega: '',
+    dias_credito: '',
+    vigencia_cotizacion: '',
     notas: '',
     categorias: [categoriaVacia()],
 });
@@ -130,9 +142,26 @@ function guardar(): void {
                 <InputError :message="errorDe('proveedor')" />
             </div>
             <div class="grid gap-2">
-                <Label for="manual-iva">IVA</Label>
-                <Input id="manual-iva" type="number" min="0" step="0.01" v-model.number="form.iva" />
-                <InputError :message="errorDe('iva')" />
+                <Label for="manual-tiempo-entrega">Tiempo de entrega</Label>
+                <Input id="manual-tiempo-entrega" v-model="form.tiempo_entrega"
+                    placeholder="Ej. 07 días después de recibida la Orden de Compra" />
+                <InputError :message="errorDe('tiempo_entrega')" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="manual-dias-credito">Días de crédito</Label>
+                <Input id="manual-dias-credito" v-model="form.dias_credito" placeholder="Ej. 30 Días" />
+                <InputError :message="errorDe('dias_credito')" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="manual-vigencia">Vigencia de la cotización</Label>
+                <Input id="manual-vigencia" v-model="form.vigencia_cotizacion" placeholder="Ej. 15 Días" />
+                <InputError :message="errorDe('vigencia_cotizacion')" />
+            </div>
+            <div class="grid gap-2">
+                <Label>IVA</Label>
+                <p class="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                    {{ IVA_PORCENTAJE }}% fijo — se calcula automáticamente sobre el subtotal
+                </p>
             </div>
         </div>
 
@@ -158,20 +187,39 @@ function guardar(): void {
                     </Button>
                 </div>
 
+                <div v-if="categoria.partidas.length"
+                    class="mb-1 hidden grid-cols-[1fr_100px_100px_120px_36px] gap-2 px-0.5 sm:grid">
+                    <Label class="text-xs text-muted-foreground">Descripción</Label>
+                    <Label class="text-xs text-muted-foreground">Unidad</Label>
+                    <Label class="text-xs text-muted-foreground">Cantidad</Label>
+                    <Label class="text-xs text-muted-foreground">Precio unitario</Label>
+                    <span />
+                </div>
+
                 <div class="space-y-2">
                     <div v-for="(partida, indicePartida) in categoria.partidas" :key="indicePartida"
                         class="grid grid-cols-[1fr_100px_100px_120px_36px] items-start gap-2">
                         <div>
+                            <Label class="sr-only sm:hidden">Descripción</Label>
                             <Input v-model="partida.descripcion"
                                 :placeholder="`${indiceCategoria + 1}.${indicePartida + 1} Descripción`" />
                             <InputError
                                 :message="errorDe(`categorias.${indiceCategoria}.partidas.${indicePartida}.descripcion`)" />
                         </div>
-                        <Input v-model="partida.unidad" placeholder="Unidad" />
-                        <Input type="number" min="0.01" step="0.01" v-model.number="partida.cantidad"
-                            placeholder="Cant." />
-                        <Input type="number" min="0" step="0.01" v-model.number="partida.precio_unitario"
-                            placeholder="P. Unitario" />
+                        <div>
+                            <Label class="sr-only sm:hidden">Unidad</Label>
+                            <Input v-model="partida.unidad" placeholder="Unidad" />
+                        </div>
+                        <div>
+                            <Label class="sr-only sm:hidden">Cantidad</Label>
+                            <Input type="number" min="0.01" step="0.01" v-model.number="partida.cantidad"
+                                placeholder="Cant." />
+                        </div>
+                        <div>
+                            <Label class="sr-only sm:hidden">Precio unitario</Label>
+                            <Input type="number" min="0" step="0.01" v-model.number="partida.precio_unitario"
+                                placeholder="P. Unitario" />
+                        </div>
                         <Button type="button" variant="ghost" size="icon"
                             class="text-destructive hover:bg-destructive/10" :disabled="categoria.partidas.length <= 1"
                             @click="quitarPartida(indiceCategoria, indicePartida)">
