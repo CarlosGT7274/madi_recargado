@@ -103,9 +103,14 @@ function tipoVariant(tipo: string) {
     return 'secondary';
 }
 
+/**
+ * Mismos nombres que usa el selector de tipo en Create.vue
+ * ("Proyectos mayores" / "Proyectos menores") — antes decía
+ * "estándar/directo", que no correspondía con el resto de la UI.
+ */
 function tipoLabel(tipo: string) {
-    if (tipo === 'grande') return 'Proyecto estándar';
-    if (tipo === 'chico') return 'Proyecto directo';
+    if (tipo === 'grande') return 'Proyecto mayor';
+    if (tipo === 'chico') return 'Proyecto menor';
     return tipo;
 }
 
@@ -122,8 +127,8 @@ const filtroTipo = ref<FiltroTipo>('todos');
 
 const filtros: { value: FiltroTipo; label: string }[] = [
     { value: 'todos', label: 'Todos' },
-    { value: 'grande', label: 'Proyecto estándar' },
-    { value: 'chico', label: 'Proyecto directo' },
+    { value: 'grande', label: 'Proyectos mayores' },
+    { value: 'chico', label: 'Proyectos menores' },
 ];
 
 const proyectosFiltrados = computed(() => {
@@ -148,7 +153,8 @@ function contarPorTipo(tipo: FiltroTipo): number {
         <!-- Dialog: editar planta -->
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form :action="PlantaController.update(planta.id).url" :method="PlantaController.update(planta.id).method" :options="{ preserveScroll: true }"
+                <Form :action="PlantaController.update(planta.id).url"
+                    :method="PlantaController.update(planta.id).method" :options="{ preserveScroll: true }"
                     @success="editDialogOpen = false" v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Editar planta</DialogTitle>
@@ -263,7 +269,7 @@ function contarPorTipo(tipo: FiltroTipo): number {
                         :href="ProyectoController.show([planta.id, pry.id])"
                         class="group flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-sm transition-colors hover:bg-accent/50">
                         <div class="flex items-start justify-between gap-2">
-                            <div class="flex items-center gap-3">
+                            <div class="flex min-w-0 items-center gap-3">
                                 <div
                                     class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
                                     <FolderOpen class="size-5" />
@@ -279,12 +285,18 @@ function contarPorTipo(tipo: FiltroTipo): number {
                             </span>
                         </div>
 
-                        <div class="flex items-center justify-between text-xs text-muted-foreground">
-                            <Badge :variant="tipoVariant(pry.tipo)" class="gap-1 text-[10px]">
-                                <Layers class="size-3" />
-                                {{ tipoLabel(pry.tipo) }}
+                        <!--
+                            flex-wrap: si "Proyecto mayor/menor" + "Creado: fecha" no caben
+                            en una sola línea, baja el segundo a la línea siguiente en vez
+                            de desbordar la tarjeta (era lo que pasaba con "Proyecto estándar").
+                        -->
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <Badge :variant="tipoVariant(pry.tipo)" class="max-w-full gap-1 truncate text-[10px]">
+                                <Layers class="size-3 shrink-0" />
+                                <span class="truncate">{{ tipoLabel(pry.tipo) }}</span>
                             </Badge>
-                            <span>Creado: {{ pry.creado ?? '—' }}</span>
+                            <span class="shrink-0 whitespace-nowrap">Creado: {{ pry.creado ?? '—' }}</span>
                         </div>
                     </Link>
                 </div>
