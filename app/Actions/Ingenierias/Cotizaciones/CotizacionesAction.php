@@ -406,4 +406,31 @@ class CotizacionesAction
             ->flatMap(fn (Role $rol) => $rol->usuarios)
             ->values();
     }
+
+    public function listSeleccionablesProyecto(Proyecto $proyecto): Collection
+    {
+        return $proyecto->cotizaciones()
+            ->with(['archivos', 'insumos', 'partidas.asignaciones'])
+            ->latest('id')
+            ->get()
+            ->map(function (Cotizacion $c) {
+                $completada = $c->estaCompletada();
+                $tienePlaneacion = $c->partidas->contains(
+                    fn ($p) => $p->asignaciones->isNotEmpty()
+                );
+
+                return [
+                    'id' => $c->id,
+                    'folio' => $c->folio,
+                    'obra' => $c->obra,
+                    'fecha' => $c->fecha?->format('d/m/Y'),
+                    'total' => (float) $c->total,
+                    'flujo' => $c->esDeProyectoDirecto() ? 'chico' : 'grande',
+                    'completada' => $completada,
+                    'tienePlaneacion' => $tienePlaneacion,
+                    'seleccionable' => $completada,
+                ];
+            })
+            ->values();
+    }
 }

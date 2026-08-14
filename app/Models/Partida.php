@@ -64,4 +64,9 @@ class Partida extends Model
     {
         return $this->cotizacion_id === null;
     }
+
+    public function asignaciones(): HasMany
+    {
+        return $this->hasMany(PlaneacionAsignacion::class, 'partida_id');
+    }
 }

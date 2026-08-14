@@ -47,6 +47,10 @@ interface CotizacionAprobada {
     obra: string | null;
     fecha: string | null;
     total: number;
+    flujo: 'grande' | 'chico';
+    completada: boolean;
+    tienePlaneacion: boolean;
+    seleccionable: boolean;
 }
 
 interface PartidaDisponible {
@@ -71,9 +75,24 @@ interface AsignacionCronograma {
     horas: number;
 }
 
-type DiaSemana = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+type DiaSemana =
+    | 'lunes'
+    | 'martes'
+    | 'miercoles'
+    | 'jueves'
+    | 'viernes'
+    | 'sabado'
+    | 'domingo';
 
-const DIAS_ENUM: DiaSemana[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+const DIAS_ENUM: DiaSemana[] = [
+    'lunes',
+    'martes',
+    'miercoles',
+    'jueves',
+    'viernes',
+    'sabado',
+    'domingo',
+];
 const DIAS_LABEL: Record<DiaSemana, string> = {
     lunes: 'Lun',
     martes: 'Mar',
@@ -101,15 +120,35 @@ defineOptions({
 // ---------- Paso 1: Semana ----------
 
 const nombresMeses = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
 ];
 
-const semanaSeleccionada = ref<{ anio: number; semana: number }>(isoWeekInfo(new Date()));
-const mesCalendario = ref(lunesDeSemanaIso(semanaSeleccionada.value.anio, semanaSeleccionada.value.semana));
+const semanaSeleccionada = ref<{ anio: number; semana: number }>(
+    isoWeekInfo(new Date()),
+);
+const mesCalendario = ref(
+    lunesDeSemanaIso(
+        semanaSeleccionada.value.anio,
+        semanaSeleccionada.value.semana,
+    ),
+);
 
 const diasDeLaSemanaSeleccionada = computed(() =>
-    diasDeSemana(semanaSeleccionada.value.anio, semanaSeleccionada.value.semana),
+    diasDeSemana(
+        semanaSeleccionada.value.anio,
+        semanaSeleccionada.value.semana,
+    ),
 );
 
 function formatoFecha(fecha: Date): string {
@@ -121,7 +160,11 @@ function seleccionarSemanaDeFecha(fecha: Date): void {
 }
 
 function cambiarMesCalendario(delta: number): void {
-    mesCalendario.value = new Date(mesCalendario.value.getFullYear(), mesCalendario.value.getMonth() + delta, 1);
+    mesCalendario.value = new Date(
+        mesCalendario.value.getFullYear(),
+        mesCalendario.value.getMonth() + delta,
+        1,
+    );
 }
 
 function irASemanaActual(): void {
@@ -142,20 +185,28 @@ const celdasCalendario = computed<CeldaCalendario[]>(() => {
 
     const celdas: CeldaCalendario[] = [];
     for (let i = 0; i < inicioOffset; i++) celdas.push({ fecha: null });
-    for (let d = 1; d <= totalDias; d++) celdas.push({ fecha: new Date(anio, mes, d) });
+    for (let d = 1; d <= totalDias; d++)
+        celdas.push({ fecha: new Date(anio, mes, d) });
     return celdas;
 });
 
 function perteneceASemanaSeleccionada(fecha: Date | null): boolean {
     if (!fecha) return false;
     const info = isoWeekInfo(fecha);
-    return info.anio === semanaSeleccionada.value.anio && info.semana === semanaSeleccionada.value.semana;
+    return (
+        info.anio === semanaSeleccionada.value.anio &&
+        info.semana === semanaSeleccionada.value.semana
+    );
 }
 
 function esHoy(fecha: Date | null): boolean {
     if (!fecha) return false;
     const hoy = new Date();
-    return fecha.getFullYear() === hoy.getFullYear() && fecha.getMonth() === hoy.getMonth() && fecha.getDate() === hoy.getDate();
+    return (
+        fecha.getFullYear() === hoy.getFullYear() &&
+        fecha.getMonth() === hoy.getMonth() &&
+        fecha.getDate() === hoy.getDate()
+    );
 }
 
 // ---------- Paso 2: Planta / Proyecto ----------
@@ -194,7 +245,10 @@ async function onCambiarProyecto(v: string | null): Promise<void> {
     cargandoCotizaciones.value = true;
     try {
         const respuesta = await fetch(
-            PlaneacionController.cotizacionesAprobadas.url({ planta: plantaId.value, proyecto: proyectoId.value }),
+            PlaneacionController.cotizacionesAprobadas.url({
+                planta: plantaId.value,
+                proyecto: proyectoId.value,
+            }),
         );
         cotizaciones.value = (await respuesta.json()) as CotizacionAprobada[];
     } finally {
@@ -212,7 +266,12 @@ async function onCambiarCotizacion(v: string | null): Promise<void> {
     partidas.value = [];
     asignaciones.value = [];
 
-    if (plantaId.value === null || proyectoId.value === null || cotizacionId.value === null) return;
+    if (
+        plantaId.value === null ||
+        proyectoId.value === null ||
+        cotizacionId.value === null
+    )
+        return;
 
     cargandoPartidas.value = true;
     try {
@@ -246,7 +305,10 @@ onMounted(() => {
         onCambiarPlanta(String(plantaQuery));
 
         const proyectoQuery = Number(query.get('proyecto'));
-        if (proyectoQuery && proyectosDePlanta.value.some((p) => p.id === proyectoQuery)) {
+        if (
+            proyectoQuery &&
+            proyectosDePlanta.value.some((p) => p.id === proyectoQuery)
+        ) {
             onCambiarProyecto(String(proyectoQuery));
         }
     }
@@ -255,7 +317,10 @@ onMounted(() => {
 // ---------- Helpers ----------
 
 function formatoMoneda(valor: number): string {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
+    return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+    }).format(valor);
 }
 
 const cotizacionSeleccionada = computed(
@@ -264,7 +329,9 @@ const cotizacionSeleccionada = computed(
 
 const pasoProyectoHabilitado = computed(() => plantaId.value !== null);
 const pasoCotizacionHabilitado = computed(() => proyectoId.value !== null);
-const pasoCronogramaHabilitado = computed(() => cotizacionId.value !== null && partidas.value.length > 0);
+const pasoCronogramaHabilitado = computed(
+    () => cotizacionId.value !== null && partidas.value.length > 0,
+);
 
 // ---------- Cronograma: drag & drop empleado -> celda (partida x día) ----------
 
@@ -275,12 +342,19 @@ function empleadoPorId(id: number): EmpleadoOpcion | undefined {
     return props.empleados.find((e) => e.id === id);
 }
 
-function onDragStartEmpleado(evento: DragEvent, empleado: EmpleadoOpcion): void {
+function onDragStartEmpleado(
+    evento: DragEvent,
+    empleado: EmpleadoOpcion,
+): void {
     evento.dataTransfer?.setData('text/empleado-id', String(empleado.id));
     evento.dataTransfer!.effectAllowed = 'copy';
 }
 
-function onDropCelda(evento: DragEvent, partidaId: number, dia: DiaSemana): void {
+function onDropCelda(
+    evento: DragEvent,
+    partidaId: number,
+    dia: DiaSemana,
+): void {
     evento.preventDefault();
     const empleadoIdStr = evento.dataTransfer?.getData('text/empleado-id');
     if (!empleadoIdStr) return;
@@ -290,7 +364,10 @@ function onDropCelda(evento: DragEvent, partidaId: number, dia: DiaSemana): void
     if (!empleado) return;
 
     const yaExiste = asignaciones.value.some(
-        (a) => a.partidaId === partidaId && a.empleadoId === empleadoId && a.dia === dia,
+        (a) =>
+            a.partidaId === partidaId &&
+            a.empleadoId === empleadoId &&
+            a.dia === dia,
     );
     if (yaExiste) return;
 
@@ -304,8 +381,13 @@ function onDropCelda(evento: DragEvent, partidaId: number, dia: DiaSemana): void
     });
 }
 
-function celdaAsignaciones(partidaId: number, dia: DiaSemana): AsignacionCronograma[] {
-    return asignaciones.value.filter((a) => a.partidaId === partidaId && a.dia === dia);
+function celdaAsignaciones(
+    partidaId: number,
+    dia: DiaSemana,
+): AsignacionCronograma[] {
+    return asignaciones.value.filter(
+        (a) => a.partidaId === partidaId && a.dia === dia,
+    );
 }
 
 function quitarAsignacion(id: string): void {
@@ -316,7 +398,9 @@ const totalHorasCronograma = computed(() =>
     asignaciones.value.reduce((suma, a) => suma + (Number(a.horas) || 0), 0),
 );
 
-const empleadosInvolucrados = computed(() => new Set(asignaciones.value.map((a) => a.empleadoId)).size);
+const empleadosInvolucrados = computed(
+    () => new Set(asignaciones.value.map((a) => a.empleadoId)).size,
+);
 
 // ---------- Guardar / enviar a aprobación ----------
 
@@ -346,19 +430,25 @@ function guardar(enviarAprobacion: boolean): void {
     }
 
     if (asignaciones.value.length === 0) {
-        errorGuardado.value = 'Arrastra al menos un empleado a una actividad para construir el cronograma.';
+        errorGuardado.value =
+            'Arrastra al menos un empleado a una actividad para construir el cronograma.';
         return;
     }
 
     guardando.value = true;
 
     router.post(
-        PlaneacionController.store.url({ planta: plantaId.value, proyecto: proyectoId.value }),
+        PlaneacionController.store.url({
+            planta: plantaId.value,
+            proyecto: proyectoId.value,
+        }),
         construirPayload(enviarAprobacion),
         {
             preserveScroll: true,
             onError: (errores) => {
-                errorGuardado.value = Object.values(errores)[0] as string ?? 'No se pudo guardar la planeación.';
+                errorGuardado.value =
+                    (Object.values(errores)[0] as string) ??
+                    'No se pudo guardar la planeación.';
             },
             onFinish: () => {
                 guardando.value = false;
@@ -403,7 +493,8 @@ function guardar(enviarAprobacion: boolean): void {
                             <ChevronLeft class="size-3.5" />
                         </button>
                         <p class="text-[11px] font-medium capitalize">
-                            {{ nombresMeses[mesCalendario.getMonth()] }} {{ mesCalendario.getFullYear() }}
+                            {{ nombresMeses[mesCalendario.getMonth()] }}
+                            {{ mesCalendario.getFullYear() }}
                         </p>
                         <button type="button" class="rounded-md p-1 hover:bg-accent" @click="cambiarMesCalendario(1)">
                             <ChevronRight class="size-3.5" />
@@ -419,9 +510,17 @@ function guardar(enviarAprobacion: boolean): void {
                             class="relative flex aspect-square items-center justify-center rounded text-[11px] transition-colors disabled:cursor-default"
                             :class="[
                                 !celda.fecha ? 'invisible' : '',
-                                celda.fecha && !perteneceASemanaSeleccionada(celda.fecha) ? 'hover:bg-accent' : '',
-                                perteneceASemanaSeleccionada(celda.fecha) ? 'bg-primary/15' : '',
-                            ]" @click="celda.fecha && seleccionarSemanaDeFecha(celda.fecha)">
+                                celda.fecha &&
+                                    !perteneceASemanaSeleccionada(celda.fecha)
+                                    ? 'hover:bg-accent'
+                                    : '',
+                                perteneceASemanaSeleccionada(celda.fecha)
+                                    ? 'bg-primary/15'
+                                    : '',
+                            ]" @click="
+                                celda.fecha &&
+                                seleccionarSemanaDeFecha(celda.fecha)
+                                ">
                             {{ celda.fecha?.getDate() }}
                             <span v-if="esHoy(celda.fecha)"
                                 class="absolute inset-x-1.5 bottom-0.5 h-0.5 rounded-full bg-primary" />
@@ -429,8 +528,11 @@ function guardar(enviarAprobacion: boolean): void {
                     </div>
 
                     <p class="mt-2 rounded-lg bg-muted/40 px-2 py-1.5 text-center text-[11px] font-medium">
-                        Semana {{ semanaSeleccionada.semana }}/{{ semanaSeleccionada.anio }} ·
-                        {{ formatoFecha(diasDeLaSemanaSeleccionada[0]) }}–{{ formatoFecha(diasDeLaSemanaSeleccionada[6])
+                        Semana {{ semanaSeleccionada.semana }}/{{
+                            semanaSeleccionada.anio
+                        }}
+                        · {{ formatoFecha(diasDeLaSemanaSeleccionada[0]) }}–{{
+                            formatoFecha(diasDeLaSemanaSeleccionada[6])
                         }}
                     </p>
                 </div>
@@ -447,8 +549,10 @@ function guardar(enviarAprobacion: boolean): void {
                     <div class="space-y-3">
                         <div class="grid gap-1.5">
                             <label class="text-[11px] font-medium text-muted-foreground">Planta</label>
-                            <Select :model-value="plantaId ? String(plantaId) : undefined"
-                                @update:model-value="(v) => onCambiarPlanta(v as string | null)">
+                            <Select :model-value="plantaId ? String(plantaId) : undefined
+                                " @update:model-value="
+                                    (v) => onCambiarPlanta(v as string | null)
+                                ">
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona una planta" />
                                 </SelectTrigger>
@@ -462,12 +566,15 @@ function guardar(enviarAprobacion: boolean): void {
 
                         <div class="grid gap-1.5">
                             <label class="text-[11px] font-medium text-muted-foreground">Proyecto</label>
-                            <Select :model-value="proyectoId ? String(proyectoId) : undefined"
-                                :disabled="!pasoProyectoHabilitado"
-                                @update:model-value="(v) => onCambiarProyecto(v as string | null)">
+                            <Select :model-value="proyectoId ? String(proyectoId) : undefined
+                                " :disabled="!pasoProyectoHabilitado" @update:model-value="
+                                    (v) => onCambiarProyecto(v as string | null)
+                                ">
                                 <SelectTrigger>
-                                    <SelectValue
-                                        :placeholder="pasoProyectoHabilitado ? 'Selecciona un proyecto' : 'Primero una planta'" />
+                                    <SelectValue :placeholder="pasoProyectoHabilitado
+                                            ? 'Selecciona un proyecto'
+                                            : 'Primero una planta'
+                                        " />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem v-for="p in proyectosDePlanta" :key="p.id" :value="String(p.id)">
@@ -489,34 +596,68 @@ function guardar(enviarAprobacion: boolean): void {
                         <p class="text-xs font-semibold">Cotización aprobada</p>
                     </div>
 
-                    <Select :model-value="cotizacionId ? String(cotizacionId) : undefined"
-                        :disabled="!pasoCotizacionHabilitado || cargandoCotizaciones"
-                        @update:model-value="(v) => onCambiarCotizacion(v as string | null)">
-                        <SelectTrigger class="w-full">
-                            <SelectValue :placeholder="!pasoCotizacionHabilitado
-                                ? 'Primero un proyecto'
-                                : cargandoCotizaciones
-                                    ? 'Cargando…'
-                                    : 'Selecciona una cotización'
-                                " />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="c in cotizaciones" :key="c.id" :value="String(c.id)">
-                                {{ c.folio }} — {{ c.obra ?? 'Sin nombre de obra' }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div v-if="!pasoCotizacionHabilitado" class="py-6 text-center text-xs text-muted-foreground">
+                        Primero un proyecto
+                    </div>
 
-                    <p v-if="pasoCotizacionHabilitado && !cargandoCotizaciones && !cotizaciones.length"
-                        class="mt-2 text-[11px] text-muted-foreground">
-                        Este proyecto no tiene cotizaciones aprobadas todavía.
-                    </p>
+                    <div v-else-if="cargandoCotizaciones" class="py-6 text-center text-xs text-muted-foreground">
+                        Cargando…
+                    </div>
 
-                    <div v-if="cotizacionSeleccionada"
-                        class="mt-2 flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1.5 text-[11px] text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400">
-                        <CheckCircle2 class="size-3.5 shrink-0" />
-                        <span>{{ cotizacionSeleccionada.fecha ?? '—' }} · {{ formatoMoneda(cotizacionSeleccionada.total)
-                            }}</span>
+                    <div v-else-if="!cotizaciones.length" class="py-6 text-center text-xs text-muted-foreground">
+                        Este proyecto no tiene cotizaciones todavía.
+                    </div>
+
+                    <div v-else class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                        <button v-for="c in cotizaciones" :key="c.id" type="button" :disabled="!c.seleccionable"
+                            :LspInfo class="w-full rounded-lg border p-3 text-left transition-colors" :class="[
+                                cotizacionId === c.id
+                                    ? 'border-primary bg-primary/5'
+                                    : 'hover:bg-accent',
+                                !c.seleccionable
+                                    ? 'cursor-not-allowed opacity-50'
+                                    : 'cursor-pointer',
+                            ]" @click="
+                                c.seleccionable &&
+                                onCambiarCotizacion(String(c.id))
+                                ">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="truncate text-sm font-medium">
+                                    {{ c.folio }} —
+                                    {{ c.obra ?? 'Sin nombre de obra' }}
+                                </p>
+                                <CheckCircle2 v-if="cotizacionId === c.id" class="size-4 shrink-0 text-primary" />
+                            </div>
+
+                            <div class="mt-1.5 flex flex-wrap gap-1.5">
+                                <span
+                                    class="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                    {{
+                                        c.flujo === 'grande'
+                                            ? 'Flujo grande'
+                                            : 'Flujo pequeño'
+                                    }}
+                                </span>
+                                <span class="rounded-full px-2 py-0.5 text-[10px] font-medium" :class="c.completada
+                                        ? 'bg-emerald-500/10 text-emerald-600'
+                                        : 'bg-amber-500/10 text-amber-600'
+                                    ">
+                                    {{
+                                        c.completada
+                                            ? 'Completada'
+                                            : 'Sin completar'
+                                    }}
+                                </span>
+                                <span v-if="c.tienePlaneacion"
+                                    class="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-600">
+                                    Ya tiene planeación
+                                </span>
+                            </div>
+
+                            <p v-if="c.fecha" class="mt-1.5 text-[11px] text-muted-foreground">
+                                {{ c.fecha }} · {{ formatoMoneda(c.total) }}
+                            </p>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -529,17 +670,21 @@ function guardar(enviarAprobacion: boolean): void {
                         <span
                             class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">4</span>
                         <Boxes class="size-4 text-muted-foreground" />
-                        <p class="text-sm font-semibold">Cronograma de la semana</p>
+                        <p class="text-sm font-semibold">
+                            Cronograma de la semana
+                        </p>
                     </div>
                     <div v-if="asignaciones.length" class="flex items-center gap-3 text-[11px] text-muted-foreground">
-                        <span>{{ totalHorasCronograma.toFixed(1) }}h programadas</span>
+                        <span>{{ totalHorasCronograma.toFixed(1) }}h
+                            programadas</span>
                         <span>·</span>
                         <span>{{ empleadosInvolucrados }} empleados</span>
                     </div>
                 </div>
 
                 <div v-if="!pasoCronogramaHabilitado" class="py-10 text-center text-sm text-muted-foreground">
-                    Selecciona una cotización aprobada con partidas para construir el cronograma.
+                    Selecciona una cotización aprobada con partidas para
+                    construir el cronograma.
                 </div>
 
                 <div v-else-if="cargandoPartidas" class="py-10 text-center text-sm text-muted-foreground">
@@ -551,17 +696,21 @@ function guardar(enviarAprobacion: boolean): void {
                     <div class="mb-4 rounded-xl border bg-muted/30 p-3">
                         <p class="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                             <UserIcon class="size-3.5" />
-                            Arrastra un empleado sobre una celda del cronograma para asignarlo
+                            Arrastra un empleado sobre una celda del cronograma
+                            para asignarlo
                         </p>
                         <div class="flex flex-wrap gap-2">
-                            <div v-for="empleado in props.empleados" :key="empleado.id" draggable="true"
-                                @dragstart="onDragStartEmpleado($event, empleado)"
+                            <div v-for="empleado in props.empleados" :key="empleado.id" draggable="true" @dragstart="
+                                onDragStartEmpleado($event, empleado)
+                                "
                                 class="flex cursor-grab items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing">
                                 <span
                                     class="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                                     {{ empleado.nombre.charAt(0) }}
                                 </span>
-                                <span class="font-medium">{{ empleado.nombre }}</span>
+                                <span class="font-medium">{{
+                                    empleado.nombre
+                                    }}</span>
                                 <span v-if="empleado.puesto" class="text-muted-foreground">· {{ empleado.puesto
                                     }}</span>
                             </div>
@@ -573,39 +722,65 @@ function guardar(enviarAprobacion: boolean): void {
                         <table class="w-full min-w-[720px] border-collapse text-xs">
                             <thead>
                                 <tr class="bg-muted/50">
-                                    <th class="w-56 border-b px-3 py-2 text-left font-semibold">Actividad</th>
-                                    <th v-for="(dia, i) in diasDeLaSemanaSeleccionada" :key="i"
+                                    <th class="w-56 border-b px-3 py-2 text-left font-semibold">
+                                        Actividad
+                                    </th>
+                                    <th v-for="(
+dia, i
+                                        ) in diasDeLaSemanaSeleccionada" :key="i"
                                         class="border-b border-l px-2 py-2 text-center font-semibold">
-                                        <div>{{ DIAS_LABEL[DIAS_ENUM[i]] }}</div>
-                                        <div class="text-[10px] font-normal text-muted-foreground">{{ formatoFecha(dia)
-                                            }}</div>
+                                        <div>
+                                            {{ DIAS_LABEL[DIAS_ENUM[i]] }}
+                                        </div>
+                                        <div class="text-[10px] font-normal text-muted-foreground">
+                                            {{ formatoFecha(dia) }}
+                                        </div>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="partida in partidas" :key="partida.id" class="align-top">
                                     <td class="border-b px-3 py-2">
-                                        <p class="font-medium leading-snug">{{ partida.descripcion }}</p>
+                                        <p class="leading-snug font-medium">
+                                            {{ partida.descripcion }}
+                                        </p>
                                         <p v-if="partida.unidad" class="text-[10px] text-muted-foreground">
-                                            {{ partida.cantidad }} {{ partida.unidad }}
+                                            {{ partida.cantidad }}
+                                            {{ partida.unidad }}
                                         </p>
                                     </td>
-                                    <td v-for="(dia, i) in diasDeLaSemanaSeleccionada" :key="i"
-                                        class="min-w-[110px] border-b border-l p-1 align-top" @dragover.prevent
-                                        @drop="onDropCelda($event, partida.id, DIAS_ENUM[i])">
+                                    <td v-for="(
+dia, i
+                                        ) in diasDeLaSemanaSeleccionada" :key="i"
+                                        class="min-w-[110px] border-b border-l p-1 align-top" @dragover.prevent @drop="
+                                            onDropCelda(
+                                                $event,
+                                                partida.id,
+                                                DIAS_ENUM[i],
+                                            )
+                                            ">
                                         <div
                                             class="flex min-h-[52px] flex-col gap-1 rounded-lg border border-dashed border-transparent p-1 transition-colors hover:border-primary/40 hover:bg-primary/5">
-                                            <div v-for="a in celdaAsignaciones(partida.id, DIAS_ENUM[i])" :key="a.id"
+                                            <div v-for="a in celdaAsignaciones(
+                                                partida.id,
+                                                DIAS_ENUM[i],
+                                            )" :key="a.id"
                                                 class="flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-1">
                                                 <span class="min-w-0 flex-1 truncate font-medium text-primary">
-                                                    {{ a.empleadoNombre.split(' ')[0] }}
+                                                    {{
+                                                        a.empleadoNombre.split(
+                                                            ' ',
+                                                        )[0]
+                                                    }}
                                                 </span>
                                                 <Input type="number" v-model.number="a.horas" min="0.5" max="24"
                                                     step="0.5"
                                                     class="h-6 w-12 border-none bg-background px-1 text-center text-[11px]" />
                                                 <button type="button"
                                                     class="shrink-0 text-muted-foreground hover:text-destructive"
-                                                    @click="quitarAsignacion(a.id)">
+                                                    @click="
+                                                        quitarAsignacion(a.id)
+                                                        ">
                                                     <Trash2 class="size-3" />
                                                 </button>
                                             </div>
@@ -621,7 +796,9 @@ function guardar(enviarAprobacion: boolean): void {
             <!-- Acciones finales -->
             <div
                 class="flex flex-col items-end gap-2 rounded-2xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-end">
-                <p v-if="errorGuardado" class="mr-auto text-xs text-destructive">{{ errorGuardado }}</p>
+                <p v-if="errorGuardado" class="mr-auto text-xs text-destructive">
+                    {{ errorGuardado }}
+                </p>
                 <Button variant="outline" :disabled="guardando || !pasoCronogramaHabilitado" @click="guardar(false)">
                     Guardar borrador
                 </Button>

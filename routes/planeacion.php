@@ -24,6 +24,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('planeaciones.index');
             Route::post('/planeaciones', [PlaneacionController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('planeaciones.store');
+            Route::get('/cotizaciones-aprobadas', [PlaneacionController::class, 'cotizacionesAprobadas'])
+                ->middleware('permiso:'.Accion::READ)->name('cotizaciones-aprobadas');
+            Route::get('/cotizaciones/{cotizacion}/partidas', [PlaneacionController::class, 'partidasDeCotizacion'])
+                ->middleware('permiso:'.Accion::READ)->name('cotizaciones.partidas');
         });
 
     Route::name('ingenierias.planeacion.')
@@ -34,11 +38,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/', [PlaneacionController::class, 'destroy'])
                 ->middleware('permiso:'.Accion::DELETE)->name('destroy');
             Route::post('/enviar', [PlaneacionController::class, 'enviar'])
-                ->middleware('permiso:enviar')->name('enviar');
+                ->middleware('permiso:'.Accion::UPDATE)->name('enviar');
             Route::post('/aprobar', [PlaneacionController::class, 'aprobar'])
                 ->middleware('permiso:aprobar')->name('aprobar');
             Route::post('/rechazar', [PlaneacionController::class, 'rechazar'])
-                ->middleware('permiso:rechazar')->name('rechazar');
+                ->middleware('permiso:aprobar')->name('rechazar');
             Route::patch('/cronograma', [PlaneacionController::class, 'actualizarCronograma'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('cronograma.update');
             Route::post('/reportar-nomina', [PlaneacionController::class, 'reportarNomina'])

@@ -207,7 +207,7 @@ class PlaneacionController extends Controller
 
     public function cotizacionesAprobadas(Planta $planta, Proyecto $proyecto, CotizacionesAction $action): JsonResponse
     {
-        return response()->json($action->listAprobadasProyecto($proyecto));
+        return response()->json($action->listSeleccionablesProyecto($proyecto));
     }
 
     public function partidasDeCotizacion(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, PartidasAction $action): JsonResponse

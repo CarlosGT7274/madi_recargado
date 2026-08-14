@@ -102,6 +102,8 @@ class PlaneacionesAction
                 ? $p->asignaciones->pluck('partida')->filter()->unique('id')
                     ->map(fn ($pa) => ['id' => $pa->id, 'descripcion' => $pa->descripcion])->values()->all()
                 : [],
+            'puedeEditar' => $p->usuario_id === Auth::id()
+                && in_array($p->estado, ['borrador', 'rechazada'], true),
         ];
     }
 
@@ -233,6 +235,7 @@ class PlaneacionesAction
     public function enviar(Planeacion $planeacion): Planeacion
     {
         abort_unless($planeacion->estado === 'borrador', 422, 'Solo una planeación en borrador puede enviarse.');
+        abort_unless($planeacion->usuario_id === Auth::id(), 403, 'Solo el residente que la creó puede enviarla.');
 
         $planeacion->update(['estado' => 'enviada', 'fecha_envio' => now()]);
 

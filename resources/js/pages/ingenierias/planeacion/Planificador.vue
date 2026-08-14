@@ -692,6 +692,13 @@ function reportarNomina(id: number): void {
                                         </span>
                                     </div>
 
+                                    <Link v-if="p.puedeEditar" :href="PlaneacionController.show(p.id)">
+                                        <Button size="sm" variant="outline" class="h-7 w-full text-xs" @click.stop>
+                                            <Pencil class="mr-1 size-3" />
+                                            Editar
+                                        </Button>
+                                    </Link>
+
                                     <div v-if="p.estado === 'enviada' && props.puedeAprobar" class="mt-2 flex gap-2">
                                         <Button size="sm"
                                             class="h-7 flex-1 bg-emerald-600 text-xs text-white hover:bg-emerald-700"
