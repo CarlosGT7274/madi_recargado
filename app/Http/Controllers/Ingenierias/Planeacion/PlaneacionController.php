@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Ingenierias\Planeacion;
 
-use App\Actions\Ingenierias\Actividades\ActividadesAction;
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Actions\Ingenierias\Planeacion\PlaneacionAsignacionesAction;
@@ -103,15 +102,6 @@ class PlaneacionController extends Controller
         ]);
     }
 
-    /**
-     * Guarda la Planeación (con su cronograma de asignaciones, si lo trae)
-     * y, cuando el front manda `enviar_aprobacion=true` (botón "Guardar y
-     * enviar a aprobación" de Create.vue), encadena PlaneacionesAction::enviar()
-     * en la misma request — que ya deja el estado en 'enviada' y notifica
-     * a los ingenieros de la planta vía el sistema de notificaciones
-     * (broadcast NotificacionCreada) existente. No se inventa ningún
-     * mecanismo nuevo de notificación aquí.
-     */
     public function store(StorePlaneacionRequest $request, Planta $planta, Proyecto $proyecto, PlaneacionesAction $action): RedirectResponse
     {
         $planeacion = $action->create($proyecto, $request->validated());
@@ -127,16 +117,24 @@ class PlaneacionController extends Controller
         return redirect()->route('ingenierias.planeacion.show', $planeacion->id);
     }
 
+    /**
+     * Detalle real: planta/proyecto, semana/rango, estado, comentarios de
+     * aprobación, y el cronograma completo (partida -> día -> empleados
+     * con horas), agrupado por PlaneacionAsignacionesAction — misma
+     * Action que ya alimentaba el cronograma en Create.vue, reutilizada
+     * aquí en modo lectura para Show.vue.
+     */
     public function show(
         Planeacion $planeacion,
         PlaneacionesAction $action,
         PlaneacionAsignacionesAction $asignacionesAction,
-        ActividadesAction $actividadesAction,
     ): Response {
+        $usuario = request()->user();
+
         return Inertia::render('ingenierias/planeacion/Show', [
             'planeacion' => $action->detail($planeacion),
-            'asignaciones' => $asignacionesAction->listAgrupadoPorPartida($planeacion),
-            'partidasDisponibles' => $actividadesAction->arbol($planeacion->proyecto),
+            'cronograma' => $asignacionesAction->listAgrupadoPorDia($planeacion),
+            'puedeAprobar' => $action->puedeAprobar($usuario),
         ]);
     }
 

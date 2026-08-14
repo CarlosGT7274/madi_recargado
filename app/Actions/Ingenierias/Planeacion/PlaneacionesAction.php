@@ -3,9 +3,11 @@
 namespace App\Actions\Ingenierias\Planeacion;
 
 use App\Actions\Notificaciones\NotificacionesAction;
+use App\Models\Permiso;
 use App\Models\Planeacion;
 use App\Models\Planta;
 use App\Models\Proyecto;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -103,11 +105,17 @@ class PlaneacionesAction
         ];
     }
 
+    /**
+     * Fuente única del calendario anual del Supervisor (Planificador.vue).
+     * Para un supervisor, trae TODAS las planeaciones de las plantas que
+     * tiene asignadas (plantasAsignadas()), sin filtrar por usuario_id —
+     * es justamente lo que le permite ver lo que le llega a supervisar,
+     * no solo lo propio. Para alguien sin permiso de supervisar, cae en
+     * lo mismo que MisPlaneaciones.vue: solo lo suyo.
+     */
     public function listVistaGeneral(User $usuario): Collection
     {
-        $query = $this->puedeSupervisar($usuario)
-            ? Planeacion::whereIn('planta_id', $usuario->plantasAsignadas()->pluck('plantas.id'))
-            : Planeacion::where('usuario_id', $usuario->id);
+        $query = $this->puedeSupervisar($usuario) ? Planeacion::query() : Planeacion::where('usuario_id', $usuario->id);
 
         return $query
             ->with([
@@ -163,6 +171,8 @@ class PlaneacionesAction
             'estado' => $planeacion->estado,
             'reportadaNomina' => $planeacion->reportada_nomina,
             'fechaReporteNomina' => $planeacion->fecha_reporte_nomina?->format('d/m/Y H:i'),
+            'fechaInicio' => $planeacion->fechaInicio()->format('Y-m-d'),
+            'fechaFin' => $planeacion->fechaFin()->format('Y-m-d'),
             'fechaEnvio' => $planeacion->fecha_envio?->format('d/m/Y H:i'),
             'fechaAprobacion' => $planeacion->fecha_aprobacion?->format('d/m/Y H:i'),
             'fechaRechazo' => $planeacion->fecha_rechazo?->format('d/m/Y H:i'),
@@ -179,17 +189,11 @@ class PlaneacionesAction
                 'firmaUrl' => $planeacion->usuario?->firma_url,
             ],
             'aprobador' => $planeacion->aprobador?->name,
+            'puedeEnviar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
+            'puedeEliminar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
         ];
     }
 
-    /**
-     * Crea la Planeación en 'borrador' y, si el cronograma armado en
-     * Create.vue trae asignaciones (empleado x partida x día x horas),
-     * las persiste de una vez como PlaneacionAsignacion. Antes de este
-     * fix, 'asignaciones' venía en $data pero Planeacion no lo tiene en
-     * $fillable, así que Eloquent lo ignoraba y el cronograma capturado
-     * nunca se guardaba.
-     */
     public function create(Proyecto $proyecto, array $data): Planeacion
     {
         $existente = $proyecto->planeaciones()
@@ -232,7 +236,10 @@ class PlaneacionesAction
 
         $planeacion->update(['estado' => 'enviada', 'fecha_envio' => now()]);
 
-        $this->notificarIngenieros($planeacion, "La planeación de {$planeacion->proyecto->nombre} (semana {$planeacion->semana}/{$planeacion->anio}) fue enviada para revisión.");
+        $this->notificarSupervisores(
+            $planeacion,
+            "La planeación de {$planeacion->proyecto->nombre} (semana {$planeacion->semana}/{$planeacion->anio}) fue enviada para revisión."
+        );
 
         return $planeacion->fresh();
     }
@@ -301,16 +308,60 @@ class PlaneacionesAction
         $planeacion->delete();
     }
 
-    private function notificarIngenieros(Planeacion $planeacion, string $mensaje): void
+    /**
+     * Reemplaza al antiguo notificarIngenieros() (planta->ingenieros: una
+     * simple pivot sin ninguna verificación de permiso). El destinatario
+     * correcto de "enviada a aprobación" es quien de verdad puede
+     * supervisar/aprobar esta Planeación: usuarios con la operación
+     * `supervisar` en el permiso `ingenierias.planeacion` (mismo objeto
+     * que valida Role::tienePermiso()/puedePorEndpoint() en el resto del
+     * módulo), acotados a la planta de la Planeación vía
+     * plantasAsignadas() — el mismo criterio de alcance que ya usa
+     * PlaneacionesAction::listVistaGeneral()/filtrosDisponibles() para
+     * decidir qué ve un supervisor.
+     *
+     * Reutiliza NotificacionesAction::crearParaUsuarios(), que ya hace el
+     * broadcast(new NotificacionCreada(...)) por WebSocket — no se crea
+     * ningún canal, evento ni tabla nueva.
+     */
+    private function notificarSupervisores(Planeacion $planeacion, string $mensaje): void
     {
-        $planeacion->loadMissing('planta.ingenieros');
+        $supervisores = $this->supervisoresDe($planeacion);
 
-        $this->notificaciones->crearParaUsuarios($planeacion->planta->ingenieros, [
+        if ($supervisores->isEmpty()) {
+            return;
+        }
+
+        $this->notificaciones->crearParaUsuarios($supervisores, [
             'mensaje' => $mensaje,
             'destino_area' => 'planeacion',
             'modulo' => 'ingenierias.planeacion',
             'tipo_entidad' => 'planeacion',
             'entidad_id' => $planeacion->id,
         ]);
+    }
+
+    /**
+     * Usuarios que pueden supervisar ESTA Planeación: tienen operación
+     * `supervisar` sobre el permiso `ingenierias.planeacion` (vía algún
+     * rol que se la conceda) Y tienen la planta de la Planeación entre
+     * sus plantasAsignadas().
+     */
+    private function supervisoresDe(Planeacion $planeacion): Collection
+    {
+        $permiso = Permiso::whereHas('padre', fn ($q) => $q->where('endpoint', 'ingenierias'))
+            ->where('endpoint', 'planeacion')
+            ->first();
+
+        if ($permiso === null) {
+            return collect();
+        }
+
+        return Role::with('usuarios')
+            ->get()
+            ->filter(fn (Role $rol) => $rol->tieneOperacion($permiso, 'supervisar'))
+            ->flatMap(fn (Role $rol) => $rol->usuarios)
+            ->unique('id')
+            ->values();
     }
 }

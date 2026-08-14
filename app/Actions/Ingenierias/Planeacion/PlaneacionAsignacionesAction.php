@@ -9,6 +9,8 @@ use Illuminate\Support\Collection;
 
 class PlaneacionAsignacionesAction
 {
+    private const ORDEN_DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+
     public function __construct(
         private readonly PlaneacionIncidenciasAction $incidencias,
     ) {}
@@ -34,6 +36,50 @@ class PlaneacionAsignacionesAction
                         'descripcion' => $partida->descripcion,
                     ],
                     'asignaciones' => $grupo->map(fn (PlaneacionAsignacion $a) => $this->resumen($a))->values(),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Vista "calendario" para el detalle del Supervisor (Show.vue):
+     * partida -> día de la semana -> lista de empleados con sus horas.
+     * Misma fuente de datos que listAgrupadoPorPartida(), reorganizada
+     * para que el detalle pueda mostrar día y horario de cada actividad,
+     * como pide la Tarea 5, sin duplicar la consulta a la BD.
+     */
+    public function listAgrupadoPorDia(Planeacion $planeacion): Collection
+    {
+        $asignaciones = $planeacion->asignaciones()
+            ->with('partida', 'empleado', 'incidencias')
+            ->get();
+
+        return $asignaciones
+            ->groupBy('partida_id')
+            ->map(function (Collection $grupo) {
+                $partida = $grupo->first()->partida;
+
+                $dias = $grupo
+                    ->groupBy('dia_semana')
+                    ->map(function (Collection $porDia, string $dia) {
+                        return [
+                            'dia' => $dia,
+                            'horasTotal' => (float) $porDia->sum('horas_trabajadas'),
+                            'empleados' => $porDia->map(fn (PlaneacionAsignacion $a) => $this->resumen($a))->values(),
+                        ];
+                    })
+                    ->sortBy(fn (array $d) => array_search($d['dia'], self::ORDEN_DIAS, true))
+                    ->values();
+
+                return [
+                    'partida' => [
+                        'id' => $partida->id,
+                        'descripcion' => $partida->descripcion,
+                        'unidad' => $partida->unidad,
+                        'cantidad' => (float) $partida->cantidad,
+                    ],
+                    'horasTotal' => (float) $grupo->sum('horas_trabajadas'),
+                    'dias' => $dias,
                 ];
             })
             ->values();
@@ -81,11 +127,6 @@ class PlaneacionAsignacionesAction
         ]);
     }
 
-    /**
-     * Si cambia día u horas extra respecto al valor anterior, registra la
-     * incidencia correspondiente automáticamente — el residente no
-     * necesita un paso separado para que quede en el historial.
-     */
     public function update(PlaneacionAsignacion $asignacion, array $data, ?string $motivo = null): PlaneacionAsignacion
     {
         $diaAnterior = $asignacion->dia_semana;
