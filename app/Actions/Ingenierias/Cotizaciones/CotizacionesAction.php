@@ -182,7 +182,9 @@ class CotizacionesAction
             'cliente' => $cotizacion->cliente,
             'direccion' => $cotizacion->direccion,
             'obra' => $cotizacion->obra,
+            'para' => $cotizacion->para,                     // <- nuevo
             'vendedor' => $cotizacion->vendedor,
+            'correoVendedor' => $cotizacion->correo_vendedor, // <- nuevo
             'proveedor' => $cotizacion->proveedor,
             'subtotal' => $cotizacion->subtotal,
             'iva' => $cotizacion->ivaCalculado(),

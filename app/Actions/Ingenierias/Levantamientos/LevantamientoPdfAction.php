@@ -23,6 +23,8 @@ class LevantamientoPdfAction
 
     public function generar(Levantamiento $levantamiento): PdfInstance
     {
+        $levantamiento->loadMissing('proyecto');
+
         $riesgos = [
             $this->filaRiesgo($levantamiento, 'Trabajos en Alturas', 'trabajos_alturas_certificado', null, 'trabajos_alturas_notas', siempreAplica: true),
             $this->filaRiesgo($levantamiento, 'Espacios Confinados', 'espacios_confinados_certificado', 'espacios_confinados_aplica', 'espacios_confinados_notas'),

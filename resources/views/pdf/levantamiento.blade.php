@@ -244,7 +244,7 @@
         </tr>
         <tr>
             <td class="label">Obra</td>
-            <td colspan="3">{{ $levantamiento->obra ?? '—' }}</td>
+            <td colspan="3">{{ $levantamiento->proyecto->nombre ?? '—' }}</td>
         </tr>
     </table>
 
@@ -253,30 +253,34 @@
         <tr>
             <td class="label">Solicitante</td>
             <td>{{ $levantamiento->solicitante ?? '—' }}</td>
-            <td class="label">Fecha de Solicitud</td>
+            <td class="label">Fecha Solicitud</td>
             <td>{{ optional($levantamiento->fecha_solicitud)->format('d/m/Y') ?? '—' }}</td>
         </tr>
         <tr>
-            <td class="label">Usuario Requiriente</td>
+            <td class="label">Nombre del Usuario Requiriente</td>
             <td>{{ $levantamiento->usuario_requiriente ?? '—' }}</td>
-            <td class="label">Correo</td>
-            <td>{{ $levantamiento->correo_usuario ?? '—' }}</td>
-        </tr>
-        <tr>
-            <td class="label">Área de Trabajo</td>
-            <td>{{ $levantamiento->area_trabajo ?? '—' }}</td>
-            <td class="label">Medio de Solicitud</td>
-            <td>{{ $medioSolicitudLabel[$levantamiento->medio_solicitud] ?? ($levantamiento->medio_solicitud ?? '—') }}</td>
-        </tr>
-        <tr>
-            <td class="label">Fecha Lev. Programada</td>
+            <td class="label">Fecha Compromiso</td>
             <td>{{ optional($levantamiento->fecha_levantamiento_programada)->format('d/m/Y') ?? '—' }}</td>
-            <td class="label">Fecha Envío Cotización Prog.</td>
+        </tr>
+        <tr>
+            <td class="label">Correo del Usuario Requiriente</td>
+            <td>{{ $levantamiento->correo_usuario ?? '—' }}</td>
+            <td class="label">Fecha Envío Cotización</td>
             <td>{{ optional($levantamiento->fecha_envio_cotizacion_programada)->format('d/m/Y') ?? '—' }}</td>
         </tr>
         <tr>
-            <td class="label">Título de Cotización</td>
+            <td class="label">Área Trabajo</td>
+            <td>{{ $levantamiento->area_trabajo ?? '—' }}</td>
+            <td class="label">Registrado por el Sistema el Día</td>
+            <td>{{ optional($levantamiento->fecha_cotizacion_enviada)->format('d/m/Y') ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Título Cotización</td>
             <td colspan="3">{{ $levantamiento->titulo_cotizacion ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Medio de Solicitud</td>
+            <td colspan="3">{{ $medioSolicitudLabel[$levantamiento->medio_solicitud] ?? ($levantamiento->medio_solicitud ?? '—') }}</td>
         </tr>
     </table>
 

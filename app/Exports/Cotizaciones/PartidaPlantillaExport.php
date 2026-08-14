@@ -96,10 +96,12 @@ class PartidaPlantillaExport implements FromArray, WithEvents
         $this->filasNegritas[] = $this->filaSeccionDatos;
 
         $this->agregarCampoCaptura('Fecha:', optional($this->cotizacion?->fecha)->format('d/m/Y') ?? '');
+        $this->agregarCampoCaptura('Para:', $this->cotizacion?->para ?? '');
         $this->agregarCampoCaptura('Cliente:', $this->cotizacion?->cliente ?? '');
         $this->agregarCampoCaptura('Dirección:', $this->cotizacion?->direccion ?? '');
         $this->agregarCampoCaptura('Obra:', $this->cotizacion?->obra ?? '');
         $this->agregarCampoCaptura('Vendedor:', $this->cotizacion?->vendedor ?? '');
+        $this->agregarCampoCaptura('Correo Vendedor:', $this->cotizacion?->correo_vendedor ?? '');
         $this->agregarCampoCaptura('Proveedor:', $this->cotizacion?->proveedor ?? '');
         $this->filas[] = $this->filaBlanco();
 

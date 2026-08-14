@@ -26,11 +26,13 @@ class Cotizacion extends Model
         'levantamiento_id',
         'proyecto_id',
         'folio',
+        'para',                 // <- nuevo
         'fecha',
         'cliente',
         'direccion',
         'obra',
         'vendedor',
+        'correo_vendedor',      // <- nuevo
         'proveedor',
         'subtotal',
         'iva',

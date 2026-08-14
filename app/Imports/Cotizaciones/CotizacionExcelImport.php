@@ -38,10 +38,12 @@ class CotizacionExcelImport implements ToCollection
 
         $datosBase = [
             'fecha' => $this->parsearFecha($header['fecha']) ?? now()->toDateString(),
+            'para' => $header['para'] ?: null,
             'cliente' => $header['cliente'] ?: null,
             'direccion' => $header['direccion'] ?: null,
             'proveedor' => $header['proveedor'] ?: null,
             'vendedor' => $header['vendedor'] ?: null,
+            'correo_vendedor' => $header['correo_vendedor'] ?: null,
             'obra' => $header['obra'] ?: null,
         ];
 
@@ -140,6 +142,7 @@ class CotizacionExcelImport implements ToCollection
         $mapa = [
             'cliente' => null, 'fecha' => null, 'direccion' => null,
             'proveedor' => null, 'vendedor' => null, 'obra' => null,
+            'para' => null, 'correo_vendedor' => null, // <- nuevos
         ];
 
         $limite = $inicioTabla ?? $filas->count();
@@ -155,9 +158,12 @@ class CotizacionExcelImport implements ToCollection
 
             match (true) {
                 str_starts_with($etiqueta, 'fecha') => $mapa['fecha'] = $valor,
+                str_starts_with($etiqueta, 'para') => $mapa['para'] = $valor,
                 str_starts_with($etiqueta, 'cliente') => $mapa['cliente'] = $valor,
                 str_starts_with($etiqueta, 'direcci') => $mapa['direccion'] = $valor,
                 str_starts_with($etiqueta, 'proveedor') => $mapa['proveedor'] = $valor,
+                str_starts_with($etiqueta, 'correo vendedor'),
+                str_starts_with($etiqueta, 'correo del vendedor') => $mapa['correo_vendedor'] = $valor,
                 str_starts_with($etiqueta, 'vendedor') => $mapa['vendedor'] = $valor,
                 str_starts_with($etiqueta, 'obra') => $mapa['obra'] = $valor,
                 default => null,

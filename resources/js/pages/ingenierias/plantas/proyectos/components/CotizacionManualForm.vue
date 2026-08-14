@@ -30,10 +30,12 @@ interface CategoriaManual {
 
 interface CotizacionManualFormData {
     fecha: string;
+    para: string;
     cliente: string;
     direccion: string;
     obra: string;
     vendedor: string;
+    correo_vendedor: string;
     proveedor: string;
     tiempo_entrega: string;
     dias_credito: string;
@@ -62,10 +64,12 @@ function categoriaVacia(): CategoriaManual {
 
 const form = useForm<CotizacionManualFormData>({
     fecha: new Date().toISOString().slice(0, 10),
+    para: '',
     cliente: '',
     direccion: '',
     obra: '',
     vendedor: '',
+    correo_vendedor: '',
     proveedor: '',
     tiempo_entrega: '',
     dias_credito: '',
@@ -117,6 +121,11 @@ function guardar(): void {
                 <InputError :message="errorDe('fecha')" />
             </div>
             <div class="grid gap-2">
+                <Label for="manual-para">Para</Label>
+                <Input id="manual-para" v-model="form.para" placeholder="A quién va dirigida la cotización" />
+                <InputError :message="errorDe('para')" />
+            </div>
+            <div class="grid gap-2">
                 <Label for="manual-obra">Obra</Label>
                 <Input id="manual-obra" v-model="form.obra" placeholder="Nombre de la obra" />
                 <InputError :message="errorDe('obra')" />
@@ -135,6 +144,12 @@ function guardar(): void {
                 <Label for="manual-vendedor">Vendedor</Label>
                 <Input id="manual-vendedor" v-model="form.vendedor" />
                 <InputError :message="errorDe('vendedor')" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="manual-correo-vendedor">Correo del vendedor</Label>
+                <Input id="manual-correo-vendedor" type="email" v-model="form.correo_vendedor"
+                    placeholder="vendedor@empresa.com" />
+                <InputError :message="errorDe('correo_vendedor')" />
             </div>
             <div class="grid gap-2">
                 <Label for="manual-proveedor">Proveedor</Label>
