@@ -77,7 +77,7 @@ export const seccionesLevantamiento: SeccionConfig[] = [
         titulo: 'Datos Generales',
         campos: [
             { key: 'solicitante', label: 'Solicitante', type: 'text', required: true, disabled: true },
-            { key: 'fecha_solicitud', label: 'Fecha Solicitud', type: 'date', required: true, disabled: true },
+            { key: 'fecha_solicitud', label: 'Fecha Solicitud', type: 'date', required: true },
             { key: 'usuario_requiriente', label: 'Nombre del Usuario Requiriente', type: 'text' },
             { key: 'fecha_levantamiento_programada', label: 'Fecha Compromiso', type: 'date' },
             { key: 'correo_usuario', label: 'Correo del Usuario Requiriente', type: 'email' },

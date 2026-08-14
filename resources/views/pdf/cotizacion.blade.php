@@ -183,11 +183,29 @@
             text-align: right;
         }
 
-        .nota-texto {
+        .notas-bloque {
             border: 1px solid #d1d5db;
             padding: 8px;
-            white-space: pre-line;
             margin-bottom: 10px;
+        }
+
+        .notas-bloque p {
+            margin: 0 0 8px 0;
+        }
+
+        .notas-bloque p:last-child {
+            margin-bottom: 0;
+        }
+
+        .notas-bloque ul,
+        .notas-bloque ol {
+            margin: 0 0 8px 18px;
+            padding: 0;
+        }
+
+        .notas-bloque ul:last-child,
+        .notas-bloque ol:last-child {
+            margin-bottom: 0;
         }
 
         .importe-letra {
@@ -337,9 +355,29 @@
         </tr>
     </table>
 
-    @if($cotizacion->notas)
+    @php($bloquesNotas = \App\Support\NotasFormateador::bloques($cotizacion->notas))
+
+    @if ($bloquesNotas !== [])
         <h2 class="seccion">Notas</h2>
-        <div class="nota-texto">{{ $cotizacion->notas }}</div>
+        <div class="notas-bloque">
+            @foreach ($bloquesNotas as $bloque)
+                @if ($bloque['tipo'] === 'lista')
+                    <ul>
+                        @foreach ($bloque['items'] as $item)
+                            <li>{{ $item }}</li>
+                        @endforeach
+                    </ul>
+                @elseif ($bloque['tipo'] === 'lista_numerada')
+                    <ol>
+                        @foreach ($bloque['items'] as $item)
+                            <li>{{ $item }}</li>
+                        @endforeach
+                    </ol>
+                @else
+                    <p>{{ $bloque['texto'] }}</p>
+                @endif
+            @endforeach
+        </div>
     @endif
 
     <h2 class="seccion">Totales</h2>

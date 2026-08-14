@@ -11,6 +11,7 @@ use App\Models\Proyecto;
 use App\Models\Role;
 use App\Services\FolioService;
 use App\Support\Accion;
+use App\Support\NotasFormateador;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -195,6 +196,7 @@ class CotizacionesAction
             'dias_credito' => $cotizacion->dias_credito,
             'vigencia_cotizacion' => $cotizacion->vigencia_cotizacion,
             'notas' => $cotizacion->notas,
+            'notasBloques' => NotasFormateador::bloques($cotizacion->notas),
             'estado' => $cotizacion->estado,
             'creado' => $cotizacion->fecha_creacion?->format('d/m/Y H:i'),
             'modificado' => $cotizacion->fecha_modificacion?->format('d/m/Y H:i'),

@@ -1,68 +1,47 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { breadcrumbsCotizacion, type CotizacionRef, type LevantamientoRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
-import PermissionButton from '@/components/PermissionButton.vue';
+import { breadcrumbsCotizacionDirecto, type CotizacionRef, type PlantaRef, type ProyectoRef, pageLayout } from '@/lib/breadcrumbs';
 
 interface Props {
     planta: PlantaRef;
     proyecto: ProyectoRef;
-    levantamiento: LevantamientoRef;
     cotizacion: CotizacionRef & { obra?: string | number | null };
 }
 
 export default pageLayout(() => {
-    const { planta, proyecto, levantamiento, cotizacion } = usePage<Props>().props;
-    return breadcrumbsCotizacion(planta, proyecto, levantamiento, cotizacion, cotizacion.obra);
+    const { planta, proyecto, cotizacion } = usePage<Props>().props;
+    return breadcrumbsCotizacionDirecto(planta, proyecto, cotizacion);
 });
 </script>
 
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
-    ArrowRight,
-    Box,
-    Building2,
-    CheckCircle2,
-    Clock,
-    DollarSign,
-    Download,
-    FileText,
-    FileWarning,
-    Hash,
-    MapPin,
-    Send,
-    ShieldCheck,
-    ShoppingCart,
-    Trash2,
-    Upload,
-    User,
-    XCircle,
+    ArrowRight, Building2, CheckCircle2, Clock, DollarSign, Download,
+    FileText, Hash, MapPin, ShoppingCart, Trash2, Upload, User,
 } from '@lucide/vue';
-import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
-import PageLayout from '@/components/PageLayout.vue';
-import { Button } from '@/components/ui/button';
-import { computed, onMounted, ref } from 'vue';
-import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoController';
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
+import PageLayout from '@/components/PageLayout.vue';
+import PermissionButton from '@/components/PermissionButton.vue';
+import { Button } from '@/components/ui/button';
+import { computed, ref } from 'vue';
 import { usePermissions } from '@/composables/usePermissions';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Eye } from '@lucide/vue';
 
-interface PlantaResumen { id: number; nombre: string }
-interface LevantamientoResumen { id: number; folio: string }
+interface PlantaRef { id: number; nombre: string }
+interface ProyectoRef { id: number; nombre: string; folio: string }
 
-interface ProyectoResumen {
-    id: number;
-    nombre: string;
-    folio: string;
-    completado: boolean;
+/**
+ * Bloque de nota estructurado, generado en el backend por
+ * App\Support\NotasFormateador::bloques(). Nunca se renderiza con
+ * v-html — siempre interpolación normal ({{ }}).
+ */
+interface NotaBloque {
+    tipo: 'parrafo' | 'lista' | 'lista_numerada';
+    texto: string | null;
+    items: string[] | null;
 }
 
 interface CotizacionDetalle {
@@ -72,15 +51,15 @@ interface CotizacionDetalle {
     cliente: string | null;
     direccion: string | null;
     obra: string | null;
+    para: string | null;
     vendedor: string | null;
+    correoVendedor: string | null;
     proveedor: string | null;
     subtotal: number | null;
     iva: number | null;
     total: number | null;
-    costo_hora_total?: number | null;
     estado: string;
     creado: string | null;
-    tiene_insumos: boolean;
     completada: boolean;
     estatusCompra: string;
     pdfAutorizacion: string | null;
@@ -90,6 +69,7 @@ interface CotizacionDetalle {
     dias_credito: string | null;
     vigencia_cotizacion: string | null;
     notas: string | null;
+    notasBloques: NotaBloque[];
 }
 
 interface PartidaHija {
@@ -110,82 +90,44 @@ interface PartidaRaiz {
 }
 
 const props = defineProps<{
-    planta: PlantaResumen;
-    proyecto: ProyectoResumen;
-    levantamiento: LevantamientoResumen;
+    planta: PlantaRef;
+    proyecto: ProyectoRef;
     cotizacion: CotizacionDetalle;
     partidas: PartidaRaiz[];
     numeroPartidas: number;
 }>();
 
-const { hasPermission, Accion } = usePermissions();
-const endpoint = 'ingenierias.plantas.proyectos.levantamientos.cotizaciones';
-const puedeEliminar = computed(() => hasPermission(endpoint, Accion.DELETE));
+const { Accion } = usePermissions();
+const endpoint = 'ingenierias.plantas.proyectos.cotizaciones';
 
 const rutaOc = computed(() => ({
     planta: props.planta.id,
     proyecto: props.proyecto.id,
-    levantamiento: props.levantamiento.id,
     cotizacion: props.cotizacion.id,
 }));
 
-const urlPdf = computed(() => CotizacionController.pdf(rutaOc.value).url);
+const verPdf = ref(false);
 
-const ocDialogOpen = ref(false);
+const urlPdf = computed(() => CotizacionController.pdfProyecto(rutaOc.value).url);
+
 const archivoOcInput = ref<HTMLInputElement | null>(null);
-
-const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
-
-const solicitudPendiente = computed(
-    () => props.cotizacion.estatusCompra === 'en_cotizacion' && !props.cotizacion.completada,
-);
-
-const estadoDescripcion = computed(() =>
-    props.cotizacion.completada
-        ? 'Insumos y Orden de Compra están completos.'
-        : 'Faltan pasos por completar en esta cotización.'
-);
-
-/**
- * `cotizacion.tiene_insumos`/`completada` se calculan en el servidor y se
- * envían como snapshot estático. Cuando el usuario navega con "atrás" del
- * navegador, Inertia puede restaurar esta página desde el caché del
- * historial en vez de pedir datos frescos, dejando el badge "Fase
- * completada" desfasado hasta la siguiente visita real. Forzamos un
- * refresh puntual de esta prop al montar para que nunca se quede vieja.
- */
-onMounted(() => {
-    router.reload({ only: ['cotizacion'] });
-});
 
 function subirOrdenCompra(): void {
     const archivo = archivoOcInput.value?.files?.[0];
     if (!archivo) return;
 
     router.post(
-        CotizacionController.subirAutorizacion(rutaOc.value).url,
+        CotizacionController.subirAutorizacionProyecto(rutaOc.value).url,
         { archivo },
-        { forceFormData: true, preserveScroll: true, onSuccess: () => (ocDialogOpen.value = false) },
+        { forceFormData: true, preserveScroll: true },
     );
-}
-
-function solicitarRevision(): void {
-    router.post(CotizacionController.solicitarRevisionCompra(rutaOc.value).url, {}, { preserveScroll: true });
-}
-
-function aprobarRevision(): void {
-    router.post(CotizacionController.aprobarCompra(rutaOc.value).url, {}, { preserveScroll: true });
-}
-
-function rechazarRevision(): void {
-    router.post(CotizacionController.rechazarCompra(rutaOc.value).url, {}, { preserveScroll: true });
 }
 
 function eliminar(): void {
     if (!confirm(`¿Eliminar la cotización "${props.cotizacion.folio}"? Esta acción no se puede deshacer.`)) {
         return;
     }
-    router.delete(CotizacionController.destroy(rutaOc.value).url);
+    router.delete(CotizacionController.destroyProyecto(rutaOc.value).url);
 }
 
 const estadoLabel: Record<string, string> = {
@@ -204,10 +146,9 @@ function formatoMoneda(valor: number | null | undefined): string {
 
     <Head :title="`Cotización ${cotizacion.folio}`" />
 
-    <PageLayout title="" description="" endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones">
+    <PageLayout title="" description="" endpoint="ingenierias.plantas.proyectos.cotizaciones">
         <template #breadcrumbs>
-            <Link
-                :href="LevantamientoController.show({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id }).url"
+            <Link :href="ProyectoController.show([planta.id, proyecto.id]).url"
                 class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowRight class="size-4 rotate-180" />
             </Link>
@@ -230,8 +171,8 @@ function formatoMoneda(valor: number | null | undefined): string {
                             </Button>
                         </a>
 
-                        <PermissionButton endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones"
-                            :accion="Accion.DELETE" variant="secondary" size="sm" @click="eliminar">
+                        <PermissionButton :endpoint="endpoint" :accion="Accion.DELETE" variant="outline" size="sm"
+                            class="border-white/30 bg-white/10 text-white hover:bg-white/20" @click="eliminar">
                             <Trash2 class="mr-2 size-4" />
                             Eliminar
                         </PermissionButton>
@@ -245,51 +186,7 @@ function formatoMoneda(valor: number | null | undefined): string {
                 </div>
             </div>
 
-            <div v-if="solicitudPendiente"
-                class="border-b border-amber-200 bg-amber-50 px-6 py-5 dark:border-amber-900 dark:bg-amber-950/30">
-                <div class="flex items-start gap-3">
-                    <Clock class="mt-0.5 size-5 shrink-0 text-amber-600" />
-                    <div>
-                        <p class="font-semibold text-amber-800 dark:text-amber-300">Pendiente de revisión administrativa
-                        </p>
-                        <p class="text-sm text-amber-700 dark:text-amber-400">
-                            Esta cotización fue enviada para revisión sin orden de compra.
-                        </p>
-                    </div>
-                </div>
-
-                <div v-if="hasPermission(endpoint, 'aprobar')"
-                    class="mt-4 border-t border-amber-200 pt-4 dark:border-amber-900">
-                    <p class="mb-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400">
-                        Acciones de administrador
-                    </p>
-                    <div class="flex gap-2">
-                        <Button class="bg-emerald-600 text-white hover:bg-emerald-700" @click="aprobarRevision">
-                            <CheckCircle2 class="mr-2 size-4" />
-                            Aprobar
-                        </Button>
-                        <Button variant="outline"
-                            class="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
-                            @click="rechazarRevision">
-                            <XCircle class="mr-2 size-4" />
-                            Rechazar
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            <div v-else-if="cotizacion.estatusCompra === 'rechazado'"
-                class="flex items-start gap-3 border-b border-red-200 bg-red-50 px-6 py-5 dark:border-red-900 dark:bg-red-950/30">
-                <FileWarning class="mt-0.5 size-5 shrink-0 text-red-600" />
-                <div>
-                    <p class="font-semibold text-red-800 dark:text-red-300">Solicitud rechazada</p>
-                    <p class="text-sm text-red-700 dark:text-red-400">
-                        La revisión sin orden de compra fue rechazada. Sube el PDF de la orden para continuar.
-                    </p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-6 border-b bg-card px-6 py-5 sm:grid-cols-4">
+            <div class="grid grid-cols-2 gap-6 border-b bg-card px-6 py-5 sm:grid-cols-3">
                 <div class="flex items-start gap-3">
                     <div class="flex size-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
                         <DollarSign class="size-4" />
@@ -317,21 +214,16 @@ function formatoMoneda(valor: number | null | undefined): string {
                         <p class="font-bold">{{ formatoMoneda(cotizacion.iva) }}</p>
                     </div>
                 </div>
-                <div class="flex items-start gap-3">
-                    <div class="flex size-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
-                        <Clock class="size-4" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-muted-foreground">Costo/Hora Total</p>
-                        <p class="font-bold">{{ formatoMoneda(cotizacion.costo_hora_total) }}</p>
-                    </div>
-                </div>
             </div>
 
             <div class="grid gap-4 border-b bg-card px-6 py-5 sm:grid-cols-2">
                 <div class="rounded-lg bg-muted/40 p-4">
                     <p class="mb-3 text-xs font-semibold uppercase text-muted-foreground">Información del Cliente</p>
                     <dl class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <User class="size-4 text-muted-foreground" /><span class="font-medium">Para:</span>
+                            {{ cotizacion.para ?? '—' }}
+                        </div>
                         <div class="flex items-center gap-2">
                             <Building2 class="size-4 text-muted-foreground" /><span class="font-medium">Cliente:</span>
                             {{ cotizacion.cliente ?? '—' }}
@@ -347,11 +239,16 @@ function formatoMoneda(valor: number | null | undefined): string {
                     <dl class="space-y-2 text-sm">
                         <div class="flex items-center gap-2">
                             <FileText class="size-4 text-muted-foreground" /><span class="font-medium">Obra:</span>
-                            {{ cotizacion.obra ?? '—' }}
+                            {{ cotizacion.obra ?? 'Sin nombre de obra' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <User class="size-4 text-muted-foreground" /><span class="font-medium">Vendedor:</span>
                             {{ cotizacion.vendedor ?? '—' }}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <Hash class="size-4 text-muted-foreground" /><span class="font-medium">Correo
+                                vendedor:</span>
+                            {{ cotizacion.correoVendedor ?? '—' }}
                         </div>
                         <div class="flex items-center gap-2">
                             <Hash class="size-4 text-muted-foreground" /><span class="font-medium">Proveedor:</span>
@@ -407,166 +304,85 @@ function formatoMoneda(valor: number | null | undefined): string {
                 <p class="font-medium capitalize">{{ cotizacion.importeLetra }}</p>
             </div>
 
-            <div v-if="cotizacion.notas" class="mt-4 border-t pt-4">
-                <p class="text-xs text-muted-foreground">Notas</p>
-                <p class="whitespace-pre-line text-sm">{{ cotizacion.notas }}</p>
+            <!--
+                Notas: bloques estructurados generados en backend por
+                NotasFormateador::bloques(). Interpolación normal, nunca v-html.
+            -->
+            <div v-if="cotizacion.notasBloques?.length" class="mt-4 border-t pt-4">
+                <p class="mb-2 text-xs text-muted-foreground">Notas</p>
+
+                <template v-for="(bloque, i) in cotizacion.notasBloques" :key="i">
+                    <ul v-if="bloque.tipo === 'lista'" class="ml-4 list-disc space-y-0.5 text-sm">
+                        <li v-for="(item, j) in bloque.items ?? []" :key="j">{{ item }}</li>
+                    </ul>
+                    <ol v-else-if="bloque.tipo === 'lista_numerada'" class="ml-4 list-decimal space-y-0.5 text-sm">
+                        <li v-for="(item, j) in bloque.items ?? []" :key="j">{{ item }}</li>
+                    </ol>
+                    <p v-else class="text-sm">{{ bloque.texto }}</p>
+                </template>
             </div>
         </div>
 
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
-            <p class="text-lg font-semibold">Proceso de Cotización</p>
-            <p class="mb-5 text-sm text-muted-foreground">Completa las fases en orden para procesar la cotización</p>
-
-            <div class="mb-5 flex items-center justify-between text-sm font-medium">
-                <span class="flex items-center gap-1.5"
-                    :class="cotizacion.tiene_insumos ? 'text-emerald-600' : 'text-muted-foreground'">
-                    <span class="flex size-6 items-center justify-center rounded-full"
-                        :class="cotizacion.tiene_insumos ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'">
-                        <CheckCircle2 v-if="cotizacion.tiene_insumos" class="size-4" />
-                        <span v-else class="text-xs">1</span>
-                    </span>
-                    Explosión de Insumos
-                </span>
-                <ArrowRight class="size-4 text-muted-foreground" />
-                <span class="flex items-center gap-1.5"
-                    :class="cotizacion.completada ? 'text-emerald-600' : 'text-muted-foreground'">
-                    <span class="flex size-6 items-center justify-center rounded-full"
-                        :class="cotizacion.completada ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'">
-                        <CheckCircle2 v-if="cotizacion.completada" class="size-4" />
-                        <span v-else class="text-xs">2</span>
-                    </span>
-                    Orden de Compra
-                </span>
+            <div class="mb-4 flex items-center gap-2">
+                <ShoppingCart class="size-5" />
+                <p class="text-lg font-semibold">Orden de Compra</p>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-xl border p-4"
-                    :class="cotizacion.tiene_insumos ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : ''">
-                    <div class="mb-3 flex items-center gap-2">
-                        <Box class="size-5"
-                            :class="cotizacion.tiene_insumos ? 'text-emerald-600' : 'text-muted-foreground'" />
+            <Collapsible v-if="cotizacion.pdfAutorizacion" v-model:open="verPdf">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                            <CheckCircle2 class="size-4" />
+                        </div>
                         <div>
-                            <p class="font-semibold">Explosión de Insumos</p>
-                            <p class="text-xs text-muted-foreground">Materiales definidos y listos</p>
+                            <p class="font-medium">Orden de compra cargada</p>
                         </div>
                     </div>
 
-                    <div v-if="cotizacion.tiene_insumos"
-                        class="mb-3 rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20">
-                        <p class="font-medium text-emerald-700 dark:text-emerald-400">✓ Fase completada</p>
-                        <p class="text-xs text-muted-foreground">Los materiales han sido registrados correctamente</p>
-                    </div>
+                    <div class="flex items-center gap-2">
+                        <CollapsibleTrigger as-child>
+                            <Button variant="outline" size="sm">
+                                <Eye class="mr-1.5 size-3.5" />
+                                {{ verPdf ? 'Ocultar' : 'Ver' }}
+                                <ChevronDown class="ml-1.5 size-3.5 transition-transform"
+                                    :class="verPdf ? 'rotate-180' : ''" />
+                            </Button>
+                        </CollapsibleTrigger>
 
-                    <Link
-                        :href="InsumoController.index({ planta: planta.id, proyecto: proyecto.id, levantamiento: levantamiento.id, cotizacion: cotizacion.id }).url">
-                        <Button class="w-full"
-                            :class="cotizacion.tiene_insumos ? 'bg-emerald-600 text-white hover:bg-emerald-700' : ''"
-                            :variant="cotizacion.tiene_insumos ? 'default' : 'outline'">
-                            Ver Insumos
-                        </Button>
-                    </Link>
+                        <a :href="cotizacion.pdfAutorizacion" target="_blank">
+                            <Button variant="outline" size="sm">
+                                <Download class="mr-1.5 size-3.5" />
+                                Descargar
+                            </Button>
+                        </a>
+                    </div>
                 </div>
 
-                <div class="rounded-xl border p-4"
-                    :class="[!ocHabilitada && 'opacity-60', cotizacion.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : '']">
-                    <div class="mb-3 flex items-center gap-2">
-                        <ShoppingCart class="size-5"
-                            :class="cotizacion.completada ? 'text-emerald-600' : 'text-muted-foreground'" />
-                        <div>
-                            <p class="font-semibold">Orden de Compra</p>
-                            <p class="text-xs text-muted-foreground">Sube el PDF de la orden o solicita revisión</p>
-                        </div>
-                    </div>
+                <CollapsibleContent class="mt-4 overflow-hidden rounded-xl border bg-muted/20">
+                    <iframe :src="cotizacion.pdfAutorizacion" class="h-[70vh] w-full" title="Orden de Compra" />
+                </CollapsibleContent>
+            </Collapsible>
 
-                    <template v-if="!ocHabilitada">
-                        <p class="text-sm text-muted-foreground">Primero completa la Explosión de Insumos para habilitar
-                            este paso.</p>
-                    </template>
-
-                    <template v-else-if="cotizacion.completada">
-                        <div class="rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20">
-                            <p class="font-medium text-emerald-700 dark:text-emerald-400">✓ Fase completada</p>
-                        </div>
-                        <Link class="mt-3 block" :href="CotizacionController.ordenCompra(rutaOc).url">
-                            <Button class="w-full bg-emerald-600 text-white hover:bg-emerald-700">Ver Orden de
-                                Compra</Button>
-                        </Link>
-                    </template>
-
-                    <template v-else-if="solicitudPendiente">
-                        <div
-                            class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/20">
-                            <p class="font-medium text-amber-700 dark:text-amber-400">Solicitud enviada</p>
-                            <p class="text-xs text-muted-foreground">En espera de aprobación de un administrador.</p>
-                        </div>
-                    </template>
-
-                    <template v-else>
-                        <div
-                            class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
-                            <p class="text-sm font-medium text-blue-700 dark:text-blue-400">Opción 1: Subir orden de
-                                compra</p>
-                            <p class="mb-2 text-xs text-muted-foreground">Sube el PDF de la orden de compra</p>
-                            <Button class="w-full" @click="ocDialogOpen = true">
-                                <ShoppingCart class="mr-2 size-4" />
-                                Subir PDF
-                            </Button>
-                        </div>
-
-                        <div
-                            class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/20">
-                            <p class="text-sm font-medium text-amber-700 dark:text-amber-400">Opción 2: Solicitar
-                                revisión sin orden</p>
-                            <p class="mb-2 text-xs text-muted-foreground">Envía esta cotización para revisión
-                                administrativa</p>
-                            <Button class="w-full bg-amber-600 text-white hover:bg-amber-700"
-                                @click="solicitarRevision">
-                                <Send class="mr-2 size-4" />
-                                Solicitar Revisión
-                            </Button>
-                        </div>
-                    </template>
-                </div>
-
-                <Dialog v-model:open="ocDialogOpen">
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Subir Orden de Compra</DialogTitle>
-                            <DialogDescription>Selecciona el PDF de la orden de compra.</DialogDescription>
-                        </DialogHeader>
-
-                        <label
-                            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">
-                            <Upload class="size-5" />
-                            <span class="text-primary">Seleccionar PDF</span>
-                            <input ref="archivoOcInput" type="file" accept="application/pdf" class="hidden"
-                                @change="subirOrdenCompra" />
-                        </label>
-
-                        <DialogFooter>
-                            <DialogClose as-child>
-                                <Button variant="secondary">Cancelar</Button>
-                            </DialogClose>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
+            <label v-else
+                class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">
+                <Upload class="size-5" />
+                <span class="text-primary">Seleccionar PDF</span>
+                <span class="text-xs">Con solo subirlo, este requisito queda cumplido</span>
+                <input ref="archivoOcInput" type="file" accept="application/pdf" class="hidden"
+                    @change="subirOrdenCompra" />
+            </label>
 
             <div class="mt-5 flex items-start gap-3 rounded-lg border px-4 py-3" :class="cotizacion.completada
                 ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30'
                 : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30'">
                 <component :is="cotizacion.completada ? CheckCircle2 : Clock" class="mt-0.5 size-4 shrink-0"
                     :class="cotizacion.completada ? 'text-emerald-600' : 'text-amber-600'" />
-                <div>
-                    <p class="text-sm font-semibold"
-                        :class="cotizacion.completada ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'">
-                        {{ cotizacion.completada ? 'Flujo aprobado' : 'Flujo en proceso' }}
-                    </p>
-                    <p class="text-sm"
-                        :class="cotizacion.completada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'">
-                        {{ estadoDescripcion }}
-                    </p>
-                </div>
+                <p class="text-sm font-medium"
+                    :class="cotizacion.completada ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'">
+                    {{ cotizacion.completada ? 'Cotización completada' : 'Falta subir la orden de compra' }}
+                </p>
             </div>
         </div>
 
