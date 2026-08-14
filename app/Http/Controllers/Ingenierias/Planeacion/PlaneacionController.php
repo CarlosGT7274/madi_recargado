@@ -9,6 +9,7 @@ use App\Actions\Ingenierias\Planeacion\PlaneacionesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Planeacion\RechazarPlaneacionRequest;
 use App\Http\Requests\Ingenierias\Planeacion\StorePlaneacionRequest;
+use App\Http\Requests\Ingenierias\Planeacion\UpdateCronogramaPlaneacionRequest;
 use App\Models\Cotizacion;
 use App\Models\Empleado;
 use App\Models\Planeacion;
@@ -136,6 +137,27 @@ class PlaneacionController extends Controller
             'cronograma' => $asignacionesAction->listAgrupadoPorDia($planeacion),
             'puedeAprobar' => $action->puedeAprobar($usuario),
         ]);
+    }
+
+    /**
+     * Corrige el cronograma de una Planeación rechazada (o borrador) sin
+     * crear una nueva fila. Si el front manda enviar_aprobacion=true,
+     * encadena PlaneacionesAction::enviar() en la misma request — mismo
+     * patrón que store() ya usa al crear.
+     */
+    public function actualizarCronograma(UpdateCronogramaPlaneacionRequest $request, Planeacion $planeacion, PlaneacionesAction $action): RedirectResponse
+    {
+        $planeacion = $action->actualizarCronograma($planeacion, $request->validated());
+
+        if ($request->boolean('enviar_aprobacion')) {
+            $action->enviar($planeacion);
+
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Planeación corregida y reenviada a aprobación.']);
+        } else {
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Cronograma actualizado.']);
+        }
+
+        return redirect()->route('ingenierias.planeacion.show', $planeacion->id);
     }
 
     public function enviar(Planeacion $planeacion, PlaneacionesAction $action): RedirectResponse

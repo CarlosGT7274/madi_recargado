@@ -24,12 +24,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('planeaciones.index');
             Route::post('/planeaciones', [PlaneacionController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('planeaciones.store');
-
-            // Selects dependientes de Create.vue: planta/proyecto -> cotizaciones aprobadas -> partidas.
-            Route::get('/cotizaciones-aprobadas', [PlaneacionController::class, 'cotizacionesAprobadas'])
-                ->middleware('permiso:'.Accion::READ)->name('cotizaciones-aprobadas');
-            Route::get('/cotizaciones/{cotizacion}/partidas', [PlaneacionController::class, 'partidasDeCotizacion'])
-                ->middleware('permiso:'.Accion::READ)->name('cotizaciones.partidas');
         });
 
     Route::name('ingenierias.planeacion.')
@@ -45,6 +39,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:aprobar')->name('aprobar');
             Route::post('/rechazar', [PlaneacionController::class, 'rechazar'])
                 ->middleware('permiso:rechazar')->name('rechazar');
+            Route::patch('/cronograma', [PlaneacionController::class, 'actualizarCronograma'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('cronograma.update');
             Route::post('/reportar-nomina', [PlaneacionController::class, 'reportarNomina'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('reportar-nomina');
 
