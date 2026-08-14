@@ -7,3 +7,7 @@ id = "paketo-buildpacks/nodejs"
 [[io.buildpacks.build.env]]
 name = "BP_NODE_RUN_SCRIPTS"
 value = "build"
+
+[[io.buildpacks.build.env]]
+name = "BP_PHP_ENABLE_EXTENSIONS"
+value = "openssl,mbstring,pdo_mysql,fileinfo,tokenizer,ctype,dom,xml,curl,zip,pcntl"
