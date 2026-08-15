@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Ingenierias\Planeacion;
 
+use App\Actions\Ingenierias\Actividades\ActividadesAction;
 use App\Actions\Ingenierias\Cotizaciones\CotizacionesAction;
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
 use App\Actions\Ingenierias\Planeacion\PlaneacionAsignacionesAction;
@@ -33,6 +34,7 @@ class PlaneacionController extends Controller
             return Inertia::render('ingenierias/planeacion/Planificador', [
                 'puedeAprobar' => $action->puedeAprobar($usuario),
                 'puedeCrear' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::CREATE),
+                'puedeConfigurarCorte' => $usuario->puedePorEndpoint('ingenierias.planeacion', 'supervisar'),
                 'filtros' => Inertia::defer(fn () => $action->filtrosDisponibles($usuario)),
                 'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
             ]);
@@ -120,32 +122,34 @@ class PlaneacionController extends Controller
     }
 
     /**
-     * Detalle real: planta/proyecto, semana/rango, estado, comentarios de
-     * aprobación, y el cronograma completo (partida -> día -> empleados
-     * con horas), agrupado por PlaneacionAsignacionesAction — misma
-     * Action que ya alimentaba el cronograma en Create.vue, reutilizada
-     * aquí en modo lectura para Show.vue.
+     * Además del detalle real, manda `empleados` y `partidasDisponibles`
+     * (árbol de actividades del proyecto, mismo formato que consume
+     * ActividadController::data()) porque Show.vue los necesita SIEMPRE
+     * que la planeación sea editable — el modo edición usa el mismo
+     * drag&drop que Create.vue. Antes no se mandaban y el componente
+     * tronaba en aplanar(undefined.flatMap) en cuanto puedeEditar
+     * pasaba a true.
      */
     public function show(
         Planeacion $planeacion,
         PlaneacionesAction $action,
         PlaneacionAsignacionesAction $asignacionesAction,
+        ActividadesAction $actividadesAction,
     ): Response {
         $usuario = request()->user();
+        $planeacion->loadMissing('proyecto');
 
         return Inertia::render('ingenierias/planeacion/Show', [
             'planeacion' => $action->detail($planeacion),
             'cronograma' => $asignacionesAction->listAgrupadoPorDia($planeacion),
             'puedeAprobar' => $action->puedeAprobar($usuario),
+            'empleados' => Empleado::where('activo', true)
+                ->orderBy('nombre')
+                ->get(['id', 'nombre', 'puesto']),
+            'partidasDisponibles' => $actividadesAction->arbol($planeacion->proyecto),
         ]);
     }
 
-    /**
-     * Corrige el cronograma de una Planeación rechazada (o borrador) sin
-     * crear una nueva fila. Si el front manda enviar_aprobacion=true,
-     * encadena PlaneacionesAction::enviar() en la misma request — mismo
-     * patrón que store() ya usa al crear.
-     */
     public function actualizarCronograma(UpdateCronogramaPlaneacionRequest $request, Planeacion $planeacion, PlaneacionesAction $action): RedirectResponse
     {
         $planeacion = $action->actualizarCronograma($planeacion, $request->validated());

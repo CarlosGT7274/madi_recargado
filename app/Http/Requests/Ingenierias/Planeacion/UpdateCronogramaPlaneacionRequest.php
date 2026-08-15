@@ -16,6 +16,7 @@ class UpdateCronogramaPlaneacionRequest extends FormRequest
     {
         return [
             'enviar_aprobacion' => ['sometimes', 'boolean'],
+            'nota' => ['nullable', 'string', 'max:1000'],
             'asignaciones' => ['nullable', 'array'],
             'asignaciones.*.partida_id' => ['required', 'integer', 'exists:partidas,id'],
             'asignaciones.*.empleado_id' => ['required', 'integer', 'exists:empleados,id'],

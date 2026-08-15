@@ -193,6 +193,8 @@ class PlaneacionesAction
             'aprobador' => $planeacion->aprobador?->name,
             'puedeEnviar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
             'puedeEliminar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
+            'puedeEditar' => $planeacion->usuario_id === Auth::id()
+                && in_array($planeacion->estado, ['borrador', 'rechazada'], true),
             'corte' => $this->corteInfoPara($planeacion),
         ];
     }
@@ -422,9 +424,11 @@ class PlaneacionesAction
         if ($planeacion->estado === 'rechazada') {
             $planeacion->update([
                 'estado' => 'borrador',
-                'comentarios_aprobacion' => null,
+                'comentarios_aprobacion' => $data['nota'] ?? null,
                 'fecha_rechazo' => null,
             ]);
+        } elseif (array_key_exists('nota', $data) && $data['nota'] !== null) {
+            $planeacion->update(['comentarios_aprobacion' => $data['nota']]);
         }
 
         return $planeacion->fresh();
