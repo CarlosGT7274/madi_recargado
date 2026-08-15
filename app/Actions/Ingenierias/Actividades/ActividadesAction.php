@@ -3,6 +3,7 @@
 namespace App\Actions\Ingenierias\Actividades;
 
 use App\Actions\Ingenierias\Cotizaciones\Partidas\PartidasAction;
+use App\Models\Cotizacion;
 use App\Models\Partida;
 use App\Models\Proyecto;
 use Illuminate\Support\Collection;
@@ -27,13 +28,40 @@ class ActividadesAction
 
     public function arbol(Proyecto $proyecto): Collection
     {
+        $cotizacionIdsValidos = $this->ultimasCotizacionesAprobadasPorObra($proyecto)
+            ->pluck('id');
+
         return $proyecto->partidas()
             ->whereNull('partida_id')
             ->with(['hijas', 'cotizacion.archivos'])
             ->orderBy('id')
             ->get()
-            ->filter(fn (Partida $p) => $p->esManual() || $p->cotizacion?->estaCompletada())
+            ->filter(fn (Partida $p) => $p->esManual() || $cotizacionIdsValidos->contains($p->cotizacion_id))
             ->map(fn (Partida $p) => $this->nodo($p))
+            ->values();
+    }
+
+    /**
+     * SOLO efecto visual: para cada obra del proyecto (agrupando igual
+     * que CotizacionesAction::agruparPorObra(), con NULL como su propio
+     * grupo), toma únicamente la cotización más reciente (mayor id) que
+     * ya esté Cotizacion::estaCompletada(). No modifica Cotizacion, no
+     * escribe nada, no cambia estados — solo decide qué partidas se
+     * muestran en el árbol de Actividades quitando versiones viejas ya
+     * superadas dentro de la MISMA obra. Cotizaciones aprobadas de OTRAS
+     * obras siguen apareciendo todas.
+     *
+     * @return Collection<int, Cotizacion>
+     */
+    private function ultimasCotizacionesAprobadasPorObra(Proyecto $proyecto): Collection
+    {
+        return $proyecto->cotizaciones()
+            ->with('archivos')
+            ->latest('id')
+            ->get()
+            ->filter(fn (Cotizacion $c) => $c->estaCompletada())
+            ->groupBy(fn (Cotizacion $c) => $c->obra ?? "\0__sin_obra__{$c->id}")
+            ->map(fn (Collection $versiones) => $versiones->first())
             ->values();
     }
 

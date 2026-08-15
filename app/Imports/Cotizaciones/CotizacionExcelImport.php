@@ -80,6 +80,7 @@ class CotizacionExcelImport implements ToCollection
             if (! str_contains($no, '.')) {
                 $padre = $this->cotizacion->partidas()->create([
                     'partida_id' => null,
+                    'proyecto_id' => $this->cotizacion->proyecto_id,
                     'numero_partida' => (int) $no,
                     'descripcion' => $descripcion !== '' ? $descripcion : "Sección {$no}",
                     'cantidad' => 0,
