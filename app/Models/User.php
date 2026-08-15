@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Concerns\HasRbacAuthorization;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -50,5 +51,10 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Proyecto::class, 'proyecto_usuario', 'usuario_id', 'proyecto_id')
             ->withTimestamps();
+    }
+
+    public function empleado(): HasOne
+    {
+        return $this->hasOne(Empleado::class, 'user_id');
     }
 }

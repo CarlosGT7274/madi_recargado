@@ -57,6 +57,11 @@ interface ProyectoRef {
     folio: string;
 }
 
+interface CorteInfo {
+    fecha: string;
+    vencido: boolean;
+}
+
 interface PlaneacionDetalle {
     id: number;
     semana: number;
@@ -74,9 +79,21 @@ interface PlaneacionDetalle {
     proyecto: ProyectoRef;
     residente: { id: number | null; nombre: string | null; firmaUrl: string | null };
     aprobador: string | null;
+    corte: CorteInfo | null;
     puedeEnviar: boolean;
     puedeEliminar: boolean;
     puedeEditar: boolean;
+}
+
+interface IncidenciaAsignacion {
+    id: number;
+    tipo: string;
+    diaAnterior: string | null;
+    diaNuevo: string | null;
+    horasExtra: number | null;
+    fecha: string | null;
+    notas: string | null;
+    creada: string | null;
 }
 
 interface EmpleadoAsignado {
@@ -86,7 +103,7 @@ interface EmpleadoAsignado {
     estado: string;
     horasTrabajadas: number;
     horasExtra: number;
-    incidencias: { id: number; tipo: string; notas: string | null; creada: string | null }[];
+    incidencias: IncidenciaAsignacion[];
 }
 
 interface DiaCronograma {
@@ -190,6 +207,11 @@ function cronogramaAAsignacionesEditables(): AsignacionEditable[] {
 
 const asignacionesEditables = ref<AsignacionEditable[]>([]);
 
+/**
+ * Punto de entrada del ciclo "rechazada → editar/corregir → reenviar":
+ * carga el cronograma actual como base editable. Disponible tanto para
+ * 'borrador' (seguir armando) como 'rechazada' (corregir lo señalado).
+ */
 function iniciarEdicion(): void {
     asignacionesEditables.value = cronogramaAAsignacionesEditables();
     editando.value = true;
@@ -248,6 +270,12 @@ function quitarAsignacionEditable(id: string): void {
 const guardandoCorreccion = ref(false);
 const errorCorreccion = ref<string | null>(null);
 
+/**
+ * Guarda la corrección. `enviarAprobacion` cierra el ciclo completo
+ * ("rechazada → corregir → reenviar") en una sola request: el backend
+ * regresa la planeación a 'borrador' (limpiando el comentario de
+ * rechazo) y, si se pide, la manda a 'enviada' de una vez.
+ */
 function guardarCorreccion(enviarAprobacion: boolean): void {
     errorCorreccion.value = null;
 
@@ -294,6 +322,59 @@ const totalEmpleados = computed(
 );
 
 const totalHorasEdicion = computed(() => asignacionesEditables.value.reduce((s, a) => s + (Number(a.horas) || 0), 0));
+
+// ---------- Notas / observaciones por empleado ----------
+// Reutiliza planeacion_incidencias (tipo 'otro') como bitácora de notas
+// libres por asignación (= empleado dentro de esta planeación). No
+// depende del estado de la planeación: se puede anotar aunque ya esté
+// aprobada, precisamente porque son observaciones de seguimiento, no
+// parte del flujo de aprobación.
+
+const modalNotasAbierto = ref(false);
+const asignacionNotas = ref<{ id: number; empleadoNombre: string; notas: IncidenciaAsignacion[] } | null>(null);
+const textoNuevaNota = ref('');
+const guardandoNota = ref(false);
+const errorNota = ref<string | null>(null);
+
+function abrirNotas(asig: EmpleadoAsignado): void {
+    asignacionNotas.value = {
+        id: asig.id,
+        empleadoNombre: asig.empleado.nombre,
+        notas: asig.incidencias,
+    };
+    textoNuevaNota.value = '';
+    errorNota.value = null;
+    modalNotasAbierto.value = true;
+}
+
+function guardarNota(): void {
+    if (!asignacionNotas.value) return;
+
+    if (!textoNuevaNota.value.trim()) {
+        errorNota.value = 'Escribe una observación.';
+        return;
+    }
+
+    guardandoNota.value = true;
+    errorNota.value = null;
+
+    router.post(
+        `/planeacion/${props.planeacion.id}/asignaciones/${asignacionNotas.value.id}/incidencias`,
+        { tipo: 'otro', notas: textoNuevaNota.value },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                modalNotasAbierto.value = false;
+            },
+            onError: (errores) => {
+                errorNota.value = (Object.values(errores)[0] as string) ?? 'No se pudo guardar la observación.';
+            },
+            onFinish: () => {
+                guardandoNota.value = false;
+            },
+        },
+    );
+}
 
 // ---------- Aprobar / Rechazar ----------
 
@@ -343,7 +424,14 @@ function enviar(): void {
     router.post(
         PlaneacionController.enviar(props.planeacion.id).url,
         {},
-        { preserveScroll: true, onFinish: () => (procesando.value = false) },
+        {
+            preserveScroll: true,
+            onError: (errores) => {
+                // El backend rechaza el envío si ya venció el corte del residente.
+                alert((Object.values(errores)[0] as string) ?? 'No se pudo enviar la planeación.');
+            },
+            onFinish: () => (procesando.value = false),
+        },
     );
 }
 </script>
@@ -368,11 +456,18 @@ function enviar(): void {
             </Badge>
 
             <template v-if="!editando">
-                <Button v-if="planeacion.puedeEnviar" size="sm" :disabled="procesando" @click="enviar">
+                <Button v-if="planeacion.puedeEnviar" size="sm" :disabled="procesando || planeacion.corte?.vencido"
+                    @click="enviar">
                     <Send class="mr-1.5 size-4" />
                     Enviar a aprobación
                 </Button>
 
+                <!--
+                    Ciclo rechazada -> editar/corregir -> reenviar: mismo botón
+                    "Editar / Corregir Planeación" para 'rechazada'. El backend
+                    (actualizarCronograma) es quien decide regresar el estado a
+                    'borrador' al guardar.
+                -->
                 <Button v-if="planeacion.puedeEditar && planeacion.estado === 'rechazada'" size="sm" variant="outline"
                     @click="iniciarEdicion">
                     <Pencil class="mr-1.5 size-4" />
@@ -424,6 +519,26 @@ function enviar(): void {
                     <p class="text-xs text-muted-foreground">Horas / Empleados</p>
                     <p class="text-sm font-semibold">{{ totalHoras.toFixed(1) }}h · {{ totalEmpleados }} personas</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Corte de entrega personalizado del residente -->
+        <div v-if="planeacion.corte" class="mb-4 flex items-start gap-3 rounded-2xl border p-4 shadow-sm" :class="planeacion.corte.vencido
+            ? 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20'
+            : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20'">
+            <AlertCircle class="mt-0.5 size-5 shrink-0"
+                :class="planeacion.corte.vencido ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'" />
+            <div class="min-w-0">
+                <p class="text-sm font-semibold"
+                    :class="planeacion.corte.vencido ? 'text-red-800 dark:text-red-400' : 'text-amber-800 dark:text-amber-400'">
+                    {{ planeacion.corte.vencido ? 'Corte de entrega vencido' : 'Corte de entrega' }}
+                </p>
+                <p class="mt-0.5 text-sm"
+                    :class="planeacion.corte.vencido ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'">
+                    {{ planeacion.corte.vencido
+                        ? `Venció el ${planeacion.corte.fecha}. Contacta a tu supervisor si necesitas enviarla.`
+                        : `Debes enviarla antes del ${planeacion.corte.fecha}.` }}
+                </p>
             </div>
         </div>
 
@@ -479,7 +594,9 @@ function enviar(): void {
                                 <div class="flex flex-col gap-1">
                                     <div v-for="asig in grupo.dias.find((d) => d.dia === dia)?.empleados ?? []"
                                         :key="asig.id"
-                                        class="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1">
+                                        class="flex cursor-pointer items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 transition-colors hover:bg-primary/20"
+                                        :title="asig.incidencias.length ? 'Ver notas' : 'Agregar nota'"
+                                        @click="abrirNotas(asig)">
                                         <span
                                             class="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-primary">
                                             {{ asig.empleado.nombre.charAt(0) }}
@@ -641,6 +758,41 @@ function enviar(): void {
                 <Button class="bg-red-600 text-white hover:bg-red-700" :disabled="procesando" @click="confirmarRechazo">
                     Confirmar rechazo
                 </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Modal de notas por empleado -->
+    <Dialog v-model:open="modalNotasAbierto">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Notas · {{ asignacionNotas?.empleadoNombre }}</DialogTitle>
+                <DialogDescription>
+                    Observaciones sobre esta asignación. Se guardan sin importar el estado de la planeación.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="asignacionNotas" class="space-y-4">
+                <div v-if="asignacionNotas.notas.length" class="max-h-48 space-y-2 overflow-y-auto pr-1">
+                    <div v-for="nota in asignacionNotas.notas" :key="nota.id"
+                        class="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                        <p class="whitespace-pre-wrap">{{ nota.notas ?? '—' }}</p>
+                        <p v-if="nota.creada" class="mt-1 text-[11px] text-muted-foreground">{{ nota.creada }}</p>
+                    </div>
+                </div>
+                <p v-else class="text-sm text-muted-foreground">Sin notas registradas todavía.</p>
+
+                <div class="space-y-2">
+                    <Label for="nueva_nota">Nueva observación</Label>
+                    <Textarea id="nueva_nota" v-model="textoNuevaNota" rows="3"
+                        placeholder="Ej. Llegó tarde el jueves, se ajustó el horario de salida." />
+                    <p v-if="errorNota" class="text-xs text-destructive">{{ errorNota }}</p>
+                </div>
+            </div>
+
+            <DialogFooter class="gap-2">
+                <Button variant="secondary" :disabled="guardandoNota" @click="modalNotasAbierto = false">Cerrar</Button>
+                <Button :disabled="guardandoNota" @click="guardarNota">Guardar nota</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

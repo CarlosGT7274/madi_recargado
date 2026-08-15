@@ -193,6 +193,21 @@ class PlaneacionesAction
             'aprobador' => $planeacion->aprobador?->name,
             'puedeEnviar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
             'puedeEliminar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
+            'corte' => $this->corteInfoPara($planeacion),
+        ];
+    }
+
+    private function corteInfoPara(Planeacion $planeacion): ?array
+    {
+        $corte = $planeacion->usuario ? $this->corteEntregaDe($planeacion->usuario, $planeacion->anio, $planeacion->semana) : null;
+
+        if ($corte === null) {
+            return null;
+        }
+
+        return [
+            'fecha' => $corte->format('d/m/Y H:i'),
+            'vencido' => now()->greaterThan($corte),
         ];
     }
 
@@ -236,6 +251,14 @@ class PlaneacionesAction
     {
         abort_unless($planeacion->estado === 'borrador', 422, 'Solo una planeación en borrador puede enviarse.');
         abort_unless($planeacion->usuario_id === Auth::id(), 403, 'Solo el residente que la creó puede enviarla.');
+
+        $corte = $this->corteEntregaDe($planeacion->usuario, $planeacion->anio, $planeacion->semana);
+
+        if ($corte !== null && now()->greaterThan($corte)) {
+            throw ValidationException::withMessages([
+                'corte' => "El corte de entrega para esta semana venció el {$corte->format('d/m/Y H:i')}. Contacta a tu supervisor.",
+            ]);
+        }
 
         $planeacion->update(['estado' => 'enviada', 'fecha_envio' => now()]);
 
@@ -366,5 +389,71 @@ class PlaneacionesAction
             ->flatMap(fn (Role $rol) => $rol->usuarios)
             ->unique('id')
             ->values();
+    }
+
+    /**
+     * Corrige el cronograma de una Planeación en borrador o rechazada, sin
+     * crear una nueva fila. Si venía rechazada, la regresa a 'borrador' y
+     * limpia el comentario de rechazo — el residente vuelve a decidir si
+     * la envía ahora o sigue editando.
+     *
+     * OJO: borra y recrea las asignaciones, por lo que las incidencias
+     * ligadas a asignaciones que ya no existen se pierden (cascade). Es
+     * el mismo trade-off que Create.vue ya asume al armar el cronograma
+     * desde cero.
+     */
+    public function actualizarCronograma(Planeacion $planeacion, array $data): Planeacion
+    {
+        abort_unless(in_array($planeacion->estado, ['borrador', 'rechazada'], true), 422, 'Solo una planeación en borrador o rechazada puede corregirse.');
+        abort_unless($planeacion->usuario_id === Auth::id(), 403, 'Solo el residente que la creó puede corregirla.');
+
+        $planeacion->asignaciones()->delete();
+
+        foreach ($data['asignaciones'] ?? [] as $asignacion) {
+            $planeacion->asignaciones()->create([
+                'partida_id' => $asignacion['partida_id'],
+                'empleado_id' => $asignacion['empleado_id'],
+                'dia_semana' => $asignacion['dia_semana'],
+                'horas_trabajadas' => $asignacion['horas_trabajadas'],
+                'estado' => 'asignado',
+            ]);
+        }
+
+        if ($planeacion->estado === 'rechazada') {
+            $planeacion->update([
+                'estado' => 'borrador',
+                'comentarios_aprobacion' => null,
+                'fecha_rechazo' => null,
+            ]);
+        }
+
+        return $planeacion->fresh();
+    }
+
+    private function corteEntregaDe(User $usuario, int $anio, int $semana): ?Carbon
+    {
+        return $usuario->empleado?->corteEntregaPara($anio, $semana);
+    }
+
+    /** Empleados con cuenta de acceso, para la pantalla de configuración de cortes del supervisor. */
+    public function empleadosConCorte(): Collection
+    {
+        return Empleado::whereNotNull('user_id')
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn (Empleado $e) => [
+                'id' => $e->id,
+                'nombre' => $e->nombre,
+                'corteDiaSemana' => $e->corte_dia_semana,
+                'corteHora' => $e->corte_hora?->format('H:i'),
+                'corteSemanaRelativa' => $e->corte_semana_relativa,
+            ]);
+    }
+
+    public function actualizarCorte(Empleado $empleado, array $data): Empleado
+    {
+        $empleado->update($data);
+
+        return $empleado;
     }
 }

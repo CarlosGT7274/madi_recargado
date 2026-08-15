@@ -9,8 +9,10 @@ import {
     ChevronRight,
     Clock,
     FolderOpen,
+    Pencil,
     Plus,
     Send,
+    Settings,
     Users,
     X,
     XCircle,
@@ -20,6 +22,15 @@ import PlaneacionController from '@/actions/App/Http/Controllers/Ingenierias/Pla
 import PageLayout from '@/components/PageLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -93,6 +104,14 @@ interface FiltroOpciones {
     residentes: FiltroResidente[];
 }
 
+interface EmpleadoCorte {
+    id: number;
+    nombre: string;
+    corteDiaSemana: string | null;
+    corteHora: string | null;
+    corteSemanaRelativa: 'actual' | 'anterior';
+}
+
 const props = defineProps<{
     /**
      * Independiente del acceso a esta vista (ya requirió `supervisar` en
@@ -103,6 +122,8 @@ const props = defineProps<{
     puedeAprobar: boolean;
     /** Igual de independiente: un supervisor puede no tener permiso de crear. */
     puedeCrear: boolean;
+    /** Igual de independiente: quien supervisa no necesariamente configura cortes. */
+    puedeConfigurarCorte: boolean;
     filtros?: FiltroOpciones;
     planeaciones?: PlaneacionResumen[];
 }>();
@@ -421,6 +442,57 @@ function hrefNuevaPlaneacionParaDia(iso: string) {
     return PlaneacionController.create({ query: queryDeSemana(iso) });
 }
 
+// ---------- Configuración de cortes de entrega por empleado ----------
+// El corte no vive por planeación: es una propiedad del empleado que
+// aplica a todas sus futuras entregas. Se administra aparte del
+// drill-down de una planeación específica.
+
+const modalCorteAbierto = ref(false);
+const empleadosCorte = ref<EmpleadoCorte[]>([]);
+const cargandoEmpleadosCorte = ref(false);
+const guardandoCorteId = ref<number | null>(null);
+
+const DIAS_CORTE: { value: string; label: string }[] = [
+    { value: 'lunes', label: 'Lunes' },
+    { value: 'martes', label: 'Martes' },
+    { value: 'miercoles', label: 'Miércoles' },
+    { value: 'jueves', label: 'Jueves' },
+    { value: 'viernes', label: 'Viernes' },
+    { value: 'sabado', label: 'Sábado' },
+    { value: 'domingo', label: 'Domingo' },
+];
+
+async function abrirModalCorte(): Promise<void> {
+    modalCorteAbierto.value = true;
+    cargandoEmpleadosCorte.value = true;
+    try {
+        const respuesta = await fetch(PlaneacionController.empleadosCorte.url());
+        empleadosCorte.value = (await respuesta.json()) as EmpleadoCorte[];
+    } finally {
+        cargandoEmpleadosCorte.value = false;
+    }
+}
+
+function guardarCorte(empleado: EmpleadoCorte): void {
+    guardandoCorteId.value = empleado.id;
+
+    router.put(
+        PlaneacionController.actualizarCorteEmpleado.url(empleado.id),
+        {
+            corte_dia_semana: empleado.corteDiaSemana,
+            corte_hora: empleado.corteHora,
+            corte_semana_relativa: empleado.corteSemanaRelativa,
+        },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => {
+                guardandoCorteId.value = null;
+            },
+        },
+    );
+}
+
 // ---------- Acciones ----------
 
 function aprobar(id: number): void {
@@ -445,12 +517,18 @@ function reportarNomina(id: number): void {
     <PageLayout title="Programación"
         description="Overview anual de planeaciones: selecciona un rango para ver el detalle">
         <template #actions>
-            <Link v-if="props.puedeCrear" :href="hrefNuevaPlaneacion">
-                <Button>
-                    <Plus class="mr-2 size-4" />
-                    Nueva Planeación
+            <div class="flex items-center gap-2">
+                <Button v-if="props.puedeConfigurarCorte" variant="outline" @click="abrirModalCorte">
+                    <Settings class="mr-2 size-4" />
+                    Cortes de entrega
                 </Button>
-            </Link>
+                <Link v-if="props.puedeCrear" :href="hrefNuevaPlaneacion">
+                    <Button>
+                        <Plus class="mr-2 size-4" />
+                        Nueva Planeación
+                    </Button>
+                </Link>
+            </div>
         </template>
 
         <Deferred :data="['planeaciones', 'filtros']">
@@ -727,4 +805,62 @@ function reportarNomina(id: number): void {
             </div>
         </Deferred>
     </PageLayout>
+
+    <!-- Modal: cortes de entrega por empleado -->
+    <Dialog v-model:open="modalCorteAbierto">
+        <DialogContent class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Cortes de entrega por empleado</DialogTitle>
+                <DialogDescription>
+                    Día y hora límite para que cada residente pueda enviar su Planeación a aprobación, y si aplica a
+                    la semana que se está planeando o a la anterior. Déjalo vacío para no restringir.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="cargandoEmpleadosCorte" class="py-8 text-center text-sm text-muted-foreground">
+                Cargando…
+            </div>
+
+            <div v-else class="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                <div v-if="!empleadosCorte.length" class="py-8 text-center text-sm text-muted-foreground">
+                    No hay empleados con cuenta de acceso registrados.
+                </div>
+
+                <div v-for="empleado in empleadosCorte" :key="empleado.id" class="rounded-xl border p-3">
+                    <p class="mb-2 text-sm font-medium">{{ empleado.nombre }}</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <Select v-model="empleado.corteDiaSemana as string">
+                            <SelectTrigger class="h-8 text-xs">
+                                <SelectValue placeholder="Día" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="d in DIAS_CORTE" :key="d.value" :value="d.value">{{ d.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input type="time" v-model="empleado.corteHora as string" class="h-8 text-xs" />
+                        <Select v-model="empleado.corteSemanaRelativa">
+                            <SelectTrigger class="h-8 text-xs">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="anterior">Semana anterior</SelectItem>
+                                <SelectItem value="actual">Semana actual</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="mt-2 flex justify-end">
+                        <Button size="sm" variant="outline" class="h-7 text-xs"
+                            :disabled="guardandoCorteId === empleado.id" @click="guardarCorte(empleado)">
+                            Guardar
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="secondary" @click="modalCorteAbierto = false">Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

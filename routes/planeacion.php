@@ -15,6 +15,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/nueva', [PlaneacionController::class, 'create'])
                 ->middleware('permiso:'.Accion::CREATE)->name('create');
         });
+    Route::get('/empleados/corte', [PlaneacionController::class, 'empleadosCorte'])
+        ->middleware('permiso:supervisar')->name('empleados.corte.index');
+    Route::put('/empleados/{empleado}/corte', [PlaneacionController::class, 'actualizarCorteEmpleado'])
+        ->middleware('permiso:supervisar')->name('empleados.corte.update');
 
     Route::name('ingenierias.planeacion.plantas.proyectos.')
         ->prefix('planeacion/plantas/{planta}/proyectos/{proyecto}')

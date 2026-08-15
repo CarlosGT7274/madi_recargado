@@ -9,6 +9,7 @@ use App\Actions\Ingenierias\Planeacion\PlaneacionesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Planeacion\RechazarPlaneacionRequest;
 use App\Http\Requests\Ingenierias\Planeacion\StorePlaneacionRequest;
+use App\Http\Requests\Ingenierias\Planeacion\UpdateCorteEntregaRequest;
 use App\Http\Requests\Ingenierias\Planeacion\UpdateCronogramaPlaneacionRequest;
 use App\Models\Cotizacion;
 use App\Models\Empleado;
@@ -213,5 +214,19 @@ class PlaneacionController extends Controller
     public function partidasDeCotizacion(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, PartidasAction $action): JsonResponse
     {
         return response()->json($action->disponibles($cotizacion));
+    }
+
+    public function empleadosCorte(PlaneacionesAction $action): JsonResponse
+    {
+        return response()->json($action->empleadosConCorte());
+    }
+
+    public function actualizarCorteEmpleado(UpdateCorteEntregaRequest $request, Empleado $empleado, PlaneacionesAction $action): RedirectResponse
+    {
+        $action->actualizarCorte($empleado, $request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Corte de entrega actualizado.']);
+
+        return back();
     }
 }
