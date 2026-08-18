@@ -80,18 +80,34 @@ function alternarTodo() {
             class="grid items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/40"
             :style="{ gridTemplateColumns: `1fr repeat(${operaciones.length}, 64px) 56px` }"
         >
-            <div class="flex items-center gap-1.5" :style="{ paddingLeft: `${profundidad * 20}px` }">
-                <button
-                    v-if="tieneHijos"
-                    type="button"
-                    class="rounded p-0.5 text-muted-foreground hover:bg-accent"
-                    @click="abierto = !abierto"
-                >
-                    <ChevronDown v-if="abierto" class="size-4" />
-                    <ChevronRight v-else class="size-4" />
-                </button>
-                <span v-else class="w-5" />
-                <span :class="tieneHijos ? 'font-semibold' : 'font-medium'">{{ nodo.nombre }}</span>
+            <div class="flex min-w-0 items-stretch">
+                <!-- Rieles de indentación: un guía por cada nivel de profundidad -->
+                <span
+                    v-for="nivel in profundidad"
+                    :key="nivel"
+                    aria-hidden="true"
+                    class="ml-2 w-4 shrink-0 self-stretch border-l border-border/60"
+                />
+                <div class="flex min-w-0 items-center gap-1.5" :class="profundidad > 0 ? 'pl-1.5' : ''">
+                    <button
+                        v-if="tieneHijos"
+                        type="button"
+                        class="rounded p-0.5 text-muted-foreground hover:bg-accent"
+                        :aria-expanded="abierto"
+                        :aria-label="`${abierto ? 'Contraer' : 'Expandir'} ${nodo.nombre}`"
+                        @click="abierto = !abierto"
+                    >
+                        <ChevronDown v-if="abierto" class="size-4" />
+                        <ChevronRight v-else class="size-4" />
+                    </button>
+                    <span v-else class="inline-block w-5 shrink-0" />
+                    <span
+                        class="truncate"
+                        :class="profundidad === 0 ? 'font-semibold' : tieneHijos ? 'font-medium' : 'font-normal text-muted-foreground'"
+                    >
+                        {{ nodo.nombre }}
+                    </span>
+                </div>
             </div>
 
             <div v-for="op in operaciones" :key="op.id" class="flex justify-center">

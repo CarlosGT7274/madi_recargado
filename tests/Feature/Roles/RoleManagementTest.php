@@ -64,18 +64,40 @@ test('un usuario sin permiso de creación no puede crear un rol', function () {
         ->assertForbidden();
 });
 
-// test('no se puede eliminar un rol que tiene usuarios asignados', function () {
-//     $admin = usuarioConPermisoDeRoles(Accion::ALL);
-//     $rolConUsuarios = Role::factory()->create();
-//     $user = User::factory()->create();
-//     $user->roles()->attach($rolConUsuarios->id);
-//
-//     $this->actingAs($admin)
-//         ->delete(route('seguridad.roles.destroy', $rolConUsuarios))
-//         ->assertSessionHasErrors('role');
-//
-//     $this->assertDatabaseHas('roles', ['id' => $rolConUsuarios->id]);
-// });
+test('no se puede eliminar un rol que tiene usuarios asignados', function () {
+    $admin = usuarioConPermisoDeRoles(Accion::ALL);
+    $rolConUsuarios = Role::factory()->create();
+    $user = User::factory()->create();
+    $user->roles()->attach($rolConUsuarios->id);
+
+    $this->actingAs($admin)
+        ->delete(route('seguridad.roles.destroy', $rolConUsuarios))
+        ->assertSessionHasErrors('role');
+
+    $this->assertDatabaseHas('roles', ['id' => $rolConUsuarios->id]);
+});
+
+test('se puede eliminar un rol sin usuarios asignados', function () {
+    $admin = usuarioConPermisoDeRoles(Accion::ALL);
+    $rol = Role::factory()->create();
+
+    $this->actingAs($admin)
+        ->delete(route('seguridad.roles.destroy', $rol))
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseMissing('roles', ['id' => $rol->id]);
+});
+
+test('se puede actualizar el nombre de un rol', function () {
+    $admin = usuarioConPermisoDeRoles(Accion::ALL);
+    $rol = Role::factory()->create(['nombre' => 'Nombre Viejo']);
+
+    $this->actingAs($admin)
+        ->put(route('seguridad.roles.update', $rol), ['nombre' => 'Nombre Nuevo'])
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('roles', ['id' => $rol->id, 'nombre' => 'Nombre Nuevo']);
+});
 
 test('se pueden actualizar los permisos de un rol', function () {
     $admin = usuarioConPermisoDeRoles(Accion::ALL);
