@@ -31,10 +31,38 @@ const props = defineProps<{
     operaciones: Operacion[];
 }>();
 
-const valores = reactive<Record<number, number>>({ ...props.permisosAsignados });
-const procesando = ref(false);
-
 type EstadoCheck = boolean | 'indeterminate';
+
+/**
+ * El backend (Role::permisosPara) hereda: si un permiso no tiene fila
+ * propia en roles_permisos, trepa al padre y usa su máscara. `mapaPermisos`
+ * solo devuelve las filas EXPLÍCITAS, así que al editar un rol existente los
+ * hijos que heredan del padre llegarían vacíos y el árbol se vería
+ * inconsistente (padre marcado, hijos sin marcar). Resolvemos la herencia
+ * aquí, de arriba hacia abajo, para que cada nodo arranque con su estado
+ * efectivo real; enmascaramos por operacionesAplicables para no encender
+ * bits que ese objeto no soporta.
+ */
+function construirValoresIniciales(): Record<number, number> {
+    const asignados = props.permisosAsignados as Record<number, number>;
+    const resultado: Record<number, number> = {};
+
+    const recorrer = (nodos: PermisoNodo[], heredado: number) => {
+        for (const nodo of nodos) {
+            const explicito = asignados[nodo.id];
+            const base = explicito !== undefined ? explicito : heredado;
+            resultado[nodo.id] = base & nodo.operacionesAplicables;
+            recorrer(nodo.hijos, base);
+        }
+    };
+
+    recorrer(props.permisosArbol, 0);
+
+    return resultado;
+}
+
+const valores = reactive<Record<number, number>>(construirValoresIniciales());
+const procesando = ref(false);
 
 const iconos: Record<string, typeof Eye> = {
     ver: Eye,

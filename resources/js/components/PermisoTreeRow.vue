@@ -76,47 +76,45 @@ function alternarTodo() {
 
 <template>
     <div class="border-t first:border-t-0">
-        <div
-            class="grid items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/40"
-            :style="{ gridTemplateColumns: `1fr repeat(${operaciones.length}, 64px) 56px` }"
-        >
-            <div class="flex items-center gap-1.5" :style="{ paddingLeft: `${profundidad * 20}px` }">
-                <button
-                    v-if="tieneHijos"
-                    type="button"
-                    class="rounded p-0.5 text-muted-foreground hover:bg-accent"
-                    @click="abierto = !abierto"
-                >
-                    <ChevronDown v-if="abierto" class="size-4" />
-                    <ChevronRight v-else class="size-4" />
-                </button>
-                <span v-else class="w-5" />
-                <span :class="tieneHijos ? 'font-semibold' : 'font-medium'">{{ nodo.nombre }}</span>
+        <div class="grid items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/40"
+            :style="{ gridTemplateColumns: `1fr repeat(${operaciones.length}, 64px) 56px` }">
+            <div class="flex min-w-0 items-stretch">
+                <!-- Rieles de indentación: un guía por cada nivel de profundidad -->
+                <span v-for="nivel in profundidad" :key="nivel" aria-hidden="true"
+                    class="ml-2 w-4 shrink-0 self-stretch border-l border-border/60" />
+                <div class="flex min-w-0 items-center gap-1.5" :class="profundidad > 0 ? 'pl-1.5' : ''">
+                    <button v-if="tieneHijos" type="button" class="rounded p-0.5 text-muted-foreground hover:bg-accent"
+                        :aria-expanded="abierto" :aria-label="`${abierto ? 'Contraer' : 'Expandir'} ${nodo.nombre}`"
+                        @click="abierto = !abierto">
+                        <ChevronDown v-if="abierto" class="size-4" />
+                        <ChevronRight v-else class="size-4" />
+                    </button>
+                    <span v-else class="inline-block w-5 shrink-0" />
+                    <span class="truncate"
+                        :class="profundidad === 0 ? 'font-semibold' : tieneHijos ? 'font-medium' : 'font-normal text-muted-foreground'">
+                        {{ nodo.nombre }}
+                    </span>
+                </div>
             </div>
 
             <div v-for="op in operaciones" :key="op.id" class="flex justify-center">
-                <Checkbox
-                    v-if="aplica(op.bit)"
-                    :model-value="estadoBit(op.bit)"
-                    :aria-label="`${op.nombre} en ${nodo.nombre}`"
-                    @update:model-value="alternarBit(op.bit)"
-                >
+                <Checkbox v-if="aplica(op.bit)" :model-value="estadoBit(op.bit)"
+                    :aria-label="`${op.nombre} en ${nodo.nombre}`" @update:model-value="alternarBit(op.bit)">
                     <template #default="{ state }">
                         <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                         <Check v-else class="size-3.5" />
                     </template>
                 </Checkbox>
-                <span
-                    v-else
+                <span v-else
                     class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70"
-                    title="No aplica"
-                >
+                    title="No aplica">
                     N/A
                 </span>
             </div>
 
             <div class="flex justify-center">
-                <Checkbox :model-value="estadoTodo" aria-label="Todas las operaciones" @update:model-value="alternarTodo">
+                <Checkbox :model-value="estadoTodo" aria-label="Todas las operaciones"
+                    @update:model-value="alternarTodo">
                     <template #default="{ state }">
                         <Minus v-if="state === 'indeterminate'" class="size-3.5" />
                         <Check v-else class="size-3.5" />
@@ -126,16 +124,10 @@ function alternarTodo() {
         </div>
 
         <div v-if="tieneHijos && abierto" class="bg-muted/20">
-            <PermisoTreeRow
-                v-for="hijo in nodo.hijos"
-                :key="hijo.id"
-                :nodo="hijo"
-                :valores="valores"
-                :operaciones="operaciones"
-                :profundidad="profundidad + 1"
+            <PermisoTreeRow v-for="hijo in nodo.hijos" :key="hijo.id" :nodo="hijo" :valores="valores"
+                :operaciones="operaciones" :profundidad="profundidad + 1"
                 @cambiar="(ids, bit, activo) => emit('cambiar', ids, bit, activo)"
-                @modulo="(ids, activo) => emit('modulo', ids, activo)"
-            />
+                @modulo="(ids, activo) => emit('modulo', ids, activo)" />
         </div>
     </div>
 </template>

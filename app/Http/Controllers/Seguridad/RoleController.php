@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Seguridad;
 
 use App\Actions\Seguridad\Roles\RolesAction;
+use App\Exceptions\Seguridad\RolConUsuariosAsignadosException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Seguridad\Roles\StoreRoleRequest;
 use App\Http\Requests\Seguridad\Roles\UpdateRoleRequest;
@@ -43,6 +44,19 @@ class RoleController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol actualizado.']);
 
         return back();
+    }
+
+    public function destroy(Role $role, RolesAction $roleAction): RedirectResponse
+    {
+        try {
+            $roleAction->delete($role);
+        } catch (RolConUsuariosAsignadosException $e) {
+            return back()->withErrors(['role' => $e->getMessage()]);
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol eliminado.']);
+
+        return redirect()->route('seguridad.roles.index');
     }
 
     public function show(Role $role, RolesAction $roleAction): Response
