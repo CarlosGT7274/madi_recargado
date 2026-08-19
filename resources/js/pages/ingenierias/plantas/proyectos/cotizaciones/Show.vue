@@ -18,17 +18,15 @@ export default pageLayout(() => {
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     ArrowRight, Building2, CheckCircle2, Clock, DollarSign, Download,
-    FileText, Hash, MapPin, ShoppingCart, Trash2, Upload, User,
+    FileText, Hash, MapPin, ShoppingCart, Trash2, User,
 } from '@lucide/vue';
 import ProyectoController from '@/actions/App/Http/Controllers/Ingenierias/ProyectoController';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import PageLayout from '@/components/PageLayout.vue';
 import PermissionButton from '@/components/PermissionButton.vue';
 import { Button } from '@/components/ui/button';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { usePermissions } from '@/composables/usePermissions';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Eye } from '@lucide/vue';
 
 interface PlantaRef { id: number; nombre: string }
 interface ProyectoRef { id: number; nombre: string; folio: string }
@@ -92,22 +90,7 @@ const rutaOc = computed(() => ({
     cotizacion: props.cotizacion.id,
 }));
 
-const verPdf = ref(false);
-
 const urlPdf = computed(() => CotizacionController.pdfProyecto(rutaOc.value).url);
-
-const archivoOcInput = ref<HTMLInputElement | null>(null);
-
-function subirOrdenCompra(): void {
-    const archivo = archivoOcInput.value?.files?.[0];
-    if (!archivo) return;
-
-    router.post(
-        CotizacionController.subirAutorizacionProyecto(rutaOc.value).url,
-        { archivo },
-        { forceFormData: true, preserveScroll: true },
-    );
-}
 
 function eliminar(): void {
     if (!confirm(`¿Eliminar la cotización "${props.cotizacion.folio}"? Esta acción no se puede deshacer.`)) {
@@ -288,65 +271,55 @@ function formatoMoneda(valor: number | null | undefined): string {
         </div>
 
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
-            <div class="mb-4 flex items-center gap-2">
-                <ShoppingCart class="size-5" />
-                <p class="text-lg font-semibold">Orden de Compra</p>
-            </div>
+            <p class="text-lg font-semibold">Seguimiento de la cotización</p>
+            <p class="mb-5 text-sm text-muted-foreground">
+                El estado del proyecto y el documento de OC se gestionan de manera independiente.
+            </p>
 
-            <Collapsible v-if="cotizacion.pdfAutorizacion" v-model:open="verPdf">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                            <CheckCircle2 class="size-4" />
-                        </div>
-                        <div>
-                            <p class="font-medium">Orden de compra cargada</p>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <CollapsibleTrigger as-child>
-                            <Button variant="outline" size="sm">
-                                <Eye class="mr-1.5 size-3.5" />
-                                {{ verPdf ? 'Ocultar' : 'Ver' }}
-                                <ChevronDown class="ml-1.5 size-3.5 transition-transform"
-                                    :class="verPdf ? 'rotate-180' : ''" />
-                            </Button>
-                        </CollapsibleTrigger>
-
-                        <a :href="cotizacion.pdfAutorizacion" target="_blank">
-                            <Button variant="outline" size="sm">
-                                <Download class="mr-1.5 size-3.5" />
-                                Descargar
-                            </Button>
-                        </a>
+            <div class="rounded-xl border p-4" :class="[
+                cotizacion.completada
+                    ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20'
+                    : '',
+            ]">
+                <div class="mb-3 flex items-center gap-2">
+                    <ShoppingCart class="size-5" :class="cotizacion.completada
+                            ? 'text-emerald-600'
+                            : 'text-muted-foreground'
+                        " />
+                    <div>
+                        <p class="font-semibold">Orden de Compra</p>
+                        <p class="text-xs text-muted-foreground">
+                            Administra el PDF y el estatus manualmente
+                        </p>
                     </div>
                 </div>
 
-                <CollapsibleContent class="mt-4 overflow-hidden rounded-xl border bg-muted/20">
-                    <iframe :src="cotizacion.pdfAutorizacion" class="h-[70vh] w-full" title="Orden de Compra" />
-                </CollapsibleContent>
-            </Collapsible>
-
-            <label v-else
-                class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">
-                <Upload class="size-5" />
-                <span class="text-primary">Seleccionar PDF</span>
-                <span class="text-xs">Con solo subirlo, este requisito queda cumplido</span>
-                <input ref="archivoOcInput" type="file" accept="application/pdf" class="hidden"
-                    @change="subirOrdenCompra" />
-            </label>
+                <div class="rounded-lg border bg-muted/30 p-3">
+                    <p class="text-sm font-medium">Gestión de OC</p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                        El estado puede cerrarse sin PDF; el documento se carga después desde el panel de gestión.
+                    </p>
+                    <Link class="mt-3 block" :href="CotizacionController.ordenCompraProyecto(rutaOc).url">
+                        <Button class="w-full">Abrir gestión de OC</Button>
+                    </Link>
+                </div>
+            </div>
 
             <div class="mt-5 flex items-start gap-3 rounded-lg border px-4 py-3" :class="cotizacion.completada
                 ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30'
                 : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30'">
                 <component :is="cotizacion.completada ? CheckCircle2 : Clock" class="mt-0.5 size-4 shrink-0"
                     :class="cotizacion.completada ? 'text-emerald-600' : 'text-amber-600'" />
-                <p class="text-sm font-medium"
-                    :class="cotizacion.completada ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'">
-                    {{ cotizacion.completada ? 'Cotización completada' : 'Falta subir la orden de compra' }}
-                </p>
+                <div>
+                    <p class="text-sm font-semibold"
+                        :class="cotizacion.completada ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'">
+                        {{ cotizacion.completada ? 'Proyecto completado' : 'Proyecto en gestión' }}
+                    </p>
+                    <p class="text-sm"
+                        :class="cotizacion.completada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'">
+                        {{ cotizacion.completada ? 'El proyecto puede continuar aunque el PDF de la OC se cargue después.' : 'Puedes actualizar el estatus y cargar el PDF desde el panel de la OC.' }}
+                    </p>
+                </div>
             </div>
         </div>
 

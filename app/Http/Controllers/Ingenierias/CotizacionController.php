@@ -12,13 +12,13 @@ use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\StorePartidaRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\UpdatePartidaRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\StoreCotizacionManualRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\UpdateCotizacionRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\UpdateEstatusCompraRequest;
 use App\Imports\Cotizaciones\CotizacionExcelImport;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
 use App\Models\Partida;
 use App\Models\Planta;
 use App\Models\Proyecto;
-use App\Support\Accion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -40,6 +40,65 @@ class CotizacionController extends Controller
         return back();
     }
 
+    public function ordenCompraProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion): Response
+    {
+        $pdf = $cotizacion->archivos()->where('tipo_archivo', 'pdf')->latest('fecha_creacion')->first();
+
+        return Inertia::render('ingenierias/plantas/proyectos/cotizaciones/orden-compra/Show', [
+            'planta' => ['id' => $planta->id, 'nombre' => $planta->nombre],
+            'proyecto' => ['id' => $proyecto->id, 'nombre' => $proyecto->nombre],
+            'cotizacion' => [
+                'id' => $cotizacion->id,
+                'folio' => $cotizacion->folio,
+                'obra' => $cotizacion->obra,
+                'total' => (float) $cotizacion->total,
+                'completada' => $cotizacion->estaCompletada(),
+                'estatusCompra' => $cotizacion->estatus_compra,
+                'fechaEstatus' => $cotizacion->fecha_aprobacion_compra?->format('d/m/Y H:i'),
+            ],
+            'archivoId' => $pdf?->id,
+            'pdfUrl' => $pdf?->urlPublica(),
+            'pdfNombre' => $pdf?->nombre_archivo,
+            'subidoEl' => $pdf?->fecha_creacion?->format('d/m/Y H:i'),
+        ]);
+    }
+
+    public function actualizarEstatusCompraProyecto(UpdateEstatusCompraRequest $request, Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->actualizarEstatusCompra($cotizacion, $request->validated('estatus_compra'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Estatus de la OC actualizado.']);
+
+        return back();
+    }
+
+    public function solicitarRevisionCompraProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->solicitarRevisionSinPdf($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Revisión solicitada.']);
+
+        return back();
+    }
+
+    public function aprobarCompraProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->aprobarCompra($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización aprobada.']);
+
+        return back();
+    }
+
+    public function rechazarCompraProyecto(Planta $planta, Proyecto $proyecto, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->rechazarCompra($cotizacion);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización rechazada.']);
+
+        return back();
+    }
+
     public function ordenCompra(Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion): Response
     {
         $pdf = $cotizacion->archivos()->where('tipo_archivo', 'pdf')->latest('fecha_creacion')->first();
@@ -54,6 +113,9 @@ class CotizacionController extends Controller
                 'obra' => $cotizacion->obra,
                 'total' => (float) $cotizacion->total,
                 'tieneInsumos' => $cotizacion->tieneInsumos(),
+                'completada' => $cotizacion->estaCompletada(),
+                'estatusCompra' => $cotizacion->estatus_compra,
+                'fechaEstatus' => $cotizacion->fecha_aprobacion_compra?->format('d/m/Y H:i'),
             ],
             'archivoId' => $pdf?->id,
             'pdfUrl' => $pdf?->urlPublica(),
@@ -286,6 +348,15 @@ class CotizacionController extends Controller
         $action->subirPdfAutorizacion($cotizacion, $request->file('archivo'));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Autorización subida.']);
+
+        return back();
+    }
+
+    public function actualizarEstatusCompra(UpdateEstatusCompraRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->actualizarEstatusCompra($cotizacion, $request->validated('estatus_compra'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Estatus de la OC actualizado.']);
 
         return back();
     }

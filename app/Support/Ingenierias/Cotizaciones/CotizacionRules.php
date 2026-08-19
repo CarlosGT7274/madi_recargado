@@ -21,7 +21,7 @@ class CotizacionRules
             'correo_vendedor' => ['nullable', 'email', 'max:255'],
             'proveedor' => ['nullable', 'string', 'max:255'],
             'tiempo_entrega' => ['nullable', 'string', 'max:100'],
-            'dias_credito' => ['nullable', 'string', 'max:50'],
+            'dias_credito' => ['nullable', 'string', 'max:255'],
             'vigencia_cotizacion' => ['nullable', 'string', 'max:100'],
             'notas' => ['nullable', 'string'],
             'iva' => ['nullable', 'numeric', 'min:0'],

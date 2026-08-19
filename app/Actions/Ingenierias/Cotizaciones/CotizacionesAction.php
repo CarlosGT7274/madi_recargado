@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
 class CotizacionesAction
 {
@@ -312,12 +311,6 @@ class CotizacionesAction
 
     public function subirPdfAutorizacion(Cotizacion $cotizacion, UploadedFile $archivo): Cotizacion
     {
-        if (! $cotizacion->esDeProyectoDirecto() && ! $cotizacion->tieneInsumos()) {
-            throw ValidationException::withMessages([
-                'archivo' => 'Debes completar la Explosión de Insumos antes de subir la Orden de Compra.',
-            ]);
-        }
-
         $ruta = $archivo->store('archivos/cotizacion_autorizacion', 'public');
 
         $cotizacion->archivos()->create([
@@ -330,6 +323,17 @@ class CotizacionesAction
             'url' => $ruta,
             'storage_driver' => 'public',
             'usuario_id' => Auth::id(),
+        ]);
+
+        return $cotizacion->fresh();
+    }
+
+    public function actualizarEstatusCompra(Cotizacion $cotizacion, string $estatus): Cotizacion
+    {
+        $cotizacion->update([
+            'estatus_compra' => $estatus,
+            'aprobador_compra_id' => Auth::id(),
+            'fecha_aprobacion_compra' => $estatus === 'aprobado' ? now() : null,
         ]);
 
         return $cotizacion->fresh();

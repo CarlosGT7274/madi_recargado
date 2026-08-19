@@ -1,9 +1,8 @@
 <script lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import {
-    breadcrumbsCotizacion,
+    breadcrumbsCotizacionDirecto,
     type CotizacionRef,
-    type LevantamientoRef,
     type PlantaRef,
     type ProyectoRef,
     pageLayout,
@@ -12,20 +11,13 @@ import {
 interface Props {
     planta: PlantaRef;
     proyecto: ProyectoRef;
-    levantamiento: LevantamientoRef;
     cotizacion: CotizacionRef & { obra?: string | number | null };
 }
 
 export default pageLayout(() => {
-    const { planta, proyecto, levantamiento, cotizacion } =
+    const { planta, proyecto, cotizacion } =
         usePage<Props>().props;
-    return breadcrumbsCotizacion(
-        planta,
-        proyecto,
-        levantamiento,
-        cotizacion,
-        cotizacion.obra,
-    );
+    return breadcrumbsCotizacionDirecto(planta, proyecto, cotizacion);
 });
 </script>
 
@@ -33,7 +25,6 @@ export default pageLayout(() => {
 import { Head, router } from '@inertiajs/vue3';
 import {
     Check,
-    CheckCircle2,
     ChevronLeft,
     CircleAlert,
     FileCheck2,
@@ -56,10 +47,6 @@ interface ProyectoInfo {
     id: number;
     nombre: string;
 }
-interface LevantamientoInfo {
-    id: number;
-    folio: string;
-}
 type EstadoCompra = 'pendiente' | 'en_cotizacion' | 'aprobado' | 'rechazado';
 
 interface CotizacionInfo {
@@ -74,7 +61,6 @@ interface CotizacionInfo {
 const props = defineProps<{
     planta: PlantaInfo;
     proyecto: ProyectoInfo;
-    levantamiento: LevantamientoInfo;
     cotizacion: CotizacionInfo;
     archivoId: number | null;
     pdfUrl: string | null;
@@ -85,7 +71,6 @@ const props = defineProps<{
 const rutaOc = computed(() => ({
     planta: props.planta.id,
     proyecto: props.proyecto.id,
-    levantamiento: props.levantamiento.id,
     cotizacion: props.cotizacion.id,
 }));
 
@@ -131,16 +116,11 @@ const esCompletado = computed(
     () => props.cotizacion.estatusCompra === 'aprobado',
 );
 const tieneDocumento = computed(() => Boolean(props.pdfUrl));
-const mensajeDocumento = computed(() => {
-    if (tieneDocumento.value) return 'Documento cargado';
-    if (esCompletado.value) return 'Pendiente de documento';
-    return 'Sin documento';
-});
 
 function guardarEstatus(): void {
     guardandoEstatus.value = true;
     router.post(
-        CotizacionController.actualizarEstatusCompra(rutaOc.value).url,
+        CotizacionController.actualizarEstatusCompraProyecto(rutaOc.value).url,
         { estatus_compra: estatus.value },
         {
             preserveScroll: true,
@@ -159,7 +139,7 @@ function subirArchivo(): void {
     archivoSeleccionado.value = archivo.name;
 
     router.post(
-        CotizacionController.subirAutorizacion(rutaOc.value).url,
+        CotizacionController.subirAutorizacionProyecto(rutaOc.value).url,
         { archivo },
         {
             forceFormData: true,
@@ -239,59 +219,6 @@ function volver(): void {
                     </div>
                 </div>
             </header>
-
-            <!-- <div class="mt-6 grid gap-4 md:grid-cols-3"> -->
-            <!--     <div class="rounded-2xl border bg-card p-5"> -->
-            <!--         <div class="flex items-center justify-between"> -->
-            <!--             <span class="text-sm text-muted-foreground">Estado</span> -->
-            <!--             <CheckCircle2 class="size-5" :class="esCompletado -->
-            <!--                     ? 'text-emerald-600' -->
-            <!--                     : 'text-muted-foreground' -->
-            <!--                 " /> -->
-            <!--         </div> -->
-            <!--         <p class="mt-3 text-lg font-semibold"> -->
-            <!--             {{ estadoActual.label }} -->
-            <!--         </p> -->
-            <!--         <p class="mt-1 text-sm text-muted-foreground"> -->
-            <!--             {{ estadoActual.description }} -->
-            <!--         </p> -->
-            <!--     </div> -->
-            <!--     <div class="rounded-2xl border bg-card p-5"> -->
-            <!--         <div class="flex items-center justify-between"> -->
-            <!--             <span class="text-sm text-muted-foreground">Documento</span> -->
-            <!--             <FileCheck2 class="size-5" :class="tieneDocumento -->
-            <!--                     ? 'text-emerald-600' -->
-            <!--                     : 'text-amber-600' -->
-            <!--                 " /> -->
-            <!--         </div> -->
-            <!--         <p class="mt-3 text-lg font-semibold"> -->
-            <!--             {{ mensajeDocumento }} -->
-            <!--         </p> -->
-            <!--         <p class="mt-1 text-sm text-muted-foreground"> -->
-            <!--             {{ -->
-            <!--                 tieneDocumento -->
-            <!--                     ? pdfNombre -->
-            <!--                     : 'El PDF puede llegar después.' -->
-            <!--             }} -->
-            <!--         </p> -->
-            <!--     </div> -->
-            <!--     <div class="rounded-2xl border bg-card p-5"> -->
-            <!--         <div class="flex items-center justify-between"> -->
-            <!--             <span class="text-sm text-muted-foreground">Relación</span> -->
-            <!--             <FileText class="size-5 text-primary" /> -->
-            <!--         </div> -->
-            <!--         <p class="mt-3 text-lg font-semibold"> -->
-            <!--             {{ -->
-            <!--                 esCompletado && !tieneDocumento -->
-            <!--                     ? 'Cierre sin PDF' -->
-            <!--                     : 'Gestión independiente' -->
-            <!--             }} -->
-            <!--         </p> -->
-            <!--         <p class="mt-1 text-sm text-muted-foreground"> -->
-            <!--             Estado y documento se gestionan por separado. -->
-            <!--         </p> -->
-            <!--     </div> -->
-            <!-- </div> -->
 
             <div v-if="esCompletado && !tieneDocumento"
                 class="mt-6 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
