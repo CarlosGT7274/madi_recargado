@@ -47,7 +47,7 @@ interface ProyectoInfo {
     id: number;
     nombre: string;
 }
-type EstadoCompra = 'pendiente' | 'en_cotizacion' | 'aprobado' | 'rechazado';
+type EstadoCompra = 'pendiente' | 'aprobado' | 'rechazado';
 
 interface CotizacionInfo {
     id: number;
@@ -90,11 +90,6 @@ const estadosCompra: Array<{
             description: 'Aún no se ha definido el cierre.',
         },
         {
-            value: 'en_cotizacion',
-            label: 'En cotización',
-            description: 'La compra sigue en gestión.',
-        },
-        {
             value: 'aprobado',
             label: 'Completado',
             description: 'El proyecto puede cerrarse aunque falte el PDF.',
@@ -129,9 +124,7 @@ function guardarEstatus(): void {
     );
 }
 
-function elegirArchivo(): void {
-    archivoInput.value?.click();
-}
+
 
 function subirArchivo(): void {
     const archivo = archivoInput.value?.files?.[0];
@@ -309,8 +302,7 @@ function volver(): void {
                     </div>
 
                     <label
-                        class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-5 text-sm font-medium text-muted-foreground transition hover:border-primary hover:bg-primary/5"
-                        @click.prevent="elegirArchivo">
+                        class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-5 text-sm font-medium text-muted-foreground transition hover:border-primary hover:bg-primary/5">
                         <Upload class="size-5 text-primary" />
                         <span>{{
                             tieneDocumento
