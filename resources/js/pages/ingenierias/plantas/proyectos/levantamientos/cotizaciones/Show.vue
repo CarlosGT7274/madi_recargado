@@ -591,14 +591,70 @@ function formatoMoneda(valor: number | null | undefined): string {
                                 Administra el PDF y el estatus manualmente
                             </p>
                         </div>
+                        <span
+                            class="ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
+                            :class="
+                                cotizacion.completada
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                    : 'bg-muted text-muted-foreground'
+                            "
+                        >
+                            {{
+                                cotizacion.completada
+                                    ? 'Completado'
+                                    : cotizacion.estatusCompra === 'rechazado'
+                                      ? 'Rechazado'
+                                      : cotizacion.estatusCompra ===
+                                          'en_cotizacion'
+                                        ? 'En cotización'
+                                        : 'Pendiente'
+                            }}
+                        </span>
                     </div>
 
-                    <div class="rounded-lg border bg-muted/30 p-3">
-                        <p class="text-sm font-medium">Gestión independiente</p>
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            El estado puede cerrarse sin PDF; el documento se
-                            carga después desde el panel.
-                        </p>
+                    <div
+                        class="rounded-lg border p-3"
+                        :class="
+                            cotizacion.pdfAutorizacion
+                                ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20'
+                                : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20'
+                        "
+                    >
+                        <div class="flex items-start gap-2">
+                            <FileText
+                                class="mt-0.5 size-4 shrink-0"
+                                :class="
+                                    cotizacion.pdfAutorizacion
+                                        ? 'text-emerald-600'
+                                        : 'text-amber-600'
+                                "
+                            />
+                            <div>
+                                <p
+                                    class="text-sm font-medium"
+                                    :class="
+                                        cotizacion.pdfAutorizacion
+                                            ? 'text-emerald-800 dark:text-emerald-300'
+                                            : 'text-amber-800 dark:text-amber-300'
+                                    "
+                                >
+                                    {{
+                                        cotizacion.pdfAutorizacion
+                                            ? 'Documento de OC cargado'
+                                            : cotizacion.completada
+                                              ? 'Completado, falta el documento de OC'
+                                              : 'Documento de OC pendiente'
+                                    }}
+                                </p>
+                                <p class="mt-1 text-xs text-muted-foreground">
+                                    {{
+                                        cotizacion.pdfAutorizacion
+                                            ? 'Puedes reemplazarlo desde el panel de gestión.'
+                                            : 'El estado del proyecto puede cambiarse sin esperar este archivo.'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
                         <Link
                             class="mt-3 block"
                             :href="CotizacionController.ordenCompra(rutaOc).url"
