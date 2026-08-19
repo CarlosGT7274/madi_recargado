@@ -173,7 +173,7 @@ function eliminarPdf(): void {
 }
 
 function volver(): void {
-    router.visit('..');
+    router.visit(CotizacionController.show(rutaOc.value).url);
 }
 </script>
 

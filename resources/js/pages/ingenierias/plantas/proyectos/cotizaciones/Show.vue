@@ -25,7 +25,7 @@ import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/Cot
 import PageLayout from '@/components/PageLayout.vue';
 import PermissionButton from '@/components/PermissionButton.vue';
 import { Button } from '@/components/ui/button';
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { usePermissions } from '@/composables/usePermissions';
 
 interface PlantaRef { id: number; nombre: string }
@@ -91,6 +91,10 @@ const rutaOc = computed(() => ({
 }));
 
 const urlPdf = computed(() => CotizacionController.pdfProyecto(rutaOc.value).url);
+
+onMounted(() => {
+    router.reload({ only: ['cotizacion'] });
+});
 
 function eliminar(): void {
     if (!confirm(`¿Eliminar la cotización "${props.cotizacion.folio}"? Esta acción no se puede deshacer.`)) {
