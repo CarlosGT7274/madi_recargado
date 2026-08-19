@@ -335,6 +335,17 @@ class CotizacionesAction
         return $cotizacion->fresh();
     }
 
+    public function actualizarEstatusCompra(Cotizacion $cotizacion, string $estatus): Cotizacion
+    {
+        $cotizacion->update([
+            'estatus_compra' => $estatus,
+            'aprobador_compra_id' => Auth::id(),
+            'fecha_aprobacion_compra' => $estatus === 'aprobado' ? now() : null,
+        ]);
+
+        return $cotizacion->fresh();
+    }
+
     public function solicitarRevisionSinPdf(Cotizacion $cotizacion): Cotizacion
     {
         $cotizacion->update(['estatus_compra' => 'en_cotizacion']);

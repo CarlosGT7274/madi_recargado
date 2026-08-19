@@ -12,6 +12,7 @@ use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\StorePartidaRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\Partidas\UpdatePartidaRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\StoreCotizacionManualRequest;
 use App\Http\Requests\Ingenierias\Cotizaciones\UpdateCotizacionRequest;
+use App\Http\Requests\Ingenierias\Cotizaciones\UpdateEstatusCompraRequest;
 use App\Imports\Cotizaciones\CotizacionExcelImport;
 use App\Models\Cotizacion;
 use App\Models\Levantamiento;
@@ -54,6 +55,9 @@ class CotizacionController extends Controller
                 'obra' => $cotizacion->obra,
                 'total' => (float) $cotizacion->total,
                 'tieneInsumos' => $cotizacion->tieneInsumos(),
+                'completada' => $cotizacion->estaCompletada(),
+                'estatusCompra' => $cotizacion->estatus_compra,
+                'fechaEstatus' => $cotizacion->fecha_aprobacion_compra?->format('d/m/Y H:i'),
             ],
             'archivoId' => $pdf?->id,
             'pdfUrl' => $pdf?->urlPublica(),
@@ -286,6 +290,15 @@ class CotizacionController extends Controller
         $action->subirPdfAutorizacion($cotizacion, $request->file('archivo'));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Autorización subida.']);
+
+        return back();
+    }
+
+    public function actualizarEstatusCompra(UpdateEstatusCompraRequest $request, Planta $planta, Proyecto $proyecto, Levantamiento $levantamiento, Cotizacion $cotizacion, CotizacionesAction $action): RedirectResponse
+    {
+        $action->actualizarEstatusCompra($cotizacion, $request->validated('estatus_compra'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Estatus de la OC actualizado.']);
 
         return back();
     }

@@ -118,6 +118,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::READ)->name('index');
             Route::post('/', [CotizacionController::class, 'subirAutorizacion'])
                 ->middleware('permiso:'.Accion::CREATE)->name('store');
+            Route::post('/estatus', [CotizacionController::class, 'actualizarEstatusCompra'])
+                ->middleware('permiso:'.Accion::UPDATE)->name('estatus');
             Route::post('/solicitar-revision', [CotizacionController::class, 'solicitarRevisionCompra'])
                 ->middleware('permiso:'.Accion::CREATE)->name('solicitar-revision');
             Route::post('/aprobar', [CotizacionController::class, 'aprobarCompra'])
