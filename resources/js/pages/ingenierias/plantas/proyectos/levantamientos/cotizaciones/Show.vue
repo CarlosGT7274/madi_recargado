@@ -44,9 +44,7 @@ import {
     FileWarning,
     Hash,
     MapPin,
-    ShoppingCart,
     Trash2,
-    Upload,
     User,
 } from '@lucide/vue';
 import LevantamientoController from '@/actions/App/Http/Controllers/Ingenierias/LevantamientoController';
@@ -54,15 +52,6 @@ import PageLayout from '@/components/PageLayout.vue';
 import { Button } from '@/components/ui/button';
 import { computed, onMounted, ref } from 'vue';
 import InsumoController from '@/actions/App/Http/Controllers/Ingenierias/InsumoController';
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import CotizacionController from '@/actions/App/Http/Controllers/Ingenierias/CotizacionController';
 import { usePermissions } from '@/composables/usePermissions';
 
@@ -148,11 +137,6 @@ const rutaOc = computed(() => ({
 
 const urlPdf = computed(() => CotizacionController.pdf(rutaOc.value).url);
 
-const ocDialogOpen = ref(false);
-const archivoOcInput = ref<HTMLInputElement | null>(null);
-
-const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
-
 /**
  * `cotizacion.tiene_insumos`/`completada` se calculan en el servidor y se
  * envían como snapshot estático. Cuando el usuario navega con "atrás" del
@@ -164,21 +148,6 @@ const ocHabilitada = computed(() => props.cotizacion.tiene_insumos);
 onMounted(() => {
     router.reload({ only: ['cotizacion'] });
 });
-
-function subirOrdenCompra(): void {
-    const archivo = archivoOcInput.value?.files?.[0];
-    if (!archivo) return;
-
-    router.post(
-        CotizacionController.subirAutorizacion(rutaOc.value).url,
-        { archivo },
-        {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => (ocDialogOpen.value = false),
-        },
-    );
-}
 
 function eliminar(): void {
     if (
@@ -473,9 +442,10 @@ function formatoMoneda(valor: number | null | undefined): string {
         </div>
 
         <div class="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
-            <p class="text-lg font-semibold">Proceso de Cotización</p>
+            <p class="text-lg font-semibold">Seguimiento de la cotización</p>
             <p class="mb-5 text-sm text-muted-foreground">
-                Completa las fases en orden para procesar la cotización
+                La Explosión de Insumos, el estado del proyecto y el documento
+                de OC se gestionan por separado.
             </p>
 
             <div
@@ -601,7 +571,6 @@ function formatoMoneda(valor: number | null | undefined): string {
                 <div
                     class="rounded-xl border p-4"
                     :class="[
-                        !ocHabilitada && 'opacity-60',
                         cotizacion.completada
                             ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20'
                             : '',
@@ -624,94 +593,20 @@ function formatoMoneda(valor: number | null | undefined): string {
                         </div>
                     </div>
 
-                    <template v-if="!ocHabilitada">
-                        <p class="text-sm text-muted-foreground">
-                            Primero completa la Explosión de Insumos para
-                            habilitar este paso.
+                    <div class="rounded-lg border bg-muted/30 p-3">
+                        <p class="text-sm font-medium">Gestión independiente</p>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                            El estado puede cerrarse sin PDF; el documento se
+                            carga después desde el panel.
                         </p>
-                    </template>
-
-                    <template v-else-if="cotizacion.completada">
-                        <div
-                            class="rounded-lg bg-white/60 px-3 py-2 text-sm dark:bg-black/20"
-                        >
-                            <p
-                                class="font-medium text-emerald-700 dark:text-emerald-400"
-                            >
-                                ✓ Fase completada
-                            </p>
-                        </div>
                         <Link
                             class="mt-3 block"
                             :href="CotizacionController.ordenCompra(rutaOc).url"
                         >
-                            <Button
-                                class="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-                                >Ver Orden de Compra</Button
-                            >
+                            <Button class="w-full">Abrir gestión de OC</Button>
                         </Link>
-                    </template>
-
-                    <template v-else>
-                        <div
-                            class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20"
-                        >
-                            <p
-                                class="text-sm font-medium text-blue-700 dark:text-blue-400"
-                            >
-                                Opción 1: Subir orden de compra
-                            </p>
-                            <p class="mb-2 text-xs text-muted-foreground">
-                                Sube el PDF de la orden de compra
-                            </p>
-                            <Button class="w-full" @click="ocDialogOpen = true">
-                                <ShoppingCart class="mr-2 size-4" />
-                                Subir PDF
-                            </Button>
-                        </div>
-
-                        <Link
-                            class="block"
-                            :href="CotizacionController.ordenCompra(rutaOc).url"
-                        >
-                            <Button variant="outline" class="w-full"
-                                >Abrir panel de OC y estatus</Button
-                            >
-                        </Link>
-                    </template>
+                    </div>
                 </div>
-
-                <Dialog v-model:open="ocDialogOpen">
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Subir Orden de Compra</DialogTitle>
-                            <DialogDescription
-                                >Selecciona el PDF de la orden de
-                                compra.</DialogDescription
-                            >
-                        </DialogHeader>
-
-                        <label
-                            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent"
-                        >
-                            <Upload class="size-5" />
-                            <span class="text-primary">Seleccionar PDF</span>
-                            <input
-                                ref="archivoOcInput"
-                                type="file"
-                                accept="application/pdf"
-                                class="hidden"
-                                @change="subirOrdenCompra"
-                            />
-                        </label>
-
-                        <DialogFooter>
-                            <DialogClose as-child>
-                                <Button variant="secondary">Cancelar</Button>
-                            </DialogClose>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
             </div>
 
             <div
@@ -742,8 +637,8 @@ function formatoMoneda(valor: number | null | undefined): string {
                     >
                         {{
                             cotizacion.completada
-                                ? 'Flujo aprobado'
-                                : 'Flujo en proceso'
+                                ? 'Proyecto completado'
+                                : 'Proyecto en gestión'
                         }}
                     </p>
                     <p
