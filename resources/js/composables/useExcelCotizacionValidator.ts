@@ -103,12 +103,16 @@ function parsearFechaTexto(valor: string): Date | null {
         anio = Number(m[3]);
         if (anio < 100) anio += anio < 70 ? 2000 : 1900;
 
-        // Descarte de ambigüedad: si "a" no puede ser mes (>12), es día.
         if (a > 12 && b <= 12) {
+            // "a" no puede ser mes → es día. Formato d/m/Y.
             dia = a;
             mes = b;
+        } else if (b > 12 && a <= 12) {
+            // "b" no puede ser mes → es día. Formato m/d/Y (US).
+            mes = a;
+            dia = b;
         } else {
-            // Ambiguo o ambos ≤ 12: convención del sistema = día/mes/año.
+            // Ambiguo (ambos ≤ 12) o ambos inválidos: convención del sistema = día/mes/año.
             dia = a;
             mes = b;
         }

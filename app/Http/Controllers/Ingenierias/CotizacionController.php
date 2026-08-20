@@ -22,6 +22,7 @@ use App\Models\Proyecto;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -160,7 +161,10 @@ class CotizacionController extends Controller
     /**
      * El Excel es la fuente de verdad de la Cotización: crea SIEMPRE una
      * nueva versión, aunque ya exista una cotización previa con la misma
-     * obra en este levantamiento.
+     * obra en este levantamiento. Si el Excel trae errores, no se crea
+     * NADA (ni la cotización ni las partidas) — el import es todo o
+     * nada, igual que un formulario que no guarda nada si un campo
+     * falla.
      */
     public function store(
         ImportCotizacionRequest $request,
@@ -173,10 +177,14 @@ class CotizacionController extends Controller
         $import = new CotizacionExcelImport($levantamiento, $action, $partidasAction);
         Excel::import($import, $request->file('archivo'));
 
+        if (! empty($import->errores())) {
+            throw ValidationException::withMessages($this->erroresParaFormulario($import->errores()));
+        }
+
         $cotizacion = $import->cotizacion();
 
         Inertia::flash('toast', [
-            'type' => empty($import->errores()) ? 'success' : 'warning',
+            'type' => 'success',
             'message' => "Cotización creada con {$import->partidasCreadas()} partidas.",
         ]);
 
@@ -246,6 +254,11 @@ class CotizacionController extends Controller
         ]);
     }
 
+    /**
+     * Equivalente a store(), para el flujo de Proyecto directo. Mismo
+     * comportamiento todo-o-nada: si el Excel trae errores, no se crea
+     * nada y el usuario recibe fila+columna+motivo de cada error.
+     */
     public function storeProyecto(
         ImportCotizacionRequest $request,
         Planta $planta,
@@ -256,10 +269,14 @@ class CotizacionController extends Controller
         $import = new CotizacionExcelImport($proyecto, $action, $partidasAction);
         Excel::import($import, $request->file('archivo'));
 
+        if (! empty($import->errores())) {
+            throw ValidationException::withMessages($this->erroresParaFormulario($import->errores()));
+        }
+
         $cotizacion = $import->cotizacion();
 
         Inertia::flash('toast', [
-            'type' => empty($import->errores()) ? 'success' : 'warning',
+            'type' => 'success',
             'message' => "Cotización creada con {$import->partidasCreadas()} partidas.",
         ]);
 
@@ -386,5 +403,28 @@ class CotizacionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Cotización rechazada.']);
 
         return back();
+    }
+
+    /**
+     * Convierte los errores del import (fila del Excel => mensajes ya
+     * legibles "Partida X, columna Y: motivo") al formato de errores de
+     * un FormRequest, para que ValidationException los mande igual que
+     * cualquier otro error de formulario y el frontend los lea de
+     * page.props.errors sin ningún mecanismo especial.
+     *
+     * @param  array<int, array<int, string>>  $errores
+     * @return array<string, string>
+     */
+    private function erroresParaFormulario(array $errores): array
+    {
+        $mensajes = [];
+
+        foreach ($errores as $fila => $erroresFila) {
+            foreach ($erroresFila as $indice => $mensaje) {
+                $mensajes["archivo_fila_{$fila}_{$indice}"] = $fila > 0 ? "Fila {$fila}: {$mensaje}" : $mensaje;
+            }
+        }
+
+        return $mensajes;
     }
 }
