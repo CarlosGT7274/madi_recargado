@@ -54,6 +54,8 @@ import { Label } from '@/components/ui/label';
 import { ChevronDown } from '@lucide/vue';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import CotizacionManualForm from './components/CotizacionManualForm.vue';
+import SubirCotizacionExcelInput from '@/components/SubirCotizacionExcelInput.vue';
+
 
 type PlantaRef = { id: number; nombre: string };
 
@@ -227,19 +229,13 @@ const nombreMes = computed(() =>
 
 const diasSemana = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-// --- Proyecto directo: subir cotización ---
-const archivoCotizacionInput = ref<HTMLInputElement | null>(null);
-
 const captureManualOpen = ref(false);
 
-function subirCotizacionExcel(): void {
-    const archivo = archivoCotizacionInput.value?.files?.[0];
-    if (!archivo) return;
-
+function subirCotizacionValidada(archivo: File): void {
     router.post(
         CotizacionController.storeProyecto({ planta: props.planta.id, proyecto: props.proyecto.id }).url,
         { archivo },
-        { forceFormData: true, preserveScroll: true, onFinish: () => { if (archivoCotizacionInput.value) archivoCotizacionInput.value.value = ''; } },
+        { forceFormData: true, preserveScroll: true },
     );
 }
 
@@ -258,7 +254,8 @@ function formatoMoneda(valor: number | null): string {
         @delete="eliminarProyecto">
         <Dialog v-model:open="editDialogOpen">
             <DialogContent>
-                <Form :action="ProyectoController.update([planta.id, proyecto.id]).url" :method="ProyectoController.update([planta.id, proyecto.id]).method"
+                <Form :action="ProyectoController.update([planta.id, proyecto.id]).url"
+                    :method="ProyectoController.update([planta.id, proyecto.id]).method"
                     :options="{ preserveScroll: true }" @success="editDialogOpen = false"
                     v-slot="{ errors, processing }" class="space-y-4">
                     <DialogHeader>
@@ -313,7 +310,8 @@ function formatoMoneda(valor: number | null): string {
                         </div>
                     </div>
 
-                    <PermissionButton v-if="proyecto.tipo === 'grande'" endpoint="ingenierias.plantas.proyectos.levantamientos" :accion="Accion.CREATE"
+                    <PermissionButton v-if="proyecto.tipo === 'grande'"
+                        endpoint="ingenierias.plantas.proyectos.levantamientos" :accion="Accion.CREATE"
                         :href="LevantamientoController.create({ planta: planta.id, proyecto: proyecto.id }).url">
                         <Plus class="size-4" />
                         Nuevo Levantamiento
@@ -321,23 +319,21 @@ function formatoMoneda(valor: number | null): string {
 
                     <div v-else class="flex flex-col items-end gap-2">
                         <div class="flex items-center gap-2">
-                            <a v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)" :href="CotizacionController.plantillaProyecto([planta.id, proyecto.id]).url">
+                            <a v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)"
+                                :href="CotizacionController.plantillaProyecto([planta.id, proyecto.id]).url">
                                 <Button variant="outline">
                                     <Download class="size-4" />
                                     Descargar Plantilla
                                 </Button>
                             </a>
 
-                            <label v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)">
-                                <Button as="span" class="cursor-pointer">
-                                    <Upload class="size-4" />
-                                    Subir cotización
-                                </Button>
-                                <input ref="archivoCotizacionInput" type="file" accept=".xlsx,.xls" class="hidden"
-                                    @change="subirCotizacionExcel" />
-                            </label>
+                            <SubirCotizacionExcelInput
+                                v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)"
+                                label="Subir cotización" @archivo-validado="subirCotizacionValidada" />
 
-                            <Collapsible v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)" v-model:open="captureManualOpen">
+                            <Collapsible
+                                v-if="hasPermission('ingenierias.plantas.proyectos.cotizaciones', Accion.CREATE)"
+                                v-model:open="captureManualOpen">
                                 <CollapsibleTrigger as-child>
                                     <Button variant="outline">
                                         <ChevronDown class="size-4 transition-transform"
@@ -498,7 +494,8 @@ function formatoMoneda(valor: number | null): string {
                                 planta: planta.id,
                                 proyecto: proyecto.id,
                                 obra: grupo.obra,
-                            }).url" class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
+                            }).url"
+                                class="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-accent/50"
                                 :class="grupo.completada ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'bg-card'">
                                 <div class="flex items-start justify-between gap-2">
                                     <p class="truncate font-semibold">{{ grupo.obra }}</p>

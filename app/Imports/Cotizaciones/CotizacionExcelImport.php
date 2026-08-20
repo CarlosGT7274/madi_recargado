@@ -10,14 +10,11 @@ use App\Models\Proyecto;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithColumnLimit;
-use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
-use PhpOffice\PhpSpreadsheet\Cell\Cell;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 
-class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, WithColumnLimit, WithCustomValueBinder
+class CotizacionExcelImport implements ToCollection, WithColumnLimit
 {
     private ?Cotizacion $cotizacion = null;
 
@@ -32,40 +29,61 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
         private readonly PartidasAction $partidasAction,
     ) {}
 
-    /**
-     * Limita la lectura a las columnas A–F (6 columnas). La plantilla
-     * solo usa 5 (No., Descripción, Unidad, Cantidad, P.U.) más una
-     * columna extra de margen. Sin este límite, PhpSpreadsheet expande
-     * TODAS las columnas que tengan formato/estilo, aunque estén vacías,
-     * y eso infla la memoria con miles de objetos Cell innecesarios.
-     */
     public function endColumn(): string
     {
         return 'F';
     }
 
     /**
-     * Fuerza la lectura de cada celda como cadena plana. Evita que
-     * PhpSpreadsheet cree objetos RichText, DateTime o fórmulas
-     * calculadas para cada celda — uno de los mayores consumidores de
-     * memoria en archivos .xlsx con formato pesado. El código ya maneja
-     * los cast a float/date manualmente.
+     * VALIDACIÓN ESTRUCTURAL DURA. Antes de tocar la base de datos,
+     * verifica que el archivo tenga la forma mínima esperada (encabezado
+     * "No." + al menos una partida padre válida + al menos un dato de
+     * encabezado reconocible). Si algo de esto falla, lanza
+     * ValidationException y NO crea absolutamente nada — ni la
+     * Cotización ni partidas. Esto reemplaza el comportamiento anterior
+     * de "best effort" que creaba una Cotización vacía cuando el Excel
+     * no tenía el formato correcto (ej. una plantilla externa distinta a
+     * la generada por PartidaPlantillaExport).
      */
-    public function bindValue(Cell $cell, mixed $value): bool
-    {
-        $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
-
-        return true;
-    }
-
     public function collection(Collection $filas): void
     {
         $inicioTabla = $this->localizarEncabezadoTabla($filas);
+
+        if ($inicioTabla === null) {
+            throw ValidationException::withMessages([
+                'archivo' => 'El archivo no tiene el formato esperado: no se encontró el encabezado de tabla "No." en la columna A. '
+                    .'Descarga la plantilla oficial y usa esa estructura — no se puede importar un Excel con un layout distinto.',
+            ]);
+        }
+
         $header = $this->leerEncabezado($filas, $inicioTabla);
+
+        if ($header['cliente'] === null && $header['obra'] === null) {
+            throw ValidationException::withMessages([
+                'archivo' => 'El archivo no tiene los campos mínimos de encabezado (Cliente u Obra). '
+                    .'Verifica que las etiquetas "Cliente:" y "Obra:" estén en la columna A, con su valor en la columna B.',
+            ]);
+        }
+
         $condicionesEntrega = $this->leerCondicionesEntrega($filas);
-        $finTabla = $inicioTabla !== null
-    ? $this->localizarFinTabla($filas, $inicioTabla)
-    : $filas->count();
+        $finTabla = $this->localizarFinTabla($filas, $inicioTabla);
+
+        $filasPartidas = $this->extraerFilasPartidas($filas, $inicioTabla, $finTabla);
+
+        if ($filasPartidas->isEmpty()) {
+            throw ValidationException::withMessages([
+                'archivo' => 'El archivo no contiene ninguna partida debajo del encabezado "No.". '
+                    .'Agrega al menos una sección (ej. "1") y una subpartida (ej. "1.1") antes de importar.',
+            ]);
+        }
+
+        $erroresEstructura = $this->validarEstructuraPartidas($filasPartidas);
+
+        if ($erroresEstructura !== []) {
+            throw ValidationException::withMessages(['archivo' => $erroresEstructura]);
+        }
+
+        // ---- A partir de aquí el archivo ya pasó validación estructural: se crea todo ----
 
         $datosBase = [
             'fecha' => $this->parsearFecha($header['fecha']) ?? now()->toDateString(),
@@ -91,30 +109,15 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
             ? $this->cotizacionesAction->create($this->padre, $datos)
             : $this->cotizacionesAction->createParaProyecto($this->padre, $datos);
 
-        if ($inicioTabla === null) {
-            $this->errores[0] = ['No se encontró la tabla de partidas ("No.") en el archivo. Se creó la cotización sin partidas.'];
-
-            return;
-        }
-
         $padresPorNumero = [];
 
-        for ($i = $inicioTabla + 1; $i < $finTabla; $i++) {
-            $fila = $filas[$i];
-            $no = trim((string) ($fila[0] ?? ''));
-            $descripcion = trim((string) ($fila[1] ?? ''));
-
-            if ($no === '' && $descripcion === '') {
-                continue;
-            }
+        foreach ($filasPartidas as $fila) {
+            $indiceExcel = $fila['indiceExcel'];
+            $no = $fila['no'];
+            $descripcion = $fila['descripcion'];
 
             if (! str_contains($no, '.')) {
                 $numPadre = (int) $no;
-
-                if ($numPadre > 65535) {
-                    $this->errores[$i + 1] = ["La partida \"{$no}\" excede el límite permitido de 65535."];
-                    continue;
-                }
 
                 $padre = $this->cotizacion->partidas()->create([
                     'partida_id' => null,
@@ -131,25 +134,138 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
             }
 
             [$numPadre, $numHija] = array_pad(array_map('intval', explode('.', $no, 2)), 2, 0);
+            $padre = $padresPorNumero[$numPadre];
 
-            if ($numHija > 65535) {
-                $this->errores[$i + 1] = ["La subpartida \"{$no}\" excede el límite permitido de 65535."];
+            $data = [
+                'descripcion' => $descripcion,
+                'unidad' => $fila['unidad'] ?: null,
+                'cantidad' => (float) $fila['cantidad'],
+                'precio_unitario' => (float) $fila['precioUnitario'],
+            ];
+
+            $this->partidasAction->createSinRecalcular($this->cotizacion, $data + [
+                'partida_id' => $padre->id,
+                'numero_partida' => $numHija,
+            ]);
+            $this->partidasCreadas++;
+        }
+
+        if ($this->partidasCreadas > 0) {
+            $this->partidasAction->recalcularTotales($this->cotizacion);
+        }
+    }
+
+    /**
+     * Extrae y normaliza las filas de la tabla de partidas (sin filas
+     * vacías), guardando el número de fila original del Excel para
+     * mensajes de error.
+     *
+     * @return Collection<int, array{indiceExcel:int, no:string, descripcion:string, unidad:string, cantidad:string, precioUnitario:string}>
+     */
+    private function extraerFilasPartidas(Collection $filas, int $inicioTabla, int $finTabla): Collection
+    {
+        $resultado = collect();
+
+        for ($i = $inicioTabla + 1; $i < $finTabla; $i++) {
+            $fila = $filas[$i];
+            $no = trim((string) ($fila[0] ?? ''));
+            $descripcion = trim((string) ($fila[1] ?? ''));
+            $unidad = trim((string) ($fila[2] ?? ''));
+            $cantidad = trim((string) ($fila[3] ?? ''));
+            $precioUnitario = trim((string) ($fila[4] ?? ''));
+
+            if ($no === '' && $descripcion === '' && $unidad === '' && $cantidad === '' && $precioUnitario === '') {
                 continue;
             }
 
-            $padre = $padresPorNumero[$numPadre] ?? null;
+            $resultado->push([
+                'indiceExcel' => $i + 1,
+                'no' => $no,
+                'descripcion' => $descripcion,
+                'unidad' => $unidad,
+                'cantidad' => $cantidad,
+                'precioUnitario' => $precioUnitario,
+            ]);
+        }
 
-            if (! $padre) {
-                $this->errores[$i + 1] = ["La partida \"{$no}\" no tiene una sección \"{$numPadre}\" definida antes."];
+        return $resultado;
+    }
+
+    /**
+     * Replica en el servidor las mismas reglas del validador de frontend
+     * (useExcelCotizacionValidator.ts): "No." obligatorio y con formato
+     * correcto (entero para padres, "N.M" para hijas), secciones
+     * definidas antes de sus subpartidas, y cantidad/precio numéricos en
+     * subpartidas. El backend NUNCA debe confiar en que el frontend ya
+     * validó — el usuario puede subir el archivo directo a la API.
+     *
+     * @param  Collection<int, array<string, mixed>>  $filasPartidas
+     * @return array<int, string>
+     */
+    private function validarEstructuraPartidas(Collection $filasPartidas): array
+    {
+        $errores = [];
+        $padresDefinidos = [];
+
+        foreach ($filasPartidas as $fila) {
+            $no = $fila['no'];
+            $excel = $fila['indiceExcel'];
+
+            if ($no === '') {
+                $errores[] = "Fila {$excel}: falta el número de partida (columna \"No.\").";
+
+                continue;
+            }
+
+            $esPadre = ! str_contains($no, '.');
+
+            if ($esPadre) {
+                if (! preg_match('/^[1-9]\d*$/', $no)) {
+                    $errores[] = "Fila {$excel}: \"{$no}\" no es un número de sección válido (debe ser un entero como 1, 2, 3).";
+
+                    continue;
+                }
+
+                if ((int) $no > 65535) {
+                    $errores[] = "Fila {$excel}: el número de sección {$no} excede el límite permitido de 65535.";
+
+                    continue;
+                }
+
+                if ($fila['descripcion'] === '') {
+                    $errores[] = "Fila {$excel}: la sección \"{$no}\" no tiene descripción.";
+                }
+
+                $padresDefinidos[(int) $no] = true;
+
+                continue;
+            }
+
+            if (! preg_match('/^[1-9]\d*\.[1-9]\d*$/', $no)) {
+                $errores[] = "Fila {$excel}: \"{$no}\" no tiene el formato \"N.M\" esperado para subpartidas (ej. 1.1).";
+
+                continue;
+            }
+
+            [$numPadreStr, $numHijaStr] = explode('.', $no, 2);
+            $numPadre = (int) $numPadreStr;
+            $numHija = (int) $numHijaStr;
+
+            if ($numHija > 65535) {
+                $errores[] = "Fila {$excel}: la subpartida \"{$no}\" excede el límite permitido de 65535.";
+            }
+
+            if (! isset($padresDefinidos[$numPadre])) {
+                $errores[] = "Fila {$excel}: la subpartida \"{$no}\" no tiene una sección \"{$numPadre}\" definida antes.";
 
                 continue;
             }
 
             $data = [
-                'descripcion' => $descripcion,
-                'unidad' => trim((string) ($fila[2] ?? '')) ?: null,
-                'cantidad' => (float) ($fila[3] ?? 0),
-                'precio_unitario' => (float) ($fila[4] ?? 0),
+                'descripcion' => $fila['descripcion'],
+                'cantidad' => $fila['cantidad'],
+                'precio_unitario' => $fila['precioUnitario'],
+                'unidad' => $fila['unidad'] ?: null,
             ];
 
             $validador = Validator::make($data, [
@@ -160,40 +276,22 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
             ]);
 
             if ($validador->fails()) {
-                $this->errores[$i + 1] = $validador->errors()->all();
-
-                continue;
+                foreach ($validador->errors()->all() as $mensaje) {
+                    $errores[] = "Fila {$excel} (\"{$no}\"): {$mensaje}";
+                }
             }
-
-            $this->partidasAction->createSinRecalcular($this->cotizacion, $validador->validated() + [
-                'partida_id' => $padre->id,
-                'numero_partida' => $numHija,
-            ]);
-            $this->partidasCreadas++;
         }
 
-        // Recalcular totales UNA SOLA VEZ al final del lote en vez de
-        // por cada partida — elimina O(n) queries redundantes.
-        if ($this->partidasCreadas > 0) {
-            $this->partidasAction->recalcularTotales($this->cotizacion);
-        }
+        return $errores;
     }
 
-    /**
-     * Recorre el archivo desde la fila 0 hasta la fila de la tabla ("No."),
-     * sin límite fijo de filas. Así no importa cuántas filas de
-     * instrucciones traiga la plantilla por delante — antes esto usaba
-     * take(10)/take(20), un número fijo que se rompía en cuanto la
-     * plantilla cambiaba de tamaño.
-     *
-     * @return array<string, string|null>
-     */
+    /** @return array<string, string|null> */
     private function leerEncabezado(Collection $filas, ?int $inicioTabla): array
     {
         $mapa = [
             'cliente' => null, 'fecha' => null, 'direccion' => null,
             'proveedor' => null, 'vendedor' => null, 'obra' => null,
-            'para' => null, 'correo_vendedor' => null, // <- nuevos
+            'para' => null, 'correo_vendedor' => null,
         ];
 
         $limite = $inicioTabla ?? $filas->count();
@@ -224,17 +322,7 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
         return $mapa;
     }
 
-    /**
-     * "Tiempo de Entrega / Días de Crédito / Vigencia Cotización" vienen
-     * como tres encabezados en una fila y sus valores en la fila
-     * siguiente, cada uno alineado bajo su encabezado (ver plantilla:
-     * fila con los 3 títulos, fila de abajo con "07 días...", "30 Días",
-     * "15 Días"). Se ubican las columnas de los 3 encabezados y se toma,
-     * para cada uno, el primer valor no vacío de la fila siguiente dentro
-     * del rango de columnas hasta el siguiente encabezado.
-     *
-     * @return array{tiempo_entrega: ?string, dias_credito: ?string, vigencia_cotizacion: ?string}
-     */
+    /** @return array{tiempo_entrega: ?string, dias_credito: ?string, vigencia_cotizacion: ?string} */
     private function leerCondicionesEntrega(Collection $filas): array
     {
         $vacio = ['tiempo_entrega' => null, 'dias_credito' => null, 'vigencia_cotizacion' => null];
@@ -273,8 +361,8 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
     }
 
     /**
-     * @param  array<string, string>  $etiquetas  clave => etiqueta normalizada a buscar (substring)
-     * @return array<int, string> columna => clave, para las etiquetas encontradas en la fila
+     * @param  array<string, string>  $etiquetas
+     * @return array<int, string>
      */
     private function columnasConEtiquetas(mixed $fila, array $etiquetas): array
     {
@@ -312,13 +400,6 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
         return null;
     }
 
-    /**
-     * Busca la celda "NOTA:" o "NOTAS:" (CON dos puntos) — a propósito no
-     * matchea "NOTA" a secas, porque ese texto también se usa dentro de
-     * la tabla de partidas para anotaciones de una línea específica
-     * (celda roja resaltada), y no es lo mismo que las notas generales
-     * de la cotización.
-     */
     private function leerNotas(Collection $filas): ?string
     {
         foreach ($filas as $i => $fila) {
@@ -380,15 +461,6 @@ class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, 
         return null;
     }
 
-    /**
-     * Encuentra dónde termina la tabla de partidas: la primera fila después
-     * del encabezado "No." que coincide con el header de condiciones
-     * comerciales ("Tiempo de Entrega"/"Días de Crédito"/"Vigencia...") o
-     * con la etiqueta "NOTA:"/"NOTAS:". Sin este límite, el loop de partidas
-     * seguía leyendo hasta el final del archivo y confundía esas secciones
-     * con partidas nuevas (números 0 y 7 inventados a partir de "Tiempo de
-     * Entrega" y "07 días...").
-     */
     private function localizarFinTabla(Collection $filas, int $inicioTabla): int
     {
         for ($i = $inicioTabla + 1; $i < $filas->count(); $i++) {

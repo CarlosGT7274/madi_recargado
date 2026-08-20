@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { Download, FileText, Upload } from '@lucide/vue';
-import { ref } from 'vue';
+import { Download, FileText } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
-import ExcelPreviewDialog from './ExcelPreviewDialog.vue';
+import SubirCotizacionExcelInput from '@/components/SubirCotizacionExcelInput.vue';
 
 export interface VersionCotizacion {
     id: number;
@@ -32,49 +31,12 @@ const emit = defineEmits<{
     (e: 'subir-excel-version', versionId: number, archivo: File): void;
 }>();
 
-const nuevaVersionInput = ref<HTMLInputElement | null>(null);
-
-// Estado para el diálogo de validación
-const previewOpen = ref(false);
-const archivoPendiente = ref<File | null>(null);
-const versionIdPendiente = ref<number | null>(null);
-
-function onNuevaVersionChange(): void {
-    const archivo = nuevaVersionInput.value?.files?.[0];
-    if (!archivo) return;
-    
-    archivoPendiente.value = archivo;
-    versionIdPendiente.value = null; // null significa "nueva versión"
-    previewOpen.value = true;
-    
-    if (nuevaVersionInput.value) nuevaVersionInput.value.value = '';
+function onNuevaVersion(archivo: File): void {
+    emit('nueva-version', archivo);
 }
 
-function onSubirExcelVersion(versionId: number, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const archivo = input.files?.[0];
-    if (!archivo) return;
-
-    archivoPendiente.value = archivo;
-    versionIdPendiente.value = versionId;
-    previewOpen.value = true;
-    
-    input.value = '';
-}
-
-function handlePreviewConfirm(archivo: File) {
-    if (versionIdPendiente.value === null) {
-        emit('nueva-version', archivo);
-    } else {
-        emit('subir-excel-version', versionIdPendiente.value, archivo);
-    }
-    archivoPendiente.value = null;
-    versionIdPendiente.value = null;
-}
-
-function handlePreviewCancel() {
-    archivoPendiente.value = null;
-    versionIdPendiente.value = null;
+function onSubirExcelVersion(versionId: number, archivo: File): void {
+    emit('subir-excel-version', versionId, archivo);
 }
 
 const estadoLabel: Record<string, string> = {
@@ -124,14 +86,8 @@ function detalleTexto(version: VersionCotizacion): string {
                     </Button>
                 </a>
 
-                <label v-if="puedeCrear">
-                    <Button size="sm" as="span" class="cursor-pointer">
-                        <Upload class="mr-2 size-4" />
-                        Subir Cotizacion
-                    </Button>
-                    <input ref="nuevaVersionInput" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="onNuevaVersionChange" />
-                </label>
+                <SubirCotizacionExcelInput v-if="puedeCrear" label="Subir Cotizacion" size="sm"
+                    @archivo-validado="onNuevaVersion" />
             </div>
         </div>
 
@@ -161,14 +117,9 @@ function detalleTexto(version: VersionCotizacion): string {
                 </div>
 
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    <label v-if="permitirSubirExcelPorVersion && puedeCrear" class="cursor-pointer">
-                        <Button variant="outline" size="sm" as="span">
-                            <Upload class="mr-1.5 size-3.5" />
-                            Guardar cotización de cliente
-                        </Button>
-                        <input type="file" accept=".xlsx,.xls" class="hidden"
-                            @change="(e) => onSubirExcelVersion(version.id, e)" />
-                    </label>
+                    <SubirCotizacionExcelInput v-if="permitirSubirExcelPorVersion && puedeCrear"
+                        label="Guardar cotización de cliente" variant="outline" size="sm"
+                        @archivo-validado="(archivo) => onSubirExcelVersion(version.id, archivo)" />
 
                     <a v-if="version.archivoExcelUrl" :href="version.archivoExcelUrl" target="_blank">
                         <Button variant="outline" size="sm">
@@ -187,12 +138,5 @@ function detalleTexto(version: VersionCotizacion): string {
                 Aún no hay versiones para esta obra.
             </p>
         </div>
-
-        <ExcelPreviewDialog 
-            v-model:open="previewOpen" 
-            :archivo="archivoPendiente"
-            @confirm="handlePreviewConfirm"
-            @cancel="handlePreviewCancel"
-        />
     </div>
 </template>

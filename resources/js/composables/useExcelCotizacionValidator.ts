@@ -10,6 +10,12 @@ export interface CellError {
     mensaje: string;
 }
 
+/** Error asociado a un campo del encabezado (Fecha, Cliente, Obra, etc). */
+export interface HeaderFieldError {
+    campo: keyof EncabezadoParsed;
+    mensaje: string;
+}
+
 export interface PartidaParsed {
     no: string;
     descripcion: string;
@@ -22,6 +28,8 @@ export interface PartidaParsed {
 
 export interface EncabezadoParsed {
     fecha: string;
+    /** Fecha ya normalizada a "d/m/Y" si se pudo determinar sin ambigüedad; null si es inválida/vacía. */
+    fechaNormalizada: string | null;
     para: string;
     cliente: string;
     direccion: string;
@@ -33,6 +41,7 @@ export interface EncabezadoParsed {
 
 export interface ExcelParseResult {
     encabezado: EncabezadoParsed;
+    erroresEncabezado: HeaderFieldError[];
     partidas: PartidaParsed[];
     erroresGlobales: string[];
 }
@@ -56,11 +65,102 @@ function str(valor: unknown): string {
     return String(valor).trim();
 }
 
+/**
+ * Formatea un objeto Date a "d/m/Y" (el formato que el backend
+ * CotizacionExcelImport::parsearFecha entiende de primera mano).
+ */
+function formatearFechaISO(fecha: Date): string {
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const anio = fecha.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+}
+
+/**
+ * Fallback SOLO para cuando la celda de fecha no es una fecha nativa de
+ * Excel (por ejemplo, el usuario escribió el texto a mano en una celda
+ * de texto plano). En ese caso no hay forma de eliminar la ambigüedad
+ * día/mes de un string tipo "8/20/26" salvo por descarte: si un número
+ * es > 12, forzosamente es el día (no existe el "mes 20"). Si ambos son
+ * ≤ 12 la ambigüedad es real y se asume d/m/Y por convención del
+ * sistema.
+ */
+function parsearFechaTexto(valor: string): Date | null {
+    const conSlash = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    const conGuionInverso = valor.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const conGuion = valor.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+
+    let dia: number, mes: number, anio: number;
+
+    if (conGuionInverso) {
+        anio = Number(conGuionInverso[1]);
+        mes = Number(conGuionInverso[2]);
+        dia = Number(conGuionInverso[3]);
+    } else if (conSlash || conGuion) {
+        const m = (conSlash ?? conGuion)!;
+        const a = Number(m[1]);
+        const b = Number(m[2]);
+        anio = Number(m[3]);
+        if (anio < 100) anio += anio < 70 ? 2000 : 1900;
+
+        // Descarte de ambigüedad: si "a" no puede ser mes (>12), es día.
+        if (a > 12 && b <= 12) {
+            dia = a;
+            mes = b;
+        } else {
+            // Ambiguo o ambos ≤ 12: convención del sistema = día/mes/año.
+            dia = a;
+            mes = b;
+        }
+    } else {
+        return null;
+    }
+
+    if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+
+    const fecha = new Date(anio, mes - 1, dia);
+    if (fecha.getFullYear() !== anio || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
+        return null;
+    }
+
+    return fecha;
+}
+
+/**
+ * Determina si el encabezado de fecha es válido y, de serlo, su forma
+ * normalizada "d/m/Y". Prioriza `fechaNativa` (objeto Date que xlsx ya
+ * extrajo directamente del serial interno de la celda vía
+ * `cellDates: true`, sin ninguna ambigüedad de orden día/mes) sobre el
+ * texto formateado. Solo cae al parseo de texto cuando la celda no es
+ * una fecha nativa de Excel (texto libre).
+ */
+function resolverFecha(valorTexto: string, fechaNativa: Date | null): { valida: boolean; normalizada: string | null } {
+    if (fechaNativa instanceof Date && !isNaN(fechaNativa.getTime())) {
+        return { valida: true, normalizada: formatearFechaISO(fechaNativa) };
+    }
+
+    if (!valorTexto) {
+        return { valida: false, normalizada: null };
+    }
+
+    const parseada = parsearFechaTexto(valorTexto);
+    if (parseada) {
+        return { valida: true, normalizada: formatearFechaISO(parseada) };
+    }
+
+    return { valida: false, normalizada: null };
+}
+
 /* ─────────────── Parseo del Excel ─────────────── */
 
-function leerEncabezado(filas: unknown[][], inicioTabla: number | null): EncabezadoParsed {
+/**
+ * @param filas          Lectura formateada (raw:false) — texto tal como Excel lo muestra.
+ * @param filasFechas     Lectura con cellDates:true, misma posición de filas/columnas — para
+ *                         extraer el objeto Date real de la celda de fecha sin ambigüedad.
+ */
+function leerEncabezado(filas: unknown[][], filasFechas: unknown[][], inicioTabla: number | null): EncabezadoParsed {
     const mapa: EncabezadoParsed = {
-        fecha: '', para: '', cliente: '', direccion: '',
+        fecha: '', fechaNormalizada: null, para: '', cliente: '', direccion: '',
         proveedor: '', vendedor: '', correoVendedor: '', obra: '',
     };
 
@@ -73,7 +173,19 @@ function leerEncabezado(filas: unknown[][], inicioTabla: number | null): Encabez
         const valor = str(fila[1]);
         if (!etiqueta || !valor) continue;
 
-        if (etiqueta.startsWith('fecha')) mapa.fecha = valor;
+        if (etiqueta.startsWith('fecha')) {
+            mapa.fecha = valor;
+
+            // Celda hermana en la lectura con cellDates: true. Si xlsx la
+            // reconoció como fecha nativa de Excel, aquí llega como objeto
+            // Date real (sin ambigüedad de día/mes) en vez del string.
+            const valorNativo = filasFechas[i]?.[1];
+            const { valida, normalizada } = resolverFecha(
+                valor,
+                valorNativo instanceof Date ? valorNativo : null,
+            );
+            mapa.fechaNormalizada = valida ? normalizada : null;
+        }
         else if (etiqueta.startsWith('para')) mapa.para = valor;
         else if (etiqueta.startsWith('cliente')) mapa.cliente = valor;
         else if (etiqueta.startsWith('direcci')) mapa.direccion = valor;
@@ -85,6 +197,41 @@ function leerEncabezado(filas: unknown[][], inicioTabla: number | null): Encabez
     }
 
     return mapa;
+}
+
+/**
+ * Replica las reglas mínimas que CotizacionExcelImport exige en el
+ * backend antes de crear la Cotización: encabezado "No." presente
+ * (se valida aparte) y al menos Cliente u Obra reconocibles. Si el
+ * frontend no exige esto, puede marcar "válido" un archivo que el
+ * backend rechazará de todos modos con ValidationException — dejando
+ * al usuario confundido justo como pasó.
+ */
+function validarEncabezado(encabezado: EncabezadoParsed): HeaderFieldError[] {
+    const errores: HeaderFieldError[] = [];
+
+    if (!encabezado.cliente && !encabezado.obra) {
+        errores.push({
+            campo: 'cliente',
+            mensaje: 'Falta "Cliente:" u "Obra:" en la columna A con su valor en la columna B. Al menos uno de los dos es obligatorio.',
+        });
+    }
+
+    if (encabezado.fecha && encabezado.fechaNormalizada === null) {
+        errores.push({
+            campo: 'fecha',
+            mensaje: `"${encabezado.fecha}" no se pudo interpretar como fecha. Verifica que la celda tenga un valor de fecha válido en Excel (día/mes/año).`,
+        });
+    }
+
+    if (encabezado.correoVendedor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(encabezado.correoVendedor)) {
+        errores.push({
+            campo: 'correoVendedor',
+            mensaje: `"${encabezado.correoVendedor}" no es un correo válido.`,
+        });
+    }
+
+    return errores;
 }
 
 function localizarEncabezadoTabla(filas: unknown[][]): number | null {
@@ -346,8 +493,9 @@ export function useExcelCotizacionValidator() {
     });
 
     const tieneErrores = computed(() => {
-        if (!state.resultado) return false;
+        if (!state.resultado) return true; // sin resultado parseado nunca se considera válido
         if (state.resultado.erroresGlobales.length > 0) return true;
+        if (state.resultado.erroresEncabezado.length > 0) return true;
         return state.resultado.partidas.some(p => p.errores.length > 0);
     });
 
@@ -355,6 +503,7 @@ export function useExcelCotizacionValidator() {
         if (!state.resultado) return 0;
         return (
             state.resultado.erroresGlobales.length +
+            state.resultado.erroresEncabezado.length +
             state.resultado.partidas.reduce((sum, p) => sum + p.errores.length, 0)
         );
     });
@@ -374,24 +523,49 @@ export function useExcelCotizacionValidator() {
                 return;
             }
 
-            // Leer como array de arrays, limitando columnas A-F
+            // raw: false → xlsx aplica el formato de celda (numFmt) antes de
+            // devolver el valor como string. Sin esto, fechas y montos con
+            // formato de moneda llegan como el número/serial crudo interno
+            // de Excel (ej. "46254.4172") en vez del texto que el usuario ve
+            // al abrir el archivo (ej. "19/08/2026" o "18115.37").
             const filas: unknown[][] = utils.sheet_to_json(sheet, {
                 header: 1,
                 range: 0,
                 defval: '',
+                raw: false,
+            });
+
+            // Segunda lectura, esta vez con cellDates: true: si la celda es
+            // una fecha nativa de Excel (serial numérico + numFmt de
+            // fecha), xlsx la entrega como objeto Date real construido a
+            // partir del serial — sin ninguna ambigüedad de "es 8/20 o
+            // 20/8". Esto es lo que Excel YA sabe con certeza que es esa
+            // celda; parsear el texto formateado (arriba) para adivinar el
+            // orden día/mes es innecesario y propenso a error cuando el
+            // locale de origen del archivo usa m/d/Y.
+            const filasFechas: unknown[][] = utils.sheet_to_json(sheet, {
+                header: 1,
+                range: 0,
+                defval: '',
+                raw: true,
+                cellDates: true,
             });
 
             // Limitar a las primeras 6 columnas (A-F) igual que el backend
             const filasLimitadas = filas.map(fila =>
                 Array.isArray(fila) ? fila.slice(0, 6) : [],
             );
+            const filasFechasLimitadas = filasFechas.map(fila =>
+                Array.isArray(fila) ? fila.slice(0, 6) : [],
+            );
 
             const inicioTabla = localizarEncabezadoTabla(filasLimitadas);
-            const encabezado = leerEncabezado(filasLimitadas, inicioTabla);
+            const encabezado = leerEncabezado(filasLimitadas, filasFechasLimitadas, inicioTabla);
 
             if (inicioTabla === null) {
                 state.resultado = {
                     encabezado,
+                    erroresEncabezado: [],
                     partidas: [],
                     erroresGlobales: [
                         'No se encontró el encabezado de tabla ("No.") en el archivo. Verifica que la primera columna de la fila de encabezados contenga exactamente "No.".',
@@ -400,10 +574,15 @@ export function useExcelCotizacionValidator() {
                 return;
             }
 
+            const erroresEncabezado = validarEncabezado(encabezado);
+            // encabezado.fechaNormalizada (d/m/Y sin ambigüedad) es el valor
+            // que debería viajar al backend en vez de encabezado.fecha —
+            // ver nota en el punto de envío del formulario/subida.
+
             const finTabla = localizarFinTabla(filasLimitadas, inicioTabla);
             const { partidas, erroresGlobales } = validarPartidas(filasLimitadas, inicioTabla, finTabla);
 
-            state.resultado = { encabezado, partidas, erroresGlobales };
+            state.resultado = { encabezado, erroresEncabezado, partidas, erroresGlobales };
         } catch (e: unknown) {
             state.errorLectura = e instanceof Error
                 ? `Error al leer el archivo: ${e.message}`

@@ -36,6 +36,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
+import SubirCotizacionExcelInput from '@/components/SubirCotizacionExcelInput.vue';
+
 import LevantamientoForm from './components/LevantamientoForm.vue';
 import type { LevantamientoFormData } from './types';
 
@@ -70,8 +72,6 @@ const props = defineProps<{
 
 const modo = ref<'view' | 'edit'>('view');
 const form = useForm<LevantamientoFormData>({ ...props.levantamiento });
-const createCotizacionDialogOpen = ref(false);
-const archivoCotizacionInput = ref<HTMLInputElement | null>(null);
 const { Accion, hasPermission } = usePermissions();
 
 const rutaCotizaciones = computed(() => ({
@@ -84,14 +84,11 @@ const urlPdf = computed(() =>
     LevantamientoController.pdf(rutaCotizaciones.value).url,
 );
 
-function subirCotizacionExcel(): void {
-    const archivo = archivoCotizacionInput.value?.files?.[0];
-    if (!archivo) return;
-
+function subirCotizacionValidada(archivo: File): void {
     router.post(
         CotizacionController.store(rutaCotizaciones.value).url,
         { archivo },
-        { forceFormData: true, onSuccess: () => (createCotizacionDialogOpen.value = false) },
+        { forceFormData: true },
     );
 }
 
@@ -142,32 +139,6 @@ function formatoMoneda(valor: number | null): string {
             </a>
         </template>
 
-        <Dialog v-model:open="createCotizacionDialogOpen">
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Nueva cotización</DialogTitle>
-                    <DialogDescription>
-                        Sube el Excel. Si el nombre de obra coincide con una existente, se agrega como nueva versión.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <label
-                    class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm font-medium text-muted-foreground hover:bg-accent">
-                    <Upload class="size-5" />
-                    <span class="text-primary">Seleccionar Excel</span>
-                    <span class="text-xs">Formatos: .xlsx, .xls</span>
-                    <input ref="archivoCotizacionInput" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="subirCotizacionExcel" />
-                </label>
-
-                <DialogFooter>
-                    <DialogClose as-child>
-                        <Button variant="secondary">Cancelar</Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-
         <LevantamientoForm :mode="modo" :data="form" :errors="form.errors" @update="actualizar" />
 
         <GaleriaImagenes class="mt-6" archivable-type="levantamiento" :archivable-id="levantamiento.id"
@@ -192,10 +163,12 @@ function formatoMoneda(valor: number | null): string {
                             Plantilla
                         </Button>
                     </a>
-                    <PermissionButton endpoint="ingenierias.plantas.proyectos.levantamientos.cotizaciones" :accion="Accion.CREATE" size="sm" @click="createCotizacionDialogOpen = true">
-                        <Plus class="mr-2 size-4" />
-                        Subir cotización
-                    </PermissionButton>
+                    <SubirCotizacionExcelInput
+                        v-if="hasPermission('ingenierias.plantas.proyectos.levantamientos.cotizaciones', Accion.CREATE)"
+                        label="Subir cotización"
+                        size="sm"
+                        @archivo-validado="subirCotizacionValidada"
+                    />
                 </div>
             </div>
 
