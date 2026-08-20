@@ -43,6 +43,21 @@ class PartidasAction
     }
 
     /**
+     * Igual que create() pero SIN recalcular totales de la cotización.
+     * Diseñado para importaciones masivas: el llamador DEBE invocar
+     * recalcularTotales() una sola vez al terminar el lote.
+     */
+    public function createSinRecalcular(Cotizacion $cotizacion, array $data): Partida
+    {
+        $data['numero_partida'] = $data['numero_partida']
+            ?? (($cotizacion->partidas()->max('numero_partida') ?? 0) + 1);
+        $data['importe'] = round($data['cantidad'] * $data['precio_unitario'], 2);
+        $data['proyecto_id'] = $cotizacion->proyecto_id;
+
+        return $cotizacion->partidas()->create($data);
+    }
+
+    /**
      * Crea una partida manual (actividad de Proyecto directo, sin pasar
      * por una cotización). cotizacion_id queda NULL a propósito.
      */

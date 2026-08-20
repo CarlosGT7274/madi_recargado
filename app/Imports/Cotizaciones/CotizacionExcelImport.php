@@ -11,8 +11,13 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithColumnLimit;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 
-class CotizacionExcelImport implements ToCollection
+class CotizacionExcelImport extends DefaultValueBinder implements ToCollection, WithColumnLimit, WithCustomValueBinder
 {
     private ?Cotizacion $cotizacion = null;
 
@@ -26,6 +31,32 @@ class CotizacionExcelImport implements ToCollection
         private readonly CotizacionesAction $cotizacionesAction,
         private readonly PartidasAction $partidasAction,
     ) {}
+
+    /**
+     * Limita la lectura a las columnas A–F (6 columnas). La plantilla
+     * solo usa 5 (No., Descripción, Unidad, Cantidad, P.U.) más una
+     * columna extra de margen. Sin este límite, PhpSpreadsheet expande
+     * TODAS las columnas que tengan formato/estilo, aunque estén vacías,
+     * y eso infla la memoria con miles de objetos Cell innecesarios.
+     */
+    public function endColumn(): string
+    {
+        return 'F';
+    }
+
+    /**
+     * Fuerza la lectura de cada celda como cadena plana. Evita que
+     * PhpSpreadsheet cree objetos RichText, DateTime o fórmulas
+     * calculadas para cada celda — uno de los mayores consumidores de
+     * memoria en archivos .xlsx con formato pesado. El código ya maneja
+     * los cast a float/date manualmente.
+     */
+    public function bindValue(Cell $cell, mixed $value): bool
+    {
+        $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+
+        return true;
+    }
 
     public function collection(Collection $filas): void
     {
@@ -78,21 +109,34 @@ class CotizacionExcelImport implements ToCollection
             }
 
             if (! str_contains($no, '.')) {
+                $numPadre = (int) $no;
+
+                if ($numPadre > 65535) {
+                    $this->errores[$i + 1] = ["La partida \"{$no}\" excede el límite permitido de 65535."];
+                    continue;
+                }
+
                 $padre = $this->cotizacion->partidas()->create([
                     'partida_id' => null,
                     'proyecto_id' => $this->cotizacion->proyecto_id,
-                    'numero_partida' => (int) $no,
+                    'numero_partida' => $numPadre,
                     'descripcion' => $descripcion !== '' ? $descripcion : "Sección {$no}",
                     'cantidad' => 0,
                     'precio_unitario' => 0,
                     'importe' => 0,
                 ]);
-                $padresPorNumero[(int) $no] = $padre;
+                $padresPorNumero[$numPadre] = $padre;
 
                 continue;
             }
 
             [$numPadre, $numHija] = array_pad(array_map('intval', explode('.', $no, 2)), 2, 0);
+
+            if ($numHija > 65535) {
+                $this->errores[$i + 1] = ["La subpartida \"{$no}\" excede el límite permitido de 65535."];
+                continue;
+            }
+
             $padre = $padresPorNumero[$numPadre] ?? null;
 
             if (! $padre) {
@@ -121,11 +165,17 @@ class CotizacionExcelImport implements ToCollection
                 continue;
             }
 
-            $this->partidasAction->create($this->cotizacion, $validador->validated() + [
+            $this->partidasAction->createSinRecalcular($this->cotizacion, $validador->validated() + [
                 'partida_id' => $padre->id,
                 'numero_partida' => $numHija,
             ]);
             $this->partidasCreadas++;
+        }
+
+        // Recalcular totales UNA SOLA VEZ al final del lote en vez de
+        // por cada partida — elimina O(n) queries redundantes.
+        if ($this->partidasCreadas > 0) {
+            $this->partidasAction->recalcularTotales($this->cotizacion);
         }
     }
 

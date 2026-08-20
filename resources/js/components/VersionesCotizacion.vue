@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import { Download, FileText, Upload } from '@lucide/vue';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
+import ExcelPreviewDialog from './ExcelPreviewDialog.vue';
 
 export interface VersionCotizacion {
     id: number;
@@ -33,11 +34,19 @@ const emit = defineEmits<{
 
 const nuevaVersionInput = ref<HTMLInputElement | null>(null);
 
+// Estado para el diálogo de validación
+const previewOpen = ref(false);
+const archivoPendiente = ref<File | null>(null);
+const versionIdPendiente = ref<number | null>(null);
+
 function onNuevaVersionChange(): void {
     const archivo = nuevaVersionInput.value?.files?.[0];
     if (!archivo) return;
-
-    emit('nueva-version', archivo);
+    
+    archivoPendiente.value = archivo;
+    versionIdPendiente.value = null; // null significa "nueva versión"
+    previewOpen.value = true;
+    
     if (nuevaVersionInput.value) nuevaVersionInput.value.value = '';
 }
 
@@ -46,8 +55,26 @@ function onSubirExcelVersion(versionId: number, event: Event): void {
     const archivo = input.files?.[0];
     if (!archivo) return;
 
-    emit('subir-excel-version', versionId, archivo);
+    archivoPendiente.value = archivo;
+    versionIdPendiente.value = versionId;
+    previewOpen.value = true;
+    
     input.value = '';
+}
+
+function handlePreviewConfirm(archivo: File) {
+    if (versionIdPendiente.value === null) {
+        emit('nueva-version', archivo);
+    } else {
+        emit('subir-excel-version', versionIdPendiente.value, archivo);
+    }
+    archivoPendiente.value = null;
+    versionIdPendiente.value = null;
+}
+
+function handlePreviewCancel() {
+    archivoPendiente.value = null;
+    versionIdPendiente.value = null;
 }
 
 const estadoLabel: Record<string, string> = {
@@ -160,5 +187,12 @@ function detalleTexto(version: VersionCotizacion): string {
                 Aún no hay versiones para esta obra.
             </p>
         </div>
+
+        <ExcelPreviewDialog 
+            v-model:open="previewOpen" 
+            :archivo="archivoPendiente"
+            @confirm="handlePreviewConfirm"
+            @cancel="handlePreviewCancel"
+        />
     </div>
 </template>
