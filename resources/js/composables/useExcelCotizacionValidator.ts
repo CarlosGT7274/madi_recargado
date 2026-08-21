@@ -277,11 +277,14 @@ function esNumeroEnteroValido(valor: string): boolean {
 }
 
 /**
- * Valida si un valor de "No." es un formato decimal válido (subpartida).
- * Acepta: "1.1", "2.3", "10.15". Rechaza: "1.", ".1", "1.0", "abc".
+ * Subpartida válida: "N.M" donde N no tiene ceros a la izquierda (no hay
+ * "sección 0" ni "01"), pero M (lo que va después del punto) acepta
+ * cualquier cantidad de dígitos, incluyendo ceros a la izquierda —
+ * 1.01, 1.001, 1.000001 son tan válidos como 1.1 o 1.10. No hay ningún
+ * número "correcto" de decimales; el usuario numera como quiera.
  */
 function esFormatoDecimalValido(valor: string): boolean {
-    return /^[1-9]\d*\.[1-9]\d*$/.test(valor);
+    return /^[1-9]\d*\.\d+$/.test(valor);
 }
 
 /**
