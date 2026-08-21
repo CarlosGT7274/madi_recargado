@@ -69,8 +69,9 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
 
 <template>
     <Dialog :open="open" @update:open="handleOpenChange">
-        <DialogContent class="max-w-4xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
+        <DialogContent
+            class="flex mx-auto w-[95vw] sm:max-w-[1400px] flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl">
+            <DialogHeader class="shrink-0 border-b px-6 py-4">
                 <DialogTitle class="flex items-center gap-2">
                     <FileSpreadsheet class="size-5 text-primary" />
                     Validación del Excel
@@ -81,9 +82,9 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
                 </DialogDescription>
             </DialogHeader>
 
-            <div class="flex-1 overflow-hidden flex flex-col gap-4 py-4">
+            <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-4">
                 <div v-if="state.cargando"
-                    class="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    class="flex flex-1 flex-col items-center justify-center text-muted-foreground">
                     <Loader2 class="size-8 animate-spin mb-4" />
                     <p>Leyendo archivo...</p>
                 </div>
@@ -97,7 +98,8 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
 
                 <template v-else-if="state.resultado">
                     <!-- Resumen del encabezado, con error visible debajo de cada campo -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-muted/50 p-3 rounded-lg border">
+                    <div
+                        class="grid shrink-0 grid-cols-2 gap-4 rounded-lg border bg-muted/50 p-3 text-sm md:grid-cols-4">
                         <div
                             :class="{ 'rounded-md ring-1 ring-red-300 bg-red-50/60 -m-1 p-1': erroresDeCampo(state.resultado.erroresEncabezado, 'obra') }">
                             <span class="text-muted-foreground block text-xs uppercase font-medium">Obra</span>
@@ -107,7 +109,7 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
                             :class="{ 'rounded-md ring-1 ring-red-300 bg-red-50/60 -m-1 p-1': erroresDeCampo(state.resultado.erroresEncabezado, 'cliente') }">
                             <span class="text-muted-foreground block text-xs uppercase font-medium">Cliente</span>
                             <span class="font-medium truncate block">{{ state.resultado.encabezado.cliente || '—'
-                                }}</span>
+                            }}</span>
                             <span v-if="erroresDeCampo(state.resultado.erroresEncabezado, 'cliente')"
                                 class="mt-1 flex items-start gap-1 text-[11px] leading-tight text-red-600">
                                 <AlertCircle class="size-3 shrink-0 mt-0.5" />
@@ -132,7 +134,7 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
                             :class="{ 'rounded-md ring-1 ring-red-300 bg-red-50/60 -m-1 p-1': erroresDeCampo(state.resultado.erroresEncabezado, 'correoVendedor') }">
                             <span class="text-muted-foreground block text-xs uppercase font-medium">Vendedor</span>
                             <span class="font-medium truncate block">{{ state.resultado.encabezado.vendedor || '—'
-                                }}</span>
+                            }}</span>
                             <span v-if="erroresDeCampo(state.resultado.erroresEncabezado, 'correoVendedor')"
                                 class="mt-1 flex items-start gap-1 text-[11px] leading-tight text-red-600">
                                 <AlertCircle class="size-3 shrink-0 mt-0.5" />
@@ -143,27 +145,27 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
 
                     <!-- Alertas globales -->
                     <div v-if="state.resultado.erroresGlobales.length > 0"
-                        class="rounded-lg bg-red-50 p-4 text-red-900 border border-red-200">
+                        class="shrink-0 rounded-lg bg-red-50 p-4 text-red-900 border border-red-200">
                         <ul class="list-disc list-inside text-sm space-y-1">
                             <li v-for="(err, i) in state.resultado.erroresGlobales" :key="i">{{ err }}</li>
                         </ul>
                     </div>
 
-                    <!-- Tabla de partidas con scroll -->
-                    <div class="flex-1 overflow-auto border rounded-lg">
-                        <table class="w-full text-sm text-left relative border-collapse">
-                            <thead class="text-xs text-muted-foreground uppercase bg-muted sticky top-0 z-10 shadow-sm">
+                    <!-- Tabla de partidas: ocupa todo el espacio restante, con scroll propio -->
+                    <div class="min-h-0 flex-1 overflow-auto rounded-lg border">
+                        <table class="w-full border-collapse text-left text-sm">
+                            <thead class="sticky top-0 z-10 bg-muted text-xs uppercase text-muted-foreground shadow-sm">
                                 <tr>
-                                    <th class="px-3 py-2 border-b font-medium w-24">No.</th>
-                                    <th class="px-3 py-2 border-b font-medium">Descripción</th>
-                                    <th class="px-3 py-2 border-b font-medium w-24">Unidad</th>
-                                    <th class="px-3 py-2 border-b font-medium w-28 text-right">Cantidad</th>
-                                    <th class="px-3 py-2 border-b font-medium w-32 text-right">P.U.</th>
+                                    <th class="border-b px-3 py-2.5 font-medium w-24">No.</th>
+                                    <th class="border-b px-3 py-2.5 font-medium">Descripción</th>
+                                    <th class="border-b px-3 py-2.5 font-medium w-24">Unidad</th>
+                                    <th class="border-b px-3 py-2.5 font-medium w-28 text-right">Cantidad</th>
+                                    <th class="border-b px-3 py-2.5 font-medium w-32 text-right">P.U.</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y">
                                 <tr v-for="(partida, idx) in state.resultado.partidas" :key="idx" :class="[
-                                    partida.esPadre ? 'bg-muted/20 font-medium' : 'bg-background',
+                                    partida.esPadre ? 'sticky top-[37px] z-[5] bg-muted/60 font-semibold backdrop-blur-sm' : 'bg-background',
                                     partida.errores.length > 0 ? 'bg-red-50/50' : ''
                                 ]">
 
@@ -184,7 +186,7 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
                                     <!-- Celda Descripción -->
                                     <td class="px-3 py-2 border-r align-top"
                                         :class="{ 'bg-red-100/50 text-red-900': erroresDeCelda(partida.errores, 'descripcion') }">
-                                        <div class="flex items-start gap-1">
+                                        <div class="flex items-start gap-1" :class="!partida.esPadre ? 'pl-4' : ''">
                                             <AlertCircle v-if="erroresDeCelda(partida.errores, 'descripcion')"
                                                 class="size-4 text-red-500 shrink-0 mt-0.5" />
                                             <span>{{ partida.descripcion || '(vacío)' }}</span>
@@ -226,7 +228,7 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
                                             <AlertCircle v-if="erroresDeCelda(partida.errores, 'precio_unitario')"
                                                 class="size-4 text-red-500 shrink-0 mt-0.5" />
                                             <span v-if="!partida.esPadre">{{ partida.precioUnitario || '(vacío)'
-                                                }}</span>
+                                            }}</span>
                                         </div>
                                         <div v-if="erroresDeCelda(partida.errores, 'precio_unitario')"
                                             class="text-[11px] text-red-600 mt-1 leading-tight text-right">
@@ -240,13 +242,13 @@ function erroresDeCampo(errores: HeaderFieldError[], campo: string): string {
                 </template>
             </div>
 
-            <DialogFooter class="sm:justify-between items-center border-t pt-4">
+            <DialogFooter class="shrink-0 items-center gap-2 border-t px-6 py-4 sm:justify-between">
                 <div class="flex-1 flex items-center gap-2">
                     <template v-if="state.resultado">
                         <div v-if="tieneErrores" class="flex items-center gap-2 text-red-600 font-medium">
                             <X class="size-5" />
                             <span>{{ totalErrores }} {{ totalErrores === 1 ? 'error detectado' : 'errores detectados'
-                                }}.</span>
+                            }}.</span>
                             <span class="text-sm font-normal text-muted-foreground ml-2 hidden sm:inline">Corrige el
                                 Excel y vuelve a subirlo.</span>
                         </div>
