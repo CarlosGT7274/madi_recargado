@@ -3,12 +3,14 @@
 namespace App\Actions\Ingenierias\Planeacion;
 
 use App\Actions\Notificaciones\NotificacionesAction;
+use App\Models\CompromisoEntrega;
 use App\Models\Permiso;
 use App\Models\Planeacion;
 use App\Models\Planta;
 use App\Models\Proyecto;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Accion;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -107,14 +109,6 @@ class PlaneacionesAction
         ];
     }
 
-    /**
-     * Fuente única del calendario anual del Supervisor (Planificador.vue).
-     * Para un supervisor, trae TODAS las planeaciones de las plantas que
-     * tiene asignadas (plantasAsignadas()), sin filtrar por usuario_id —
-     * es justamente lo que le permite ver lo que le llega a supervisar,
-     * no solo lo propio. Para alguien sin permiso de supervisar, cae en
-     * lo mismo que MisPlaneaciones.vue: solo lo suyo.
-     */
     public function listVistaGeneral(User $usuario): Collection
     {
         $query = $this->puedeSupervisar($usuario) ? Planeacion::query() : Planeacion::where('usuario_id', $usuario->id);
@@ -137,16 +131,11 @@ class PlaneacionesAction
 
     public function filtrosDisponibles(User $usuario): array
     {
-        $plantaIds = $usuario->plantasAsignadas()->pluck('plantas.id');
+        $plantas = Planta::orderBy('nombre')->get(['id', 'nombre']);
 
-        $plantas = Planta::whereIn('id', $plantaIds)->orderBy('nombre')->get(['id', 'nombre']);
+        $proyectos = Proyecto::orderBy('nombre')->get(['id', 'nombre', 'planta_id']);
 
-        $proyectos = Proyecto::whereIn('planta_id', $plantaIds)
-            ->orderBy('nombre')
-            ->get(['id', 'nombre', 'planta_id']);
-
-        $residentes = Planeacion::whereIn('planta_id', $plantaIds)
-            ->with('usuario:id,name')
+        $residentes = Planeacion::with('usuario:id,name')
             ->get()
             ->pluck('usuario')
             ->filter()
@@ -165,6 +154,7 @@ class PlaneacionesAction
     public function detail(Planeacion $planeacion): array
     {
         $planeacion->loadMissing('planta', 'proyecto', 'usuario', 'aprobador');
+        $planeacion->usuario?->loadMissing('compromisos');
 
         return [
             'id' => $planeacion->id,
@@ -195,21 +185,28 @@ class PlaneacionesAction
             'puedeEliminar' => $planeacion->estado === 'borrador' && $planeacion->usuario_id === Auth::id(),
             'puedeEditar' => $planeacion->usuario_id === Auth::id()
                 && in_array($planeacion->estado, ['borrador', 'rechazada'], true),
-            'corte' => $this->corteInfoPara($planeacion),
+            'compromiso' => $this->compromisoInfoPara($planeacion),
         ];
     }
 
-    private function corteInfoPara(Planeacion $planeacion): ?array
+    /**
+     * Compromiso vigente (resuelto por especificidad) para el residente de
+     * esta Planeación, si tiene alguno.
+     */
+    private function compromisoInfoPara(Planeacion $planeacion): ?array
     {
-        $corte = $planeacion->usuario ? $this->corteEntregaDe($planeacion->usuario, $planeacion->anio, $planeacion->semana) : null;
+        $usuario = $planeacion->usuario;
+        $compromiso = $usuario?->compromisoVigentePara($planeacion);
 
-        if ($corte === null) {
+        if ($compromiso === null) {
             return null;
         }
 
         return [
-            'fecha' => $corte->format('d/m/Y H:i'),
-            'vencido' => now()->greaterThan($corte),
+            'id' => $compromiso->id,
+            'fecha' => $compromiso->fecha->format('d/m/Y H:i'),
+            'vencido' => $compromiso->vencido(),
+            'nota' => $compromiso->nota,
         ];
     }
 
@@ -254,11 +251,11 @@ class PlaneacionesAction
         abort_unless($planeacion->estado === 'borrador', 422, 'Solo una planeación en borrador puede enviarse.');
         abort_unless($planeacion->usuario_id === Auth::id(), 403, 'Solo el residente que la creó puede enviarla.');
 
-        $corte = $this->corteEntregaDe($planeacion->usuario, $planeacion->anio, $planeacion->semana);
+        $compromiso = $planeacion->usuario->compromisoVigentePara($planeacion);
 
-        if ($corte !== null && now()->greaterThan($corte)) {
+        if ($compromiso !== null && $compromiso->vencido()) {
             throw ValidationException::withMessages([
-                'corte' => "El corte de entrega para esta semana venció el {$corte->format('d/m/Y H:i')}. Contacta a tu supervisor.",
+                'compromiso' => "Tu fecha compromiso de entrega venció el {$compromiso->fecha->format('d/m/Y H:i')}. Contacta a tu supervisor.",
             ]);
         }
 
@@ -336,22 +333,6 @@ class PlaneacionesAction
         $planeacion->delete();
     }
 
-    /**
-     * Reemplaza al antiguo notificarIngenieros() (planta->ingenieros: una
-     * simple pivot sin ninguna verificación de permiso). El destinatario
-     * correcto de "enviada a aprobación" es quien de verdad puede
-     * supervisar/aprobar esta Planeación: usuarios con la operación
-     * `supervisar` en el permiso `ingenierias.planeacion` (mismo objeto
-     * que valida Role::tienePermiso()/puedePorEndpoint() en el resto del
-     * módulo), acotados a la planta de la Planeación vía
-     * plantasAsignadas() — el mismo criterio de alcance que ya usa
-     * PlaneacionesAction::listVistaGeneral()/filtrosDisponibles() para
-     * decidir qué ve un supervisor.
-     *
-     * Reutiliza NotificacionesAction::crearParaUsuarios(), que ya hace el
-     * broadcast(new NotificacionCreada(...)) por WebSocket — no se crea
-     * ningún canal, evento ni tabla nueva.
-     */
     private function notificarSupervisores(Planeacion $planeacion, string $mensaje): void
     {
         $supervisores = $this->supervisoresDe($planeacion);
@@ -369,13 +350,14 @@ class PlaneacionesAction
         ]);
     }
 
-    /**
-     * Usuarios que pueden supervisar ESTA Planeación: tienen operación
-     * `supervisar` sobre el permiso `ingenierias.planeacion` (vía algún
-     * rol que se la conceda) Y tienen la planta de la Planeación entre
-     * sus plantasAsignadas().
-     */
     private function supervisoresDe(Planeacion $planeacion): Collection
+    {
+        return $this->usuariosConOperacion('supervisar')
+            ->filter(fn (User $u) => $u->plantasAsignadas()->pluck('plantas.id')->contains($planeacion->planta_id))
+            ->values();
+    }
+
+    private function usuariosConOperacion(string $operacion): Collection
     {
         $permiso = Permiso::whereHas('padre', fn ($q) => $q->where('endpoint', 'ingenierias'))
             ->where('endpoint', 'planeacion')
@@ -387,23 +369,13 @@ class PlaneacionesAction
 
         return Role::with('usuarios')
             ->get()
-            ->filter(fn (Role $rol) => $rol->tieneOperacion($permiso, 'supervisar'))
+            ->filter(fn (Role $rol) => $rol->tieneOperacion($permiso, $operacion))
             ->flatMap(fn (Role $rol) => $rol->usuarios)
             ->unique('id')
+            ->sortBy('name')
             ->values();
     }
 
-    /**
-     * Corrige el cronograma de una Planeación en borrador o rechazada, sin
-     * crear una nueva fila. Si venía rechazada, la regresa a 'borrador' y
-     * limpia el comentario de rechazo — el residente vuelve a decidir si
-     * la envía ahora o sigue editando.
-     *
-     * OJO: borra y recrea las asignaciones, por lo que las incidencias
-     * ligadas a asignaciones que ya no existen se pierden (cascade). Es
-     * el mismo trade-off que Create.vue ya asume al armar el cronograma
-     * desde cero.
-     */
     public function actualizarCronograma(Planeacion $planeacion, array $data): Planeacion
     {
         abort_unless(in_array($planeacion->estado, ['borrador', 'rechazada'], true), 422, 'Solo una planeación en borrador o rechazada puede corregirse.');
@@ -434,30 +406,128 @@ class PlaneacionesAction
         return $planeacion->fresh();
     }
 
-    private function corteEntregaDe(User $usuario, int $anio, int $semana): ?Carbon
+    // =====================================================================
+    // Compromisos de entrega (compromisos_entrega): varios por usuario,
+    // cada uno opcionalmente ligado a planta/proyecto.
+    // =====================================================================
+
+    /**
+     * Lista para la columna "maestro" del modal del supervisor: un
+     * resumen por usuario (no el detalle de cada compromiso, eso lo trae
+     * compromisosDeUsuario() bajo demanda cuando se selecciona uno).
+     */
+    public function usuariosConCompromiso(): Collection
     {
-        return $usuario->empleado?->corteEntregaPara($anio, $semana);
+        $usuarios = $this->usuariosConOperacion(Accion::CREATE);
+
+        $usuarios->each->load('compromisos');
+
+        return $usuarios->map(function (User $u) {
+            $ordenados = $u->compromisos->sortBy('fecha');
+            $vigentes = $ordenados->reject(fn (CompromisoEntrega $c) => $c->vencido());
+            $proximo = $vigentes->first() ?? $ordenados->sortByDesc('fecha')->first();
+
+            return [
+                'id' => $u->id,
+                'nombre' => $u->name,
+                'totalCompromisos' => $u->compromisos->count(),
+                'vencidos' => $u->compromisos
+                    ->filter(fn (CompromisoEntrega $c) => $c->vencido())
+                    ->count(),
+                'proximaFecha' => $proximo?->fecha->toIso8601String(),
+            ];
+        });
     }
 
-    /** Empleados con cuenta de acceso, para la pantalla de configuración de cortes del supervisor. */
-    public function empleadosConCorte(): Collection
+    /** Detalle completo de compromisos de un usuario, para el panel derecho del modal. */
+    public function compromisosDeUsuario(User $usuario): Collection
     {
-        return Empleado::whereNotNull('user_id')
-            ->orderBy('nombre')
+        return $usuario->compromisos()
+            ->with('planta:id,nombre', 'proyecto:id,nombre,folio')
+            ->orderBy('fecha')
             ->get()
-            ->map(fn (Empleado $e) => [
-                'id' => $e->id,
-                'nombre' => $e->nombre,
-                'corteDiaSemana' => $e->corte_dia_semana,
-                'corteHora' => $e->corte_hora?->format('H:i'),
-                'corteSemanaRelativa' => $e->corte_semana_relativa,
-            ]);
+            ->map(fn (CompromisoEntrega $c) => $this->compromisoResumen($c));
     }
 
-    public function actualizarCorte(Empleado $empleado, array $data): Empleado
+    private function compromisoResumen(CompromisoEntrega $c): array
     {
-        $empleado->update($data);
+        return [
+            'id' => $c->id,
+            'fecha' => $c->fecha->toIso8601String(),
+            'nota' => $c->nota,
+            'vencido' => $c->vencido(),
+            'planta' => $c->planta ? ['id' => $c->planta->id, 'nombre' => $c->planta->nombre] : null,
+            'proyecto' => $c->proyecto ? ['id' => $c->proyecto->id, 'nombre' => $c->proyecto->nombre, 'folio' => $c->proyecto->folio] : null,
+        ];
+    }
 
-        return $empleado;
+    public function crearCompromiso(User $usuario, array $data): CompromisoEntrega
+    {
+        $compromiso = $usuario->compromisos()->create($data);
+
+        $this->notificarCompromiso($usuario, $compromiso, esNuevo: true);
+
+        return $compromiso;
+    }
+
+    public function actualizarCompromisoExistente(CompromisoEntrega $compromiso, array $data): CompromisoEntrega
+    {
+        $compromiso->update($data);
+        $compromiso->refresh();
+
+        $this->notificarCompromiso($compromiso->usuario, $compromiso, esNuevo: false);
+
+        return $compromiso;
+    }
+
+    public function eliminarCompromiso(CompromisoEntrega $compromiso): void
+    {
+        $usuario = $compromiso->usuario;
+        $alcance = $this->alcanceLabel($compromiso);
+
+        $compromiso->delete();
+
+        $this->notificaciones->crearParaUsuario($usuario, [
+            'mensaje' => "Tu supervisor quitó un compromiso de entrega ({$alcance}).",
+            'destino_area' => 'planeacion',
+            'modulo' => 'ingenierias.planeacion',
+            'tipo_entidad' => 'compromiso_entrega',
+            'entidad_id' => $usuario->id,
+        ]);
+    }
+
+    private function notificarCompromiso(User $usuario, CompromisoEntrega $compromiso, bool $esNuevo): void
+    {
+        $fechaLabel = $compromiso->fecha->format('d/m/Y H:i');
+        $alcance = $this->alcanceLabel($compromiso);
+        $accion = $esNuevo ? 'Nuevo compromiso de entrega' : 'Se actualizó tu compromiso de entrega';
+
+        $mensaje = "{$accion} ({$alcance}): {$fechaLabel}.";
+
+        if (! empty($compromiso->nota)) {
+            $mensaje .= " Nota de tu supervisor: {$compromiso->nota}";
+        }
+
+        $this->notificaciones->crearParaUsuario($usuario, [
+            'mensaje' => $mensaje,
+            'destino_area' => 'planeacion',
+            'modulo' => 'ingenierias.planeacion',
+            'tipo_entidad' => 'compromiso_entrega',
+            'entidad_id' => $compromiso->id,
+        ]);
+    }
+
+    private function alcanceLabel(CompromisoEntrega $compromiso): string
+    {
+        $compromiso->loadMissing('planta', 'proyecto');
+
+        if ($compromiso->proyecto) {
+            return $compromiso->proyecto->nombre;
+        }
+        if ($compromiso->planta) {
+            return $compromiso->planta->nombre;
+        }
+
+        return 'general';
     }
 }

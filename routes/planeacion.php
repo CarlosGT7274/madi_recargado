@@ -15,10 +15,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/nueva', [PlaneacionController::class, 'create'])
                 ->middleware('permiso:'.Accion::CREATE)->name('create');
         });
-    Route::get('/empleados/corte', [PlaneacionController::class, 'empleadosCorte'])
-        ->middleware('permiso:supervisar')->name('empleados.corte.index');
-    Route::put('/empleados/{empleado}/corte', [PlaneacionController::class, 'actualizarCorteEmpleado'])
-        ->middleware('permiso:supervisar')->name('empleados.corte.update');
+
+    Route::middleware('permiso:supervisar')
+        ->prefix('planeacion')
+        ->group(function () {
+            Route::get('/usuarios/corte', [PlaneacionController::class, 'usuariosCorte'])
+                ->name('ingenierias.planeacion.usuarios-corte');
+            Route::get('/usuarios/{user}/compromisos', [PlaneacionController::class, 'compromisosDeUsuario'])
+                ->name('ingenierias.planeacion.compromisos.index');
+            Route::post('/usuarios/{user}/compromisos', [PlaneacionController::class, 'storeCompromiso'])
+                ->name('ingenierias.planeacion.compromisos.store');
+            Route::put('/compromisos/{compromiso}', [PlaneacionController::class, 'actualizarCompromiso'])
+                ->name('ingenierias.planeacion.compromisos.update');
+            Route::delete('/compromisos/{compromiso}', [PlaneacionController::class, 'destroyCompromiso'])
+                ->name('ingenierias.planeacion.compromisos.destroy');
+        });
 
     Route::name('ingenierias.planeacion.plantas.proyectos.')
         ->prefix('planeacion/plantas/{planta}/proyectos/{proyecto}')
@@ -51,14 +62,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('permiso:'.Accion::UPDATE)->name('cronograma.update');
             Route::post('/reportar-nomina', [PlaneacionController::class, 'reportarNomina'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('reportar-nomina');
-
             Route::post('/asignaciones', [AsignacionController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('asignaciones.store');
             Route::put('/asignaciones/{asignacion}', [AsignacionController::class, 'update'])
                 ->middleware('permiso:'.Accion::UPDATE)->name('asignaciones.update');
             Route::delete('/asignaciones/{asignacion}', [AsignacionController::class, 'destroy'])
                 ->middleware('permiso:'.Accion::DELETE)->name('asignaciones.destroy');
-
             Route::post('/asignaciones/{asignacion}/incidencias', [IncidenciaController::class, 'store'])
                 ->middleware('permiso:'.Accion::CREATE)->name('incidencias.store');
         });

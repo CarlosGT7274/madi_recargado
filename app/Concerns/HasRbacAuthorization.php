@@ -152,12 +152,13 @@ trait HasRbacAuthorization
 
     private ?Collection $rolesActivosCache = null;
 
+    /** @var array<string, Permiso|null> */
+    private array $permisosCache = [];
+
     private function resolverPermisoPorEndpoint(string $endpoint): ?Permiso
     {
-        static $cache = [];
-
-        if (array_key_exists($endpoint, $cache)) {
-            return $cache[$endpoint];
+        if (array_key_exists($endpoint, $this->permisosCache)) {
+            return $this->permisosCache[$endpoint];
         }
 
         $padreId = null;
@@ -172,13 +173,13 @@ trait HasRbacAuthorization
 
             // Si no existe el segmento hijo en la BD, heredamos el permiso del padre más cercano.
             if ($hijo === null) {
-                return $cache[$endpoint] = $actual;
+                return $this->permisosCache[$endpoint] = $actual;
             }
 
             $actual = $hijo;
             $padreId = $actual->id;
         }
 
-        return $cache[$endpoint] = $actual;
+        return $this->permisosCache[$endpoint] = $actual;
     }
 }

@@ -9,14 +9,17 @@ use App\Actions\Ingenierias\Planeacion\PlaneacionAsignacionesAction;
 use App\Actions\Ingenierias\Planeacion\PlaneacionesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ingenierias\Planeacion\RechazarPlaneacionRequest;
+use App\Http\Requests\Ingenierias\Planeacion\StoreCompromisoEntregaRequest;
 use App\Http\Requests\Ingenierias\Planeacion\StorePlaneacionRequest;
-use App\Http\Requests\Ingenierias\Planeacion\UpdateCorteEntregaRequest;
+use App\Http\Requests\Ingenierias\Planeacion\UpdateCompromisoEntregaRequest;
 use App\Http\Requests\Ingenierias\Planeacion\UpdateCronogramaPlaneacionRequest;
+use App\Models\CompromisoEntrega;
 use App\Models\Cotizacion;
 use App\Models\Empleado;
 use App\Models\Planeacion;
 use App\Models\Planta;
 use App\Models\Proyecto;
+use App\Models\User;
 use App\Support\Accion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -43,36 +46,18 @@ class PlaneacionController extends Controller
         return Inertia::render('ingenierias/planeacion/MisPlaneaciones', [
             'puedeCrear' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::CREATE),
             'puedeEliminar' => $usuario->puedePorEndpoint('ingenierias.planeacion', Accion::DELETE),
+            'compromisos' => Inertia::defer(fn () => $action->compromisosDeUsuario($usuario)),
             'planeaciones' => Inertia::defer(fn () => $action->listVistaGeneral($usuario)),
         ]);
     }
 
     public function create(Request $request, PlaneacionesAction $action): Response
     {
-        $usuario = $request->user();
-        $puedeSupervisar = $action->puedeSupervisar($usuario);
-
-        $plantas = $puedeSupervisar
-            ? Planta::with('proyectos:id,planta_id,nombre,folio,tipo')
-                ->orderBy('nombre')
-                ->get(['id', 'nombre', 'folio'])
-                ->map(fn (Planta $p) => $this->plantaOpcion($p))
-                ->values()
-            : $usuario->proyectosAsignados()
-                ->with('planta:id,nombre,folio')
-                ->get()
-                ->groupBy('planta_id')
-                ->map(function ($proyectos) {
-                    $planta = $proyectos->first()->planta;
-
-                    return [
-                        'id' => $planta->id,
-                        'nombre' => $planta->nombre,
-                        'folio' => $planta->folio,
-                        'proyectos' => $proyectos->map(fn (Proyecto $p) => $this->proyectoOpcion($p))->values(),
-                    ];
-                })
-                ->values();
+        $plantas = Planta::with('proyectos:id,planta_id,nombre,folio,tipo')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'folio'])
+            ->map(fn (Planta $p) => $this->plantaOpcion($p))
+            ->values();
 
         return Inertia::render('ingenierias/planeacion/Create', [
             'plantas' => $plantas,
@@ -121,15 +106,6 @@ class PlaneacionController extends Controller
         return redirect()->route('ingenierias.planeacion.show', $planeacion->id);
     }
 
-    /**
-     * Además del detalle real, manda `empleados` y `partidasDisponibles`
-     * (árbol de actividades del proyecto, mismo formato que consume
-     * ActividadController::data()) porque Show.vue los necesita SIEMPRE
-     * que la planeación sea editable — el modo edición usa el mismo
-     * drag&drop que Create.vue. Antes no se mandaban y el componente
-     * tronaba en aplanar(undefined.flatMap) en cuanto puedeEditar
-     * pasaba a true.
-     */
     public function show(
         Planeacion $planeacion,
         PlaneacionesAction $action,
@@ -220,16 +196,43 @@ class PlaneacionController extends Controller
         return response()->json($action->disponibles($cotizacion));
     }
 
-    public function empleadosCorte(PlaneacionesAction $action): JsonResponse
+    // ------------------------------------------------------------------
+    // Compromisos de entrega
+    // ------------------------------------------------------------------
+
+    public function usuariosCorte(PlaneacionesAction $action): JsonResponse
     {
-        return response()->json($action->empleadosConCorte());
+        return response()->json($action->usuariosConCompromiso());
     }
 
-    public function actualizarCorteEmpleado(UpdateCorteEntregaRequest $request, Empleado $empleado, PlaneacionesAction $action): RedirectResponse
+    public function compromisosDeUsuario(User $user, PlaneacionesAction $action): JsonResponse
     {
-        $action->actualizarCorte($empleado, $request->validated());
+        return response()->json($action->compromisosDeUsuario($user));
+    }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Corte de entrega actualizado.']);
+    public function storeCompromiso(StoreCompromisoEntregaRequest $request, User $user, PlaneacionesAction $action): RedirectResponse
+    {
+        $action->crearCompromiso($user, $request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Compromiso de entrega creado.']);
+
+        return back();
+    }
+
+    public function actualizarCompromiso(UpdateCompromisoEntregaRequest $request, CompromisoEntrega $compromiso, PlaneacionesAction $action): RedirectResponse
+    {
+        $action->actualizarCompromisoExistente($compromiso, $request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Compromiso de entrega actualizado.']);
+
+        return back();
+    }
+
+    public function destroyCompromiso(CompromisoEntrega $compromiso, PlaneacionesAction $action): RedirectResponse
+    {
+        $action->eliminarCompromiso($compromiso);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Compromiso de entrega eliminado.']);
 
         return back();
     }
