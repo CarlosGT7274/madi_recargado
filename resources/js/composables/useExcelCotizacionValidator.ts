@@ -66,6 +66,18 @@ function str(valor: unknown): string {
 }
 
 /**
+ * Elimina comas de separador de miles de un string numérico (ej.
+ * "42,675.89" → "42675.89"). Excel con raw:false devuelve el número ya
+ * formateado según el numFmt de la celda, así que cualquier cantidad o
+ * precio con separador de miles llega con comas — Number() no las
+ * acepta y produce NaN, lo que antes se reportaba como "no es un
+ * número válido" para valores que en realidad sí lo son.
+ */
+function limpiarNumero(valor: string): string {
+    return valor.replace(/,/g, '');
+}
+
+/**
  * Formatea un objeto Date a "d/m/Y" (el formato que el backend
  * CotizacionExcelImport::parsearFecha entiende de primera mano).
  */
@@ -323,8 +335,14 @@ function validarPartidas(
         const no = str(fila[0]);
         const descripcion = str(fila[1]);
         const unidad = str(fila[2]);
-        const cantidad = str(fila[3]);
-        const precioUnitario = str(fila[4]);
+        // Excel (raw:false) entrega cantidad/precio ya formateados según el
+        // numFmt de la celda, lo que incluye comas de separador de miles
+        // (ej. "42,675.89"). Se limpian aquí — antes de validar y de
+        // guardar — para que tanto Number() como el backend reciban un
+        // número plano, y no se reporten como inválidos valores que en
+        // realidad sí lo son.
+        const cantidad = limpiarNumero(str(fila[3]));
+        const precioUnitario = limpiarNumero(str(fila[4]));
 
         // Fila completamente vacía — saltar
         if (!no && !descripcion && !unidad && !cantidad && !precioUnitario) continue;
